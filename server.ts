@@ -1,0 +1,627 @@
+import express, { Request, Response } from 'express';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
+import { GoogleGenAI } from '@google/genai';
+
+dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const app = express();
+const PORT = Number(process.env.PORT) || 3000;
+
+app.use(express.json({ limit: '10mb' }));
+
+// Simple in-memory IP-based rate limiting for /api/sleep/* (max 30 requests per minute) with periodic cleanup
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+
+// Periodic garbage collection every 5 minutes to prevent memory leak
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, data] of rateLimitMap.entries()) {
+    if (now > data.resetTime) {
+      rateLimitMap.delete(ip);
+    }
+  }
+}, 5 * 60 * 1000);
+
+app.use('/api/sleep/', (req: Request, res: Response, next) => {
+  const ip = req.ip || req.socket.remoteAddress || 'unknown';
+  const now = Date.now();
+  const windowMs = 60 * 1000;
+  const maxReq = 30;
+
+  const current = rateLimitMap.get(ip);
+  if (!current || now > current.resetTime) {
+    rateLimitMap.set(ip, { count: 1, resetTime: now + windowMs });
+    return next();
+  }
+
+  if (current.count >= maxReq) {
+    res.status(429).json({ error: '请求过于频繁，请稍后再试。' });
+    return;
+  }
+
+  current.count += 1;
+  next();
+});
+
+// Explicit PWA and Manifest endpoints
+app.get(['/manifest.json', '/manifest.webmanifest'], (_req: Request, res: Response) => {
+  res.sendFile(path.resolve(__dirname, 'public', 'manifest.json'), {
+    headers: { 'Content-Type': 'application/manifest+json; charset=utf-8' },
+  });
+});
+
+app.get('/sw.js', (_req: Request, res: Response) => {
+  res.sendFile(path.resolve(__dirname, 'public', 'sw.js'), {
+    headers: { 'Content-Type': 'application/javascript; charset=utf-8' },
+  });
+});
+
+app.get('/twa-manifest.json', (_req: Request, res: Response) => {
+  res.sendFile(path.resolve(__dirname, 'public', 'twa-manifest.json'), {
+    headers: { 'Content-Type': 'application/json; charset=utf-8' },
+  });
+});
+
+// Serve public static assets (manifest.json, sw.js, PNG icons) explicitly
+app.use(express.static(path.resolve(__dirname, 'public')));
+
+// Initialize Gemini Client
+const ai = new GoogleGenAI({
+  apiKey: process.env.GEMINI_API_KEY || '',
+  httpOptions: {
+    headers: {
+      'User-Agent': 'aistudio-build',
+    },
+  },
+});
+
+// Helper for calling Gemini with model fallback and error handling
+// Safe DeepSeek model normalizer
+function normalizeDeepSeekModel(modelName?: string): string {
+  if (!modelName) return 'deepseek-chat';
+  if (modelName === 'deepseek-flash') return 'deepseek-chat';
+  if (modelName === 'deepseek-pro') return 'deepseek-reasoner';
+  return modelName;
+}
+
+// SSRF Protection: Ensure custom baseUrl is HTTPS and not pointing to localhost, metadata service, or private IPs
+function isSafeHttpsUrl(urlString?: string): boolean {
+  if (!urlString) return false;
+  try {
+    const parsed = new URL(urlString);
+    if (parsed.protocol !== 'https:') return false;
+    const hostname = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, ''); // strip IPv6 brackets
+    
+    // Check loopbacks and cloud metadata
+    if (
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname === '0.0.0.0' ||
+      hostname === '::1' ||
+      hostname === '0:0:0:0:0:0:0:1' ||
+      hostname.startsWith('169.254.') || // Cloud Metadata service (AWS, GCP, Azure, OpenStack)
+      hostname.startsWith('fe80:') ||     // IPv6 Link-Local
+      hostname.startsWith('fc00:') ||     // IPv6 Unique Local
+      hostname.startsWith('fd00:') ||     // IPv6 Unique Local
+      hostname.startsWith('10.') ||
+      hostname.startsWith('192.168.') ||
+      hostname.startsWith('172.16.') ||
+      hostname.startsWith('172.17.') ||
+      hostname.startsWith('172.18.') ||
+      hostname.startsWith('172.19.') ||
+      hostname.startsWith('172.20.') ||
+      hostname.startsWith('172.21.') ||
+      hostname.startsWith('172.22.') ||
+      hostname.startsWith('172.23.') ||
+      hostname.startsWith('172.24.') ||
+      hostname.startsWith('172.25.') ||
+      hostname.startsWith('172.26.') ||
+      hostname.startsWith('172.27.') ||
+      hostname.startsWith('172.28.') ||
+      hostname.startsWith('172.29.') ||
+      hostname.startsWith('172.30.') ||
+      hostname.startsWith('172.31.') ||
+      hostname.startsWith('0x') ||        // Hex IP representations (e.g. 0x7f000001)
+      hostname.startsWith('00') ||        // Octal IP representations
+      hostname.endsWith('.internal') ||
+      hostname.endsWith('.local')
+    ) {
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Active recommended model with fallback
+const RECOMMENDED_GEMINI_MODEL = 'gemini-2.5-flash';
+
+async function callGeminiWithFallback(
+  fn: (model: string) => Promise<any>
+): Promise<any | null> {
+  if (!process.env.GEMINI_API_KEY) return null;
+
+  try {
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Model timeout after 20s')), 20000)
+    );
+    const result = await Promise.race([fn(RECOMMENDED_GEMINI_MODEL), timeoutPromise]);
+    if (result) return result;
+  } catch (err: any) {
+    console.warn(`Gemini call failed with ${RECOMMENDED_GEMINI_MODEL}:`, err?.message || err);
+  }
+  return null;
+}
+
+// Medical Clinical Sleep Engine Fallback (based on NSF & CBT-I guidelines)
+function generateClinicalSleepAnalysis(recentLogs: any[] = [], userProfile: any = {}) {
+  const count = recentLogs.length;
+  const avgDuration = count > 0 ? Math.round(recentLogs.reduce((acc, r) => acc + (r.durationMinutes || 0), 0) / count) : 450;
+  const avgDeep = count > 0 ? Math.round(recentLogs.reduce((acc, r) => acc + (r.deepSleepMinutes || 0), 0) / count) : 95;
+  const avgRem = count > 0 ? Math.round(recentLogs.reduce((acc, r) => acc + (r.remSleepMinutes || 0), 0) / count) : 90;
+  const avgScore = count > 0 ? Math.round(recentLogs.reduce((acc, r) => acc + (r.sleepScore || 0), 0) / count) : 82;
+  const avgEfficiency = count > 0 ? Math.round(recentLogs.reduce((acc, r) => acc + (r.sleepEfficiency || 0), 0) / count) : 88;
+  const avgLatency = count > 0 ? Math.round(recentLogs.reduce((acc, r) => acc + (r.latencyMinutes || 15), 0) / count) : 16;
+  const avgWake = count > 0 ? (recentLogs.reduce((acc, r) => acc + (r.wakeCount || 0), 0) / count).toFixed(1) : '1.0';
+
+  const deepPct = avgDuration > 0 ? Math.round((avgDeep / avgDuration) * 100) : 21;
+  const remPct = avgDuration > 0 ? Math.round((avgRem / avgDuration) * 100) : 20;
+
+  // Determine chronotype from average bedtime
+  let chronotype = '平衡蜂鸟型 (Hummingbird Chronotype)';
+  let chronotypeDesc = '您的昼夜生物钟具备良好的弹性与适应力，体内皮质醇与褪黑素节律平稳。建议维持固定作息以巩固深睡波峰。';
+  
+  if (recentLogs[0]?.bedtime) {
+    const [h] = recentLogs[0].bedtime.split(':').map(Number);
+    if (h >= 21 && h < 23) {
+      chronotype = '晨型云雀型 (Lark Chronotype)';
+      chronotypeDesc = '天生具备早睡早起基因，清晨皮质醇迅速攀升，前一日深度睡眠启动早，适合早间专注工作。';
+    } else if (h >= 0 || (h >= 23 && Number(recentLogs[0].bedtime.split(':')[1]) >= 45)) {
+      chronotype = '夜型猫头鹰型 (Owl Chronotype)';
+      chronotypeDesc = '褪黑素分泌峰值较常规推迟1-2小时，晚间思维活跃。建议睡前调暗卧室照度，避免强光抑制入眠。';
+    }
+  }
+
+  // Health Grade
+  let healthGrade = '良好 A';
+  if (avgScore >= 88) healthGrade = '优良 A+';
+  else if (avgScore >= 75) healthGrade = '良好 A';
+  else if (avgScore >= 65) healthGrade = '亚健康 B';
+  else healthGrade = '需调理 C';
+
+  // Gather habit mentions across recent logs
+  const allHabits = new Set<string>();
+  recentLogs.forEach((r) => {
+    (r.preSleepHabits || []).forEach((h: string) => allHabits.add(h));
+  });
+
+  const issues: string[] = [];
+  if (allHabits.has('screen_time')) {
+    issues.push('睡前手机蓝光（450-480nm波段）刺激视网膜视黑素受体，显著抑制下丘脑褪黑素自然脉冲分泌');
+  }
+  if (allHabits.has('caffeine')) {
+    issues.push('午后摄入咖啡因阻断腺苷受体清除，导致夜间睡眠压力（Homeostatic Sleep Drive）积累不足');
+  }
+  if (Number(avgWake) > 1.2) {
+    issues.push(`夜间平均觉醒 ${avgWake} 次，截断慢波深睡（N3阶段）周期的完整性，易诱发晨起残余昏睡感`);
+  }
+  if (avgLatency > 22) {
+    issues.push('入睡潜伏期偏长（超20分钟），表明睡前交感神经过度兴奋，副交感神经未能及时切换接管');
+  }
+  if (issues.length === 0) {
+    issues.push('作息节律相对稳定，需注意换季气温及光照变化对松果体生物钟的轻微扰动');
+  }
+
+  const hours = (avgDuration / 60).toFixed(1);
+  const targetH = userProfile?.targetDurationHours || 8;
+  const debt = (targetH - Number(hours)).toFixed(1);
+
+  return {
+    chronotype,
+    chronotypeDescription: chronotypeDesc,
+    overallHealthGrade: healthGrade,
+    scoreSummary: `近${count || 7}天平均睡眠${hours}小时，深睡率${deepPct}%，总体处于${healthGrade}水平。`,
+    clinicalMetricsAnalysis: {
+      durationAssessment: `周期平均睡眠时长为 ${hours} 小时（目标 ${targetH} 小时），睡眠债务差额约 ${debt} 小时。总体时长${Math.abs(Number(debt)) <= 0.5 ? '充足合理，利于神经元代谢更新' : '稍显不足，建议周末避免过度补觉以免打乱时相'}。`,
+      deepSleepAssessment: `深睡眠（慢波期N3）平均达 ${avgDeep} 分钟，占总睡眠比 ${deepPct}%（临床推荐健康值为 15%-25%）。该阶段脑脊液加速冲洗大脑代谢废物（含β-淀粉样蛋白），对体力与免疫修复至关重要。`,
+      remSleepAssessment: `快速眼动期(REM)平均 ${avgRem} 分钟，占比 ${remPct}%（参考健康值为 20%-25%）。此时脑电波接近清醒，是白天工作情绪过滤、记忆长时存储与创造力神经重组的关键窗口。`,
+      efficiencyAssessment: `睡眠效率评分为 ${avgEfficiency}%（临床优良阈值 >85%），卧床实际入睡时间占比良好，夜间偶有 ${avgWake} 次微觉醒，均在良性生理范围内。`,
+      sleepLatencyAssessment: `平均入睡潜伏期为 ${avgLatency} 分钟（健康参考 10-20 分钟），反映睡前神经松弛机制运行顺畅。`,
+    },
+    identifiedIssues: issues,
+    personalizedRecommendations: [
+      {
+        timeWindow: '白天 / 午后 (07:00 - 15:00)',
+        action: '晨间自然日光浴与午后咖啡因阻断',
+        detail: '晨起30分钟内接触15-20分钟户外阳光，抑制残留褪黑素并校准视交叉上核生物钟；设定下午14:00为咖啡因硬截止时间。',
+        impact: '增强夜间自然睡眠驱动力，缩短入睡潜伏期约10分钟',
+      },
+      {
+        timeWindow: '睡前减速期 (21:30 - 22:45)',
+        action: '40℃温水沐浴与4-7-8神经降噪呼吸',
+        detail: '睡前1小时温水洗澡使外周血管舒张、核心体温快速下降；在床上配合APP内4-7-8呼吸引导完成3-4轮，激活迷走神经。',
+        impact: '促进深睡眠启动，预计提升深睡占比15-20分钟',
+      },
+      {
+        timeWindow: '夜间睡眠微气候调控',
+        action: '卧室控温与白噪音掩蔽',
+        detail: '保持室温在19-21℃、湿度50%-60%，遮挡所有LED光源；枕边可微量播放APP内深海潮汐或Theta脑波助眠曲。',
+        impact: '减少后半夜翻身微觉醒，维持深睡眠连续性',
+      },
+    ],
+    mindsetAffirmation: '允许思绪如云朵般悄然飘过，黑夜是身体自我治愈的神圣时刻，今晚您将拥有一场深沉安稳的修复之旅。',
+  };
+}
+
+// Clinical Sleep Coach Chat Fallback
+function generateClinicalChatResponse(messages: any[] = [], currentSleepStats: any = {}): string {
+  const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user')?.content || '';
+  const text = lastUserMsg.toLowerCase();
+
+  const score = currentSleepStats?.latestScore || 85;
+  const deep = currentSleepStats?.deepSleepMin || 90;
+
+
+  if (text.includes('不打呼') || text.includes('打呼噜') || text.includes('鼾声') || text.includes('可行') || text.includes('检测') || text.includes('原理')) {
+    return `这是一个非常专业且切中要害的问题！很多朋友误以为“手机测睡眠就是录打呼噜”，其实完全不是：\n\n1. 🫁 **体动节律学 (Actigraphy) 是核心**：\n医学研究表明，人类进入非快速眼动期（N1-N3）特别是慢波深睡眠时，全身横纹肌张力会降至极低，翻身和肢体位移基本归零；而在浅睡或觉醒阶段，会有频繁的翻身与被褥摩擦微动。手机即使放在床头柜或枕边，麦克风监测的主要是这种**床品摩擦频次和呼吸起伏的周期性包络**，而不是只听鼾声！\n\n2. 📊 **呼吸频率深浅变化**：\n深睡时呼吸深长平缓（约12-14次/分），浅睡与REM梦境期呼吸较快且不规则。即便您呼吸非常安静、完全不打呼噜，声波的微小周期性起伏依然能提供可靠特征。\n\n3. 💡 **如果您觉得夜间放手机太繁琐**：\n您完全不需要整夜开启夜间监测！每天早上起床后，只需在APP首页点击【晨起极速记录】，花3秒钟填一下入睡和起床时间，APP就能根据人类生理周期模型（每90分钟一个轮次）自动推导出高精度的深睡、REM比例与睡眠健康分，完全零打扰、不耗电、不录音！`;
+  }
+
+  if (text.includes('深睡') || text.includes('深度睡眠') || text.includes('提升')) {
+    return `提升深睡眠（慢波N3阶段）是恢复脑力与免疫的关键！根据您的近期数据（深睡约${deep}分钟），建议您采取以下3个医学实证方法：\n\n1. 🛁 **睡前90分钟温水浴（40℃）**：洗澡后走出浴室，外周毛细血管扩张会驱动核心体温迅速下降0.5-1℃，这是大脑启动深慢波睡眠的关键神经信号。\n2. ☀️ **早晨户外日光暴露15分钟**：早晨强光会设定当晚松果体褪黑素的定时释放闹钟。\n3. 🧘 **避免晚间饱餐与饮酒**：胃肠蠕动和酒精分解会提高夜间心率，直接压制下丘脑进入深睡眠。您可以今晚试一下APP里的“4-7-8神经降噪呼吸法”，能有效辅助深睡启动！`;
+  }
+
+  if (text.includes('睡不着') || text.includes('失眠') || text.includes('翻来覆去') || text.includes('入睡困难')) {
+    return `翻来覆去睡不着时，最忌讳的是“努力想睡着”，因为越用力，交感神经越兴奋。医学上经典的 CBT-I（失眠认知行为疗法）建议：\n\n1. 🚶 **20分钟法则**：如果您在床上躺了超过20分钟仍无睡意，请离开床，坐在昏暗柔和的灯光下（不要看手机！），看一会儿纸质书或听听APP里的“窗畔细雨”声景。\n2. 🌬️ **4-7-8 腹式悬息**：用鼻子吸气4秒，屏气7秒，嘴巴柔和呼气8秒。这能直接刺激迷走神经，在生理层面降低血压和心率。\n3. 💡 **放下对睡眠时间的执念**：今晚即使睡不够8小时，人体次日也会通过自动增加深睡比例进行自我代偿。告诉自己“我现在只是闭目养神，身体已经在休息了”。`;
+  }
+
+  if (text.includes('醒来') || text.includes('夜醒') || text.includes('半夜') || text.includes('惊醒') || text.includes('早醒')) {
+    return `半夜醒来其实是非常正常的生理现象！每个成年人每晚都会经历4-6个睡眠周期（每个周期约90分钟），在周期交替时，大脑会短暂浮出水面进入微觉醒状态：\n\n1. 🚫 **切忌看手机或钟表**：一旦您看时间（比如发现是凌晨3:15），大脑会自动开始计算“天呐我只剩3小时能睡了”，瞬间分泌皮质醇，让您彻底清醒。\n2. 🫁 **保持闭眼，做微呼吸**：不需要睁开眼，手放在小腹上，感受呼吸的起伏。大多数微觉醒在3-5分钟内会重新滑入下一个睡眠周期。\n3. 🌡️ **检查环境温度与遮光**：后半夜体温下降，避免踢被子受凉，保持房间完全漆黑。`;
+  }
+
+  if (text.includes('咖啡') || text.includes('茶') || text.includes('咖啡因')) {
+    return `咖啡因对睡眠的影响因人而异：\n\n- ⏰ **半衰期科学事实**：咖啡因在健康成年人体内的平均半衰期约为5小时（个体差异通常在3-7小时之间，CYP1A2慢代谢人群可达8小时以上）。下午饮用浓茶或咖啡，到午夜时体内仍有相当浓度的活性分子在阻断腺苷受体。\n- 🎯 **科学建议**：建议设定**下午14:00为无咖啡因硬截止线**。下午若困倦，推荐快走5分钟、冷水洁面或饮用无咖啡因的大麦茶、洋甘菊茶替代。`;
+  }
+
+  if (text.includes('梦') || text.includes('多梦') || text.includes('噩梦')) {
+    return `很多人以为“多梦等于没睡好”，这其实是一个认知误区！\n\n做梦主要发生在 REM（快速眼动期），在这一阶段：\n1. 🧠 **情绪消磁**：大脑正在处理白天的压力、焦虑和记忆，相当于神经系统的“心灵自洁器”。\n2. 🧬 **神经可塑性**：如果能清晰回忆起梦境，通常说明您正好在一个睡眠周期的末端（REM期）醒来。\n只要白天精力充沛，多梦并不代表睡眠质量差。如果您经常做焦虑紧张的梦，建议睡前进行10分钟的纸质日记或APP助眠颂钵倾听，帮助睡前完成思绪着陆。`;
+  }
+
+  return `您好！我是您的极光睡眠伴侣。针对您昨晚的睡眠数据（综合评分约${score}分），您的昼夜生理节律总体保持在良好的自我调节状态。\n\n请随时告诉我您在入睡、夜醒、昼夜时差或睡前情绪上的任何疑问，也可以点击底栏的【助眠】模块，开启4-7-8呼吸法或自然声景，今晚为您守护深度安稳的睡眠！`;
+}
+
+// Sleep Analysis Endpoint
+app.post('/api/sleep/analyze', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { recentLogs, userProfile, aiConfig } = req.body;
+
+    const systemPrompt = `你是一位世界顶尖的睡眠医学与昼夜节律专家顾问（具备神经生物学与认知行为疗法 CBT-I 背景）。
+请基于用户近期记录的睡眠日志、作息习惯与生理指标，进行科学、温暖、高度个性化且具有可操作性的睡眠深度分析，并输出 JSON 格式。
+输出格式要求必须严格是 JSON 对象，键名如下：
+{
+  "chronotype": "识别出的生物节律时型（如：早起云雀型/晨型人、夜猫猫头鹰型/夜型人、温和中庸型、蜂鸟型）",
+  "chronotypeDescription": "该节律时型的生理特点与日常作息建议简评（60字以内）",
+  "overallHealthGrade": "评估等级（优良 A+ / 良好 A / 亚健康 B / 需调理 C）",
+  "scoreSummary": "一句话核心总结评价（25字以内）",
+  "clinicalMetricsAnalysis": {
+    "durationAssessment": "关于睡眠总时长的科学解读（与目标8小时对比、睡眠债务分析）",
+    "deepSleepAssessment": "深睡眠比例与大脑毒素排解/身体机能修复评价（正常应为15%-25%）",
+    "remSleepAssessment": "快速眼动期(REM)与情绪整合、记忆巩固评价（正常应为20%-25%）",
+    "efficiencyAssessment": "睡眠效率（实际睡着时间/卧床时间）评价（优良标准>85%）",
+    "sleepLatencyAssessment": "入睡潜伏期评价（健康范围10-20分钟）"
+  },
+  "identifiedIssues": [
+    "识别出的核心睡眠阻碍1（如：入睡前蓝光暴露抑制褪黑素释放）",
+    "识别出的核心睡眠阻碍2"
+  ],
+  "personalizedRecommendations": [
+    {
+      "timeWindow": "白天/午后 (07:00 - 18:00)",
+      "action": "具体建议标题",
+      "detail": "科学机理与具体实操细节",
+      "impact": "预计改善指标（如：提升深睡眠15分钟）"
+    },
+    {
+      "timeWindow": "睡前减速期 (21:30 - 23:00)",
+      "action": "具体建议标题",
+      "detail": "科学机理与具体实操细节",
+      "impact": "缩短入睡潜伏期"
+    },
+    {
+      "timeWindow": "夜间环境调控",
+      "action": "卧室环境优化",
+      "detail": "温度（建议18-20℃）、避光、白噪音运用等",
+      "impact": "减少夜醒频次"
+    }
+  ],
+  "mindsetAffirmation": "睡前放松心态寄语，舒缓焦虑（40字以内）"
+}
+请注意：只输出合法标准JSON字符串，不要添加任何Markdown标记或无关字符。`;
+
+    const userPrompt = `用户档案：${JSON.stringify(userProfile || { age: 28, targetHours: 8 })}
+近期睡眠记录数据：
+${JSON.stringify(recentLogs, null, 2)}
+
+请结合以上数据生成精准的睡眠医学诊断报告，返回纯JSON。`;
+
+    // Check if user specified custom AI provider (DeepSeek / Custom OpenAI Compatible)
+    if (aiConfig?.provider === 'deepseek' && aiConfig.deepseekApiKey) {
+      try {
+        const dsRes = await fetch('https://api.deepseek.com/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${aiConfig.deepseekApiKey.trim()}`,
+          },
+          body: JSON.stringify({
+            model: normalizeDeepSeekModel(aiConfig.deepseekModel),
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: userPrompt },
+            ],
+            response_format: { type: 'json_object' },
+            temperature: 0.3,
+          }),
+        });
+
+        if (dsRes.ok) {
+          const dsData = await dsRes.json();
+          const content = dsData.choices?.[0]?.message?.content?.trim();
+          if (content) {
+            const parsed = JSON.parse(content);
+            if (parsed.chronotype) {
+              res.json(parsed);
+              return;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('DeepSeek analysis failed, falling back:', err);
+      }
+    } else if (
+      aiConfig?.provider === 'custom_openai' &&
+      aiConfig.customApiKey &&
+      isSafeHttpsUrl(aiConfig.customBaseUrl)
+    ) {
+      try {
+        const baseUrl = aiConfig.customBaseUrl.replace(/\/+$/, '');
+        const customRes = await fetch(`${baseUrl}/chat/completions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${aiConfig.customApiKey.trim()}`,
+          },
+          body: JSON.stringify({
+            model: aiConfig.customModelName || 'gpt-4o-mini',
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: userPrompt },
+            ],
+            response_format: { type: 'json_object' },
+            temperature: 0.3,
+          }),
+        });
+
+        if (customRes.ok) {
+          const customData = await customRes.json();
+          const content = customData.choices?.[0]?.message?.content?.trim();
+          if (content) {
+            const parsed = JSON.parse(content);
+            if (parsed.chronotype) {
+              res.json(parsed);
+              return;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Custom API analysis failed, falling back:', err);
+      }
+    }
+
+    // Try Gemini model first with model fallback
+    const geminiResponse = await callGeminiWithFallback(async (modelName) => {
+      const response = await ai.models.generateContent({
+        model: modelName,
+        contents: userPrompt,
+        config: {
+          systemInstruction: systemPrompt,
+          responseMimeType: 'application/json',
+          temperature: 0.3,
+        },
+      });
+      const text = response.text?.trim();
+      if (!text) return null;
+      return JSON.parse(text);
+    });
+
+    if (geminiResponse && geminiResponse.chronotype) {
+      res.json(geminiResponse);
+      return;
+    }
+
+    // High quality clinical rule-based fallback
+    const fallbackResult = generateClinicalSleepAnalysis(recentLogs, userProfile);
+    res.json(fallbackResult);
+  } catch (error: any) {
+    console.error('Sleep analysis error:', error);
+    // Graceful fallback even on unexpected error
+    const fallback = generateClinicalSleepAnalysis(req.body?.recentLogs, req.body?.userProfile);
+    res.json(fallback);
+  }
+});
+
+// Sleep Coach Chat Consultation Endpoint
+app.post('/api/sleep/chat', async (req: Request, res: Response): Promise<void> => {
+  try {
+    // Normalize messages payload: accept messages array or { message, history }
+    let chatMessages: Array<{ role: string; content: string }> = [];
+    if (Array.isArray(req.body.messages) && req.body.messages.length > 0) {
+      chatMessages = req.body.messages;
+    } else if (Array.isArray(req.body.history)) {
+      chatMessages = [...req.body.history];
+      if (req.body.message) {
+        chatMessages.push({ role: 'user', content: req.body.message });
+      }
+    } else if (req.body.message) {
+      chatMessages = [{ role: 'user', content: req.body.message }];
+    }
+
+    const { currentSleepStats, aiConfig } = req.body;
+
+    const systemInstruction = `你叫“极光睡眠伴侣（Somna AI）”，是极光睡眠安卓客户端专属的随身睡眠健康顾问。
+你的语气：温柔、治愈、严谨专业、条理清晰，多用温和关切的词句，避免机械化的冷淡回答。
+你的专长：
+1. 解决失眠、多梦、早醒、半夜惊醒、睡眠呼吸浅、嗜睡困倦等问题。
+2. 指导科学助眠呼吸法（如4-7-8呼吸法、箱式呼吸、渐进式肌肉放松 Jacobson PMR）。
+3. 睡眠卫生学（褪黑素分泌规律、咖啡因半衰期、皮质醇节律、睡眠环境温湿度与光照）。
+4. 倒时差、夜班轮班作息调整。
+5. 解梦与晨间情绪疏导。
+
+当前用户的睡眠概况参考：
+${JSON.stringify(currentSleepStats || {}, null, 2)}
+
+回答要求：
+1. 语言简练亲切，通常在150-300字内，分段清晰或列出2-3个直接可行的点。
+2. 如果用户焦虑睡不着，优先给予温柔的心理降噪引导。
+3. 绝不盲目开处方药物，倡导非药物的认知行为调节与生活方式调整。`;
+
+    // 1. Check DeepSeek Custom Provider
+    if (aiConfig?.provider === 'deepseek' && aiConfig.deepseekApiKey) {
+      try {
+        const dsMessages = [
+          { role: 'system', content: systemInstruction },
+          ...chatMessages.map((m: any) => ({
+            role: m.role === 'assistant' ? 'assistant' : 'user',
+            content: m.content,
+          })),
+        ];
+
+        const dsRes = await fetch('https://api.deepseek.com/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${aiConfig.deepseekApiKey.trim()}`,
+          },
+          body: JSON.stringify({
+            model: normalizeDeepSeekModel(aiConfig.deepseekModel),
+            messages: dsMessages,
+            temperature: 0.7,
+          }),
+        });
+
+        if (dsRes.ok) {
+          const dsData = await dsRes.json();
+          const reply = dsData.choices?.[0]?.message?.content?.trim();
+          if (reply) {
+            res.json({ reply, provider: 'DeepSeek' });
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn('DeepSeek chat failed, falling back:', err);
+      }
+    }
+
+    // 2. Check Custom OpenAI Compatible Provider with SSRF Protection
+    if (
+      aiConfig?.provider === 'custom_openai' &&
+      aiConfig.customApiKey &&
+      isSafeHttpsUrl(aiConfig.customBaseUrl)
+    ) {
+      try {
+        const baseUrl = aiConfig.customBaseUrl.replace(/\/+$/, '');
+        const customMessages = [
+          { role: 'system', content: systemInstruction },
+          ...chatMessages.map((m: any) => ({
+            role: m.role === 'assistant' ? 'assistant' : 'user',
+            content: m.content,
+          })),
+        ];
+
+        const customRes = await fetch(`${baseUrl}/chat/completions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${aiConfig.customApiKey.trim()}`,
+          },
+          body: JSON.stringify({
+            model: aiConfig.customModelName || 'gpt-4o-mini',
+            messages: customMessages,
+            temperature: 0.7,
+          }),
+        });
+
+        if (customRes.ok) {
+          const customData = await customRes.json();
+          const reply = customData.choices?.[0]?.message?.content?.trim();
+          if (reply) {
+            res.json({ reply, provider: 'Custom' });
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn('Custom API chat failed, falling back:', err);
+      }
+    }
+
+    // 3. Built-in Gemini Fallback Chain
+    const contents = chatMessages.map((msg: any) => ({
+      role: msg.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: msg.content }],
+    }));
+
+    const geminiChatReply = await callGeminiWithFallback(async (modelName) => {
+      const response = await ai.models.generateContent({
+        model: modelName,
+        contents,
+        config: {
+          systemInstruction,
+          temperature: 0.7,
+        },
+      });
+      return response.text?.trim() || null;
+    });
+
+    if (geminiChatReply) {
+      res.json({ reply: geminiChatReply, provider: 'Gemini' });
+      return;
+    }
+
+    // 4. Professional clinical rule-based reply fallback
+    const fallbackReply = generateClinicalChatResponse(chatMessages, currentSleepStats);
+    res.json({ reply: fallbackReply, provider: 'ClinicalEngine' });
+  } catch (error: any) {
+    console.error('Sleep chat error:', error);
+    const fallbackReply = generateClinicalChatResponse([], req.body?.currentSleepStats);
+    res.json({ reply: fallbackReply, provider: 'ClinicalEngine' });
+  }
+});
+
+// Vite middleware or static serving
+async function setupServer() {
+  if (process.env.NODE_ENV !== 'production') {
+    const { createServer: createViteServer } = await import('vite');
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: 'spa',
+    });
+    app.use(vite.middlewares);
+  } else {
+    const distPath = path.resolve(__dirname, 'dist');
+    app.use(express.static(distPath));
+    app.get('*', (_req: Request, res: Response) => {
+      res.sendFile(path.resolve(distPath, 'index.html'));
+    });
+  }
+
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`[SomnaCare Server] Running on http://0.0.0.0:${PORT}`);
+  });
+}
+
+setupServer();

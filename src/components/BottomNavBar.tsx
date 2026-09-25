@@ -1,0 +1,60 @@
+import React from 'react';
+import { Moon, BarChart2, Sparkles, Sliders } from 'lucide-react';
+import { ThemeConfig } from '../utils/themeStyles';
+
+export type NavTab = 'today' | 'trends' | 'coach' | 'settings';
+
+interface BottomNavBarProps {
+  activeTab: NavTab;
+  onChangeTab: (tab: NavTab) => void;
+  theme: ThemeConfig;
+}
+
+export const BottomNavBar: React.FC<BottomNavBarProps> = ({ activeTab, onChangeTab, theme }) => {
+  const tabs: { key: NavTab; label: string; icon: React.ElementType }[] = [
+    { key: 'today', label: '睡眠', icon: Moon },
+    { key: 'trends', label: '趋势', icon: BarChart2 },
+    { key: 'coach', label: 'AI顾问', icon: Sparkles },
+    { key: 'settings', label: '偏好', icon: Sliders },
+  ];
+
+  return (
+    <nav
+      role="navigation"
+      aria-label="主标签栏"
+      className={`fixed bottom-0 left-0 right-0 z-50 w-full select-none ${theme.navBg} border-t ${theme.navBorder} px-4 py-2 pb-safe shadow-[0_-10px_30px_rgba(0,0,0,0.7)] transition-colors`}
+    >
+      <div className="grid grid-cols-4 items-center max-w-lg mx-auto">
+        {tabs.map((t) => {
+          const Icon = t.icon;
+          const isActive = activeTab === t.key;
+          return (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => onChangeTab(t.key)}
+              className="flex flex-col items-center justify-center min-h-[50px] py-1 px-2 rounded-xl transition-all group focus:outline-none cursor-pointer"
+            >
+              <div
+                className={`p-1.5 rounded-xl transition-all flex items-center justify-center ${
+                  isActive
+                    ? `${theme.navActiveText} ${theme.navActiveBg} shadow-sm`
+                    : `${theme.navInactiveText} group-hover:text-white`
+                }`}
+              >
+                <Icon className={`w-5 h-5 ${isActive ? 'stroke-[2.8]' : 'stroke-[2]'}`} />
+              </div>
+              <span
+                className={`text-xs mt-0.5 tracking-tight transition-colors ${
+                  isActive ? 'font-black text-white' : `${theme.navInactiveText} font-semibold`
+                }`}
+              >
+                {t.label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </nav>
+  );
+};

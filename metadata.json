@@ -1,0 +1,6 @@
+{
+  "name": "极光睡眠 (SomnaCare)",
+  "description": "专业安卓移动端睡眠记录与分析软件，提供多维睡眠质量深度洞察、实时入睡监测、白噪音助眠及Gemini AI个性化助眠建议。",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
