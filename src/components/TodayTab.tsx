@@ -160,7 +160,7 @@ export const TodayTab: React.FC<TodayTabProps> = ({
           className={`p-4 rounded-2xl ${theme.cardBg} border ${theme.cardBorder} hover:border-slate-500 text-left transition-all active:scale-[0.98] group cursor-pointer shadow-md`}
         >
           <div className="flex items-center justify-between mb-2">
-            <div className={`w-8 h-8 rounded-xl ${theme.cardInnerBg} text-amber-400 flex items-center justify-center border ${theme.cardBorder}`}>
+            <div className={`w-8 h-8 rounded-xl ${theme.cardInnerBg} ${theme.accentText} flex items-center justify-center border ${theme.cardBorder}`}>
               <Play className="w-4 h-4 fill-current ml-0.5" />
             </div>
             <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-white transition-colors" />
@@ -176,7 +176,7 @@ export const TodayTab: React.FC<TodayTabProps> = ({
         className={`p-4 rounded-2xl ${theme.cardBg} border ${theme.cardBorder} flex items-center justify-between cursor-pointer hover:border-slate-500 transition-all shadow-md`}
       >
         <div className="flex items-center gap-3">
-          <div className={`w-9 h-9 rounded-xl ${theme.cardInnerBg} text-violet-400 flex items-center justify-center border ${theme.cardBorder}`}>
+          <div className={`w-9 h-9 rounded-xl ${theme.cardInnerBg} ${theme.accentText} flex items-center justify-center border ${theme.cardBorder}`}>
             <Sparkles className="w-4 h-4" />
           </div>
           <div>
