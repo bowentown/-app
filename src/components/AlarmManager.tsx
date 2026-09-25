@@ -146,6 +146,17 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
     onUpdateAlarms(alarms.filter((a) => a.id !== id));
   };
 
+  // 调整已有闹钟的浅睡唤醒窗口（1-30 分钟步进）
+  const handleAdjustWindow = (id: string, delta: number) => {
+    onUpdateAlarms(
+      alarms.map((a) =>
+        a.id === id
+          ? { ...a, smartWakeWindowMinutes: Math.min(30, Math.max(1, (a.smartWakeWindowMinutes || 20) + delta)) }
+          : a
+      )
+    );
+  };
+
   const handleToggleDay = (day: number) => {
     if (newDays.includes(day)) {
       setNewDays(newDays.filter((d) => d !== day));
@@ -201,7 +212,7 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
         <div>
           <div className="flex items-center gap-2">
             <Bell className="w-4 h-4 text-indigo-400" />
-            <span className="text-sm font-black text-white">定时唤醒闹钟</span>
+            <span className="text-sm font-black text-white">定时唤醒</span>
             {nativeStatus.isNative && (
               <span className="text-[10px] font-black bg-emerald-950 text-emerald-300 border border-emerald-500/60 px-2 py-0.5 rounded-full flex items-center gap-1">
                 <ShieldCheck className="w-3 h-3" />
@@ -212,11 +223,11 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
           {!nativeStatus.isNative ? (
             <p className="text-[11px] text-amber-300/90 mt-0.5 font-medium flex items-center gap-1">
               <Smartphone className="w-3 h-3 shrink-0" />
-              <span>（提示：Web浏览器受沙箱限制无法后台唤醒；编译为 APK 即可由 Android 系统底层精确唤醒）</span>
+              <span>（Web 端仅页面打开时有效 · APK 版可系统级离线唤醒）</span>
             </p>
           ) : (
             <p className="text-[11px] text-slate-400 mt-0.5 font-medium">
-              已由 Android AlarmManager 底层托管，即使应用被杀或手机息屏也能准点响铃。
+              已由系统托管 · 杀进程与息屏均不影响响铃
             </p>
           )}
           {permissionHint && (
@@ -292,7 +303,7 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
           {/* Tone Selector & Preview */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <span className="text-xs text-white font-bold">唤醒音阶（手机扬声器实时发声）</span>
+              <span className="text-xs text-white font-bold">唤醒音阶</span>
               {testingTone && (
                 <button
                   type="button"
@@ -345,18 +356,37 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
             </div>
           </div>
 
-          {/* Smart Wake Toggle */}
-          <div className={`p-3 rounded-xl ${innerBg} border ${innerBorder} flex items-center justify-between`}>
-            <div>
-              <span className="text-xs text-white block font-bold">浅睡眠周期智能平缓唤醒</span>
-              <span className="text-[11px] text-slate-300">在闹钟前 10-30 分钟根据生物钟在轻睡期响铃</span>
+          {/* Smart Wake Toggle & Window */}
+          <div className={`p-3 rounded-xl ${innerBg} border ${innerBorder} space-y-2.5`}>
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-xs text-white block font-bold">浅睡唤醒</span>
+                <span className="text-[11px] text-slate-300">于设定时刻 ±{newSmartWindow} 分钟内平缓唤醒</span>
+              </div>
+              <input
+                type="checkbox"
+                checked={newSmartWake}
+                onChange={(e) => setNewSmartWake(e.target.checked)}
+                className="accent-indigo-600 w-5 h-5 rounded cursor-pointer"
+              />
             </div>
-            <input
-              type="checkbox"
-              checked={newSmartWake}
-              onChange={(e) => setNewSmartWake(e.target.checked)}
-              className="accent-indigo-600 w-5 h-5 rounded cursor-pointer"
-            />
+            {newSmartWake && (
+              <div className="flex items-center gap-3">
+                <span className="text-[10px] text-slate-400 font-mono">1m</span>
+                <input
+                  type="range"
+                  min={1}
+                  max={30}
+                  value={newSmartWindow}
+                  onChange={(e) => setNewSmartWindow(Number(e.target.value))}
+                  className="flex-1 accent-indigo-500 cursor-pointer"
+                />
+                <span className="text-[10px] text-slate-400 font-mono">30m</span>
+                <span className="text-[11px] text-indigo-300 font-mono font-bold w-9 text-right tabular-nums">
+                  {newSmartWindow}m
+                </span>
+              </div>
+            )}
           </div>
 
           <button
@@ -373,7 +403,7 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
       <div className="space-y-2.5">
         {alarms.length === 0 ? (
           <div className={`p-5 rounded-2xl ${innerBg} border ${innerBorder} text-center text-xs text-slate-300 font-medium`}>
-            暂无自定义闹钟，点击右上角【添加闹钟】设置
+            暂无闹钟 · 点右上角添加
           </div>
         ) : (
           alarms.map((alarm) => {
@@ -381,11 +411,11 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
               alarm.repeatDays.length === 7
                 ? '每天'
                 : alarm.repeatDays.length === 5 && !alarm.repeatDays.includes(6) && !alarm.repeatDays.includes(7)
-                ? '工作日 (周一至周五)'
+                ? '工作日'
                 : alarm.repeatDays.length === 2 && alarm.repeatDays.includes(6) && alarm.repeatDays.includes(7)
                 ? '周末'
                 : alarm.repeatDays.length === 0
-                ? '仅响一次'
+                ? '仅一次'
                 : `周 ${alarm.repeatDays.join('、')}`;
 
             return (
@@ -421,8 +451,24 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
                     <div className="text-xs text-slate-300 mt-0.5 flex items-center gap-2 font-medium">
                       <span>{dayText}</span>
                       {alarm.smartWakeEnabled && (
-                        <span className="text-indigo-300 bg-indigo-950 border border-indigo-600 px-1.5 py-0.5 rounded text-[11px] font-bold">
-                          浅睡唤醒 ±{alarm.smartWakeWindowMinutes}m
+                        <span className="inline-flex items-center text-indigo-300 bg-indigo-950 border border-indigo-600 px-1 py-0.5 rounded text-[11px] font-bold">
+                          <button
+                            type="button"
+                            title="减小唤醒窗口"
+                            onClick={() => handleAdjustWindow(alarm.id, -1)}
+                            className="px-1 hover:text-white cursor-pointer"
+                          >
+                            −
+                          </button>
+                          <span className="tabular-nums">浅睡唤醒 ±{alarm.smartWakeWindowMinutes}m</span>
+                          <button
+                            type="button"
+                            title="增大唤醒窗口"
+                            onClick={() => handleAdjustWindow(alarm.id, +1)}
+                            className="px-1 hover:text-white cursor-pointer"
+                          >
+                            +
+                          </button>
                         </span>
                       )}
                     </div>

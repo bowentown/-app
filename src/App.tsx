@@ -43,7 +43,14 @@ export const App: React.FC = () => {
     const saved = localStorage.getItem('somnacare_user_profile');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsedProfile = JSON.parse(saved) as UserProfile;
+        // 老默认闹钟名对称化：工作日 → 周内（仅迁移未改过名的默认项）
+        if (Array.isArray(parsedProfile?.alarms)) {
+          parsedProfile.alarms = parsedProfile.alarms.map((a) =>
+            a.label === '工作日温和唤醒' ? { ...a, label: '周内温和唤醒' } : a
+          );
+        }
+        return parsedProfile;
       } catch (e) {
         console.error('Failed to parse profile', e);
       }
@@ -64,7 +71,7 @@ export const App: React.FC = () => {
         {
           id: 'alarm-1',
           time: '07:30',
-          label: '工作日温和唤醒',
+          label: '周内温和唤醒',
           enabled: true,
           repeatDays: [1, 2, 3, 4, 5],
           tone: 'gentle_chime',

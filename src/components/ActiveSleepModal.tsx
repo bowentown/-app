@@ -19,8 +19,9 @@ export const ActiveSleepModal: React.FC<ActiveSleepModalProps> = ({
   const [currentDate, setCurrentDate] = useState('');
   const [startTime, setStartTime] = useState<Date>(new Date());
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const [decibels, setDecibels] = useState(28);
-  const [soundBars, setSoundBars] = useState<number[]>([12, 18, 14, 25, 20, 16, 12, 22, 19, 14]);
+  const [decibels, setDecibels] = useState<number | null>(null);
+  const [soundBars, setSoundBars] = useState<number[]>(Array(10).fill(6));
+  const [micStatus, setMicStatus] = useState<'requesting' | 'active' | 'unavailable'>('requesting');
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   const [activeSound, setActiveSound] = useState<'rain' | 'ocean' | 'bowl'>('rain');
 
@@ -33,7 +34,8 @@ export const ActiveSleepModal: React.FC<ActiveSleepModalProps> = ({
 
   const audioStreamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
-  const simTimerRef = useRef<any>(null);
+  const rafRef = useRef<number | null>(null);
+  const splSmoothRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -72,64 +74,68 @@ export const ActiveSleepModal: React.FC<ActiveSleepModalProps> = ({
     };
   }, [isOpen]);
 
-  // Attempt real microphone analyzer, or fall back to sleep ambient generator
+  // 真实麦克风采样：时域 RMS → dBFS → 估算环境声级；频域分桶 → 实时频谱柱。
+  // 关闭 AGC/降噪/回声消除，避免系统算法拉伸真实声级。数据仅在本机内存实时计算，不录制、不存储。
   const startNoiseDetection = async () => {
+    setMicStatus('requesting');
     try {
-      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true }).catch(() => null);
-        if (stream) {
-          audioStreamRef.current = stream;
-          const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-          const ctx = new AudioContextClass();
-          audioContextRef.current = ctx;
-          const source = ctx.createMediaStreamSource(stream);
-          const analyser = ctx.createAnalyser();
-          analyser.fftSize = 64;
-          source.connect(analyser);
-
-          const dataArray = new Uint8Array(analyser.frequencyBinCount);
-          const pollAudio = () => {
-            if (!audioContextRef.current) return;
-            analyser.getByteFrequencyData(dataArray);
-            let sum = 0;
-            const bars: number[] = [];
-            for (let i = 0; i < 10; i++) {
-              const val = dataArray[i * 2] || 0;
-              sum += val;
-              bars.push(Math.max(6, Math.round((val / 255) * 45)));
-            }
-            const avg = sum / 10;
-            const db = Math.round(25 + (avg / 255) * 45);
-            setDecibels(db);
-            setSoundBars(bars);
-            requestAnimationFrame(pollAudio);
-          };
-          pollAudio();
-          return;
-        }
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setMicStatus('unavailable');
+        return;
       }
-    } catch {
-      // Permission denied or not supported, continue with simulation
-    }
-
-    // Realistic ambient noise simulator
-    simTimerRef.current = setInterval(() => {
-      const baseDb = 26;
-      const noiseSpike = Math.random() > 0.88 ? Math.floor(Math.random() * 18) : Math.floor(Math.random() * 5);
-      const currentDb = baseDb + noiseSpike;
-      setDecibels(currentDb);
-
-      const newBars = Array.from({ length: 10 }, () => {
-        return Math.floor(8 + Math.random() * (currentDb > 35 ? 32 : 16));
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
       });
-      setSoundBars(newBars);
-    }, 450);
+      audioStreamRef.current = stream;
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      const ctx = new AudioContextClass();
+      if (ctx.state === 'suspended') await ctx.resume().catch(() => {});
+      audioContextRef.current = ctx;
+      const source = ctx.createMediaStreamSource(stream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 1024;
+      analyser.smoothingTimeConstant = 0.8;
+      source.connect(analyser);
+
+      const freq = new Uint8Array(analyser.frequencyBinCount);
+      const time = new Float32Array(analyser.fftSize);
+
+      const pollAudio = () => {
+        if (!audioContextRef.current) return;
+        // RMS → dBFS → 估算 SPL。手机麦克风灵敏度未校准，估算误差可达 ±10 dB，仅作环境参考。
+        // 全零样本（数字静音）按测量下限 25 dB 处理。
+        analyser.getFloatTimeDomainData(time);
+        let sumSquares = 0;
+        for (let i = 0; i < time.length; i++) sumSquares += time[i] * time[i];
+        const rms = Math.sqrt(sumSquares / time.length);
+        const spl = Math.min(110, Math.max(25, Math.round(100 + 20 * Math.log10(Math.max(rms, 1e-6)))));
+        // 指数平滑，避免数字跳动
+        splSmoothRef.current =
+          splSmoothRef.current === null ? spl : Math.round(splSmoothRef.current * 0.8 + spl * 0.2);
+        setDecibels(splSmoothRef.current);
+        analyser.getByteFrequencyData(freq);
+        const bars: number[] = [];
+        const bucket = Math.floor(freq.length / 10);
+        for (let b = 0; b < 10; b++) {
+          let peak = 0;
+          for (let i = 0; i < bucket; i++) peak = Math.max(peak, freq[b * bucket + i]);
+          bars.push(Math.max(6, Math.round((peak / 255) * 42)));
+        }
+        setSoundBars(bars);
+        rafRef.current = requestAnimationFrame(pollAudio);
+      };
+      rafRef.current = requestAnimationFrame(pollAudio);
+      setMicStatus('active');
+    } catch {
+      // 权限被拒或设备不支持：诚实降级，不伪造数据
+      setMicStatus('unavailable');
+    }
   };
 
   const stopNoiseDetection = () => {
-    if (simTimerRef.current) {
-      clearInterval(simTimerRef.current);
-      simTimerRef.current = null;
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
     }
     if (audioStreamRef.current) {
       audioStreamRef.current.getTracks().forEach((t) => t.stop());
@@ -139,6 +145,8 @@ export const ActiveSleepModal: React.FC<ActiveSleepModalProps> = ({
       audioContextRef.current.close().catch(() => {});
       audioContextRef.current = null;
     }
+    splSmoothRef.current = null;
+    setDecibels(null);
   };
 
   const toggleSound = (type: 'rain' | 'ocean' | 'bowl') => {
@@ -263,9 +271,11 @@ export const ActiveSleepModal: React.FC<ActiveSleepModalProps> = ({
             <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
               <div className="flex items-center gap-1.5">
                 <Volume2 className="w-3.5 h-3.5 text-indigo-400" />
-                <span>枕边环境声级估算</span>
+                <span>枕边环境声级 · 实时采样</span>
               </div>
-              <span className="font-mono text-slate-200 tabular-nums">~{decibels} dB(A)</span>
+              <span className="font-mono text-slate-200 tabular-nums">
+                {decibels !== null ? `~${decibels}` : '--'} dB(A)
+              </span>
             </div>
 
             {/* Waveform bars */}
@@ -274,16 +284,24 @@ export const ActiveSleepModal: React.FC<ActiveSleepModalProps> = ({
                 <div
                   key={i}
                   style={{ height: `${height}px` }}
-                  className="w-2 rounded-full bg-indigo-500/70 transition-all duration-150"
+                  className={`w-2 rounded-full transition-all duration-150 ${
+                    micStatus === 'active' ? 'bg-indigo-500/70' : 'bg-slate-700/50'
+                  }`}
                 />
               ))}
             </div>
             <div className="text-[11px] text-slate-400 mt-2 text-left space-y-0.5">
               <p className="text-slate-300 font-medium">
-                {decibels < 35 ? '🟢 环境安静 · 利于褪黑素分泌' : '🟡 监测到枕边环境动静或轻微杂音'}
+                {micStatus === 'active'
+                  ? decibels !== null && decibels < 40
+                    ? '🟢 环境安静 · 利于褪黑素分泌'
+                    : '🟡 检测到枕边环境动静或杂音'
+                  : micStatus === 'requesting'
+                  ? '🎙️ 正在请求麦克风权限...'
+                  : '🔕 麦克风未授权或不可用 · 无声级监测'}
               </p>
               <p className="text-[10px] text-slate-500">
-                （说明：基于麦克风环境声级参考估算，非医用多导睡眠图 PSG）
+                （真实麦克风采样估算，未声学校准 ±10 dB；数据仅本机实时计算，不录制不存储）
               </p>
             </div>
           </div>

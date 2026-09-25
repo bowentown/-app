@@ -84,11 +84,13 @@ jobs:
           echo "sdk.dir=$ANDROID_HOME" > android/local.properties
           
           # 注入 AndroidManifest 核心闹钟与通知权限 (Android 12/13/14 必需，进程级息屏唤醒)
+          # RECORD_AUDIO 供 WebView getUserMedia 做枕边环境声级采样（Capacitor 桥接运行时授权）
           sed -i '/<application/i \
           <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />\
           <uses-permission android:name="android.permission.USE_EXACT_ALARM" />\
           <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\
           <uses-permission android:name="android.permission.WAKE_LOCK" />\
+          <uses-permission android:name="android.permission.RECORD_AUDIO" />\
           <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />' android/app/src/main/AndroidManifest.xml
           
           # 统一 Kotlin 依赖，避免 duplicate class

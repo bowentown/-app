@@ -74,7 +74,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               <Palette className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-sm font-black text-white tracking-wide">界面主题色彩</h3>
+              <h3 className="text-sm font-black text-white tracking-wide">界面主题</h3>
             </div>
           </div>
           <span className="text-[11px] font-bold text-slate-400">
@@ -134,7 +134,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               <Sliders className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-sm font-black text-white">AI 顾问模型与角色人设</h3>
+              <h3 className="text-sm font-black text-white">AI 顾问</h3>
               <p className="text-xs text-slate-300">
                 当前运行：
                 <span className="text-indigo-300 font-bold ml-1">
@@ -159,8 +159,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           </button>
         </div>
 
-        <p className="text-xs text-slate-300 leading-relaxed font-medium">
-          已支持 DeepSeek 官方直连（Flash极速 / Pro专业推理）、端口可用模型在线探查，以及自定义临床医学顾问人设提示词。
+        <p className="text-xs text-slate-300 font-medium">
+          云端直连 · 端侧小模型 · 本地规则引擎，三级自由切换
         </p>
       </div>
 
@@ -171,8 +171,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             <Clock className="w-4 h-4" />
           </div>
           <div>
-            <h3 className="text-sm font-black text-white">作息节律与睡眠目标</h3>
-            <p className="text-xs text-slate-300">系统将依据此时间推算就寝窗口与入眠效率</p>
+            <h3 className="text-sm font-black text-white">作息目标</h3>
           </div>
         </div>
 
@@ -220,7 +219,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         <div className="flex items-center justify-between pb-2 border-b border-slate-700/60">
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span className="text-sm font-black text-white">健康数据备份与恢复</span>
+            <span className="text-sm font-black text-white">数据备份</span>
           </div>
           <span className={`text-[10px] ${theme.textMuted} font-mono`}>共 {records.length} 条记录</span>
         </div>
@@ -253,7 +252,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           className={`w-full py-2.5 rounded-xl ${theme.cardInnerBg} hover:opacity-80 border ${theme.cardInnerBorder} ${theme.textMuted} hover:text-white text-xs font-medium flex items-center justify-center gap-2 transition-all cursor-pointer`}
         >
           <RotateCcw className="w-3.5 h-3.5 opacity-60" />
-          <span>恢复预置示例睡眠数据（7天演示）</span>
+          <span>恢复示例数据（7天演示）</span>
         </button>
       </div>
 
