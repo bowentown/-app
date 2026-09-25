@@ -11,7 +11,6 @@ import {
   Check,
   Sun,
   ShieldCheck,
-  Smartphone,
 } from 'lucide-react';
 import { CustomAlarmSetting } from '../types/sleep';
 import { sleepAudio } from '../utils/audioSynth';
@@ -208,36 +207,20 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
       )}
 
       {/* Header with Add Button & Native Platform Status */}
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <Bell className="w-4 h-4 text-indigo-400" />
-            <span className="text-sm font-black text-white">定时唤醒</span>
+      <div className="space-y-1">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <Bell className="w-4 h-4 text-indigo-400 shrink-0" />
+            <span className="text-sm font-black text-white whitespace-nowrap">定时唤醒</span>
             {nativeStatus.isNative && (
-              <span className="text-[10px] font-black bg-emerald-950 text-emerald-300 border border-emerald-500/60 px-2 py-0.5 rounded-full flex items-center gap-1">
-                <ShieldCheck className="w-3 h-3" />
+              <span className="text-[10px] font-black bg-emerald-950 text-emerald-300 border border-emerald-500/60 px-2 py-0.5 rounded-full flex items-center gap-1 whitespace-nowrap">
+                <ShieldCheck className="w-3 h-3 shrink-0" />
                 <span>系统级精确唤醒已激活 ({nativeStatus.scheduledCount})</span>
               </span>
             )}
           </div>
-          {!nativeStatus.isNative ? (
-            <p className="text-[11px] text-amber-300/90 mt-0.5 font-medium flex items-center gap-1">
-              <Smartphone className="w-3 h-3 shrink-0" />
-              <span>（Web 端仅页面打开时有效 · APK 版可系统级离线唤醒）</span>
-            </p>
-          ) : (
-            <p className="text-[11px] text-slate-400 mt-0.5 font-medium">
-              已由系统托管 · 杀进程与息屏均不影响响铃
-            </p>
-          )}
-          {permissionHint && (
-            <p className="text-[11px] text-rose-300 mt-1 font-bold">
-              ⚠️ {permissionHint}
-            </p>
-          )}
-        </div>
 
-        <button
+          <button
           type="button"
           onClick={() => {
             if (isAdding) {
@@ -250,6 +233,20 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
         >
           {isAdding ? '取消' : <><Plus className="w-3.5 h-3.5 stroke-[3]" /><span>添加闹钟</span></>}
         </button>
+        </div>
+
+        {!nativeStatus.isNative ? (
+          <p className="text-[10px] text-amber-300/90 font-medium whitespace-nowrap">
+            （Web 端需保持页面打开 · APK 版可离线唤醒）
+          </p>
+        ) : (
+          <p className="text-[10px] text-slate-400 font-medium whitespace-nowrap">
+            已由系统托管 · 杀进程与息屏均不影响响铃
+          </p>
+        )}
+        {permissionHint && (
+          <p className="text-[11px] text-rose-300 font-bold">⚠️ {permissionHint}</p>
+        )}
       </div>
 
       {/* Add New Alarm Form */}
@@ -411,7 +408,7 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
               alarm.repeatDays.length === 7
                 ? '每天'
                 : alarm.repeatDays.length === 5 && !alarm.repeatDays.includes(6) && !alarm.repeatDays.includes(7)
-                ? '工作日'
+                ? '周内'
                 : alarm.repeatDays.length === 2 && alarm.repeatDays.includes(6) && alarm.repeatDays.includes(7)
                 ? '周末'
                 : alarm.repeatDays.length === 0
