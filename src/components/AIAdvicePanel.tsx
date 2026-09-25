@@ -30,7 +30,19 @@ interface AIAdvicePanelProps {
 export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfile, theme }) => {
   const [analysis, setAnalysis] = useState<SleepAnalysisResult | null>(null);
   const [isLoadingAnalysis, setIsLoadingAnalysis] = useState(false);
-  const [activeProviderName, setActiveProviderName] = useState<string>('DeepSeek');
+  const [activeProviderName, setActiveProviderName] = useState<string>(() => {
+    // 初始标签反映用户已保存的档位，而非写死的默认值
+    switch (userProfile.aiConfig?.provider) {
+      case 'local_llm':
+        return 'Qwen3-0.6B 端侧模型';
+      case 'local_rules':
+        return '本地临床规则引擎';
+      case 'custom_openai':
+        return '自建 API';
+      default:
+        return 'DeepSeek';
+    }
+  });
 
   // Chat consultation state
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
