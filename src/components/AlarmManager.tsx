@@ -212,12 +212,6 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
           <div className="flex items-center gap-2 min-w-0">
             <Bell className="w-4 h-4 text-indigo-400 shrink-0" />
             <span className="text-sm font-black text-white whitespace-nowrap">定时唤醒</span>
-            {nativeStatus.isNative && (
-              <span className="text-[10px] font-black bg-emerald-950 text-emerald-300 border border-emerald-500/60 px-2 py-0.5 rounded-full flex items-center gap-1 whitespace-nowrap">
-                <ShieldCheck className="w-3 h-3 shrink-0" />
-                <span>系统级精确唤醒已激活 ({nativeStatus.scheduledCount})</span>
-              </span>
-            )}
           </div>
 
           <button
@@ -240,9 +234,15 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
             （Web 端需保持页面打开 · APK 版可离线唤醒）
           </p>
         ) : (
-          <p className="text-[10px] text-slate-400 font-medium whitespace-nowrap">
-            已由系统托管 · 杀进程与息屏均不影响响铃
-          </p>
+          <div className="flex items-center flex-wrap gap-x-2 gap-y-1">
+            <span className="text-[10px] font-black bg-emerald-950 text-emerald-300 border border-emerald-500/60 px-2 py-0.5 rounded-full inline-flex items-center gap-1 whitespace-nowrap">
+              <ShieldCheck className="w-3 h-3 shrink-0" />
+              <span>系统级精确唤醒已激活 ({nativeStatus.scheduledCount})</span>
+            </span>
+            <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap">
+              杀进程与息屏均不影响响铃
+            </span>
+          </div>
         )}
         {permissionHint && (
           <p className="text-[11px] text-rose-300 font-bold">⚠️ {permissionHint}</p>
@@ -439,11 +439,11 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
                   </button>
 
                   <div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-2xl font-mono font-black tracking-tight text-white">
                         {alarm.time}
                       </span>
-                      <span className="text-xs text-white font-bold">{alarm.label}</span>
+                      <span className="text-xs text-white font-bold whitespace-nowrap">{alarm.label}</span>
                     </div>
                     <div className="text-xs text-slate-300 mt-0.5 flex items-center flex-wrap gap-x-2 gap-y-1 font-medium">
                       <span className="whitespace-nowrap">{dayText}</span>

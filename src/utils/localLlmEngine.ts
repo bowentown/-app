@@ -1,4 +1,4 @@
-import { Wllama } from '@wllama/wllama';
+import { Wllama, CacheManager } from '@wllama/wllama';
 import wasmUrl from '@wllama/wllama/esm/wasm/wllama.wasm?url';
 
 /**
@@ -6,8 +6,10 @@ import wasmUrl from '@wllama/wllama/esm/wasm/wllama.wasm?url';
  *
  * 运行形态：llama.cpp 编译为 WebAssembly，在 WebView 的 Worker 中做 CPU 推理。
  * - 纯 Web 技术栈：无需任何原生插件，PWA 与离线 APK 行为一致；
- * - 模型按需下载（约 462 MB），缓存于浏览器 OPFS，wllama 带 ETag 完整性校验；
- * - 未开跨域隔离时自动回落单线程（WebView 默认即单线程，速度较慢属预期）；
+ * - 模型按需下载（约 462 MB），由本模块自管缓存（Cache API，流式落盘不占内存）；
+ * - 不使用 wllama 内置缓存层：其默认 OPFS 后端在部分 Android WebView 上缺失
+ *   （无 navigator.storage.getDirectory），构造时即抛 "No supported storage backend found"，
+ *   因此向其注入一个直通后端，模型通过 loadModel(Blob) 喂入；
  * - 危机/用药安全护栏不在本模块内——由调用方（AIAdvicePanel）在进入本引擎之前拦截。
  */
 
@@ -18,7 +20,7 @@ export const LOCAL_LLM_MODEL = {
   fallbackUrl:
     'https://huggingface.co/bartowski/Qwen_Qwen3-0.6B-GGUF/resolve/main/Qwen_Qwen3-0.6B-Q4_K_M.gguf',
   label: 'Qwen3-0.6B (Q4_K_M)',
-  // 用于完整性参考的远端文件大小（约 462 MiB）
+  // 用于完整性参考与界面展示的远端文件大小（约 462 MiB）
   expectedBytes: 484_220_320,
   minFreeStorageBytes: 1_200_000_000, // 下载 + 解压缓冲余量
   minDeviceMemoryGB: 4,
@@ -26,6 +28,8 @@ export const LOCAL_LLM_MODEL = {
 
 /** 依次尝试的下载源 */
 const MODEL_SOURCES: string[] = [LOCAL_LLM_MODEL.url, LOCAL_LLM_MODEL.fallbackUrl];
+
+const LLM_CACHE_NAME = 'somnacare-llm-model';
 
 export interface LocalLlmSupport {
   supported: boolean;
@@ -46,9 +50,23 @@ let loadedUrl: string | null = null;
 let busy = false;
 
 /**
- * 环境与资源门控：内存 ≥4GB（deviceMemory 为粗粒度档位）且剩余存储 ≥1.2GB。
- * deviceMemory 不可用时放行（未知 ≠ 不支持），交由用户在设置页自行决定。
+ * 直通缓存后端：wllama 构造时会急切创建 CacheManager 并探测 OPFS，
+ * 在缺失 OPFS 的 WebView 上会直接抛错。模型缓存由本模块的 Cache API 自管，
+ * 引擎只通过 loadModel(Blob) 读取，因此这里注入一个恒可用的空后端绕过探测。
  */
+function createBypassCacheManager(): CacheManager {
+  const bypassBackend = { isSupported: () => true } as any;
+  return new CacheManager([bypassBackend]);
+}
+
+function createWllama(): Wllama {
+  return new Wllama(
+    { default: wasmUrl },
+    { allowOffline: true, cacheManager: createBypassCacheManager() }
+  );
+}
+
+/** 环境与资源门控：内存 ≥4GB（deviceMemory 为粗粒度档位）且剩余存储 ≥1.2GB。 */
 export async function getLocalLlmSupport(): Promise<LocalLlmSupport> {
   const nav = navigator as any;
   const deviceMemoryGB: number | null = typeof nav.deviceMemory === 'number' ? nav.deviceMemory : null;
@@ -73,6 +91,9 @@ export async function getLocalLlmSupport(): Promise<LocalLlmSupport> {
   } else if (freeStorageGB !== null && freeStorageGB < LOCAL_LLM_MODEL.minFreeStorageBytes / 1024 ** 3) {
     supported = false;
     reason = `剩余存储空间不足（${freeStorageGB.toFixed(1)}GB）`;
+  } else if (typeof caches === 'undefined') {
+    supported = false;
+    reason = '当前浏览器内核过旧，缺少模型缓存能力';
   }
 
   return { supported, reason, deviceMemoryGB, freeStorageGB };
@@ -92,100 +113,98 @@ export async function ensureStoragePersistence(): Promise<boolean> {
   return false;
 }
 
-/** 找出已成功缓存到本地的模型源 URL（可能来自任一下载源） */
-async function findCachedModelUrl(): Promise<string | null> {
-  const probe = new Wllama({ default: wasmUrl });
-  try {
-    for (const url of MODEL_SOURCES) {
-      try {
-        const name = await probe.cacheManager.getNameFromURL(url);
-        const size = await probe.cacheManager.getSize(name);
-        if (size !== null && size > 0) return url;
-      } catch {
-        // 该源未缓存，继续检查下一个
-      }
-    }
-  } finally {
-    await probe.exit();
-  }
-  return null;
+async function openModelCache(): Promise<Cache> {
+  return caches.open(LLM_CACHE_NAME);
 }
 
-/** 查询模型缓存状态（wllama 默认后端为 OPFS，按原始 URL 寻址） */
-export async function getLocalLlmCacheState(): Promise<LocalLlmCacheState> {
+/** 找出已成功缓存到本地的模型源 URL（可能来自任一下载源） */
+async function findCachedModelUrl(): Promise<string | null> {
+  if (typeof caches === 'undefined') return null;
   try {
-    const cachedUrl = await findCachedModelUrl();
-    if (cachedUrl) {
-      const probe = new Wllama({ default: wasmUrl });
-      try {
-        const name = await probe.cacheManager.getNameFromURL(cachedUrl);
-        const size = await probe.cacheManager.getSize(name);
-        if (size !== null && size > 0) {
-          return { cached: true, cachedBytes: size };
-        }
-      } finally {
-        await probe.exit();
-      }
+    const cache = await openModelCache();
+    for (const url of MODEL_SOURCES) {
+      const hit = await cache.match(url);
+      if (hit) return url;
     }
   } catch {
     // 查询失败按未下载处理
   }
-  return { cached: false, cachedBytes: 0 };
+  return null;
+}
+
+/** 查询模型缓存状态。缓存条目只在完整下载后写入，存在即完整。 */
+export async function getLocalLlmCacheState(): Promise<LocalLlmCacheState> {
+  const cachedUrl = await findCachedModelUrl();
+  if (!cachedUrl) return { cached: false, cachedBytes: 0 };
+  try {
+    const cache = await openModelCache();
+    const hit = await cache.match(cachedUrl);
+    const size = Number(hit?.headers.get('content-length') || 0);
+    return { cached: true, cachedBytes: size > 0 ? size : LOCAL_LLM_MODEL.expectedBytes };
+  } catch {
+    return { cached: true, cachedBytes: LOCAL_LLM_MODEL.expectedBytes };
+  }
 }
 
 /**
- * 下载模型到本地缓存（仅落盘，不载入内存，避免数百 MB 的内存尖峰）。
+ * 流式下载模型到 Cache API：边下边写盘，内存占用恒定（不积压 462MB 到内存）。
  * 多源依次尝试：任一源成功即返回；用户取消时立即中断不再尝试下一源。
+ * cache.put 只有在流被完整消费后才 resolve，因此缓存存在即下载完整。
  */
 export async function downloadLocalLlm(
   onProgress: (percent: number) => void,
   signal?: AbortSignal
 ): Promise<void> {
-  const wllama = new Wllama(
-    { default: wasmUrl },
-    { allowOffline: true, parallelDownloads: 3 }
-  );
-  let lastError: unknown = null;
-  try {
-    for (const url of MODEL_SOURCES) {
-      if (signal?.aborted) throw lastError ?? new Error('下载已取消');
-      try {
-        await wllama.cacheManager.download(url, {
-          progressCallback: ({ loaded, total }) => {
-            if (total > 0) onProgress(Math.min(100, Math.round((loaded / total) * 100)));
-          },
-          signal,
-        });
-        return; // 当前源下载成功
-      } catch (e: any) {
-        if (signal?.aborted) throw e; // 用户主动取消，不换源重试
-        lastError = e;
-        onProgress(0); // 复位进度，换下一源
-      }
-    }
-    throw lastError ?? new Error('所有下载源均不可用');
-  } finally {
-    await wllama.exit();
+  if (typeof caches === 'undefined') {
+    throw new Error('当前浏览器内核过旧，缺少模型缓存能力');
   }
+  let lastError: unknown = null;
+  for (const url of MODEL_SOURCES) {
+    if (signal?.aborted) throw lastError ?? new Error('下载已取消');
+    try {
+      const res = await fetch(url, { signal });
+      if (!res.ok || !res.body) throw new Error(`下载源响应异常 (HTTP ${res.status})`);
+
+      const total = Number(res.headers.get('content-length') || 0);
+      let loaded = 0;
+      const progressStream = new TransformStream({
+        transform(chunk, controller) {
+          loaded += chunk.byteLength;
+          if (total > 0) onProgress(Math.min(99, Math.round((loaded / total) * 100)));
+          controller.enqueue(chunk);
+        },
+      });
+      const streamedRes = new Response(res.body.pipeThrough(progressStream));
+
+      const cache = await openModelCache();
+      await cache.put(url, streamedRes);
+      onProgress(100);
+      return; // 当前源下载成功
+    } catch (e: any) {
+      if (signal?.aborted) throw e; // 用户主动取消，不换源重试
+      lastError = e;
+      onProgress(0); // 复位进度，换下一源
+    }
+  }
+  const detail = lastError instanceof Error ? lastError.message : String(lastError);
+  throw new Error(detail || '所有下载源均不可用');
 }
 
 /** 删除已缓存的模型文件 */
 export async function deleteLocalLlm(): Promise<void> {
-  const probe = new Wllama({ default: wasmUrl });
+  if (typeof caches === 'undefined') return;
   try {
-    await probe.cacheManager.delete(LOCAL_LLM_MODEL.url);
-    await probe.cacheManager.delete(LOCAL_LLM_MODEL.fallbackUrl);
+    const cache = await openModelCache();
+    for (const url of MODEL_SOURCES) {
+      await cache.delete(url);
+    }
   } finally {
-    await probe.exit();
-  }
-  if (loadedUrl !== null) {
-    // 缓存被删后常驻实例不再有效
     await unloadLocalLlm();
   }
 }
 
 /**
- * 流式生成对话回复。模型未加载时先用缓存加载（首次约需数秒）。
+ * 流式生成对话回复。模型未加载时从本地缓存读取 Blob 并载入（首次约需数秒）。
  * 返回完整回复文本；调用方通过 onToken 逐段收到增量。
  */
 export async function generateLocalLlmReply(
@@ -202,22 +221,22 @@ export async function generateLocalLlmReply(
   busy = true;
   try {
     if (!instance) {
-      instance = new Wllama(
-        { default: wasmUrl },
-        { allowOffline: true, parallelDownloads: 3 }
-      );
+      instance = createWllama();
     }
     if (!loadedUrl) {
       handlers.onStage?.('loading');
-      // 优先加载已缓存的源；本地没有任何缓存时才回退到主源（会触发在线下载）
       const cachedUrl = await findCachedModelUrl();
-      const loadFrom = cachedUrl ?? LOCAL_LLM_MODEL.url;
-      await instance.loadModelFromUrl(loadFrom, {
-        useCache: true,
-        n_ctx: 1024,
-        n_gpu_layers: 0,
-      });
-      loadedUrl = loadFrom;
+      if (!cachedUrl) {
+        throw new Error('模型尚未下载，请先在设置中下载');
+      }
+      const cache = await openModelCache();
+      const hit = await cache.match(cachedUrl);
+      const blob = await hit?.blob();
+      if (!blob || blob.size === 0) {
+        throw new Error('本地模型缓存读取失败，请删除后重新下载');
+      }
+      await instance.loadModel([blob], { n_ctx: 1024, n_gpu_layers: 0 });
+      loadedUrl = cachedUrl;
     }
     handlers.onStage?.('generating');
 
