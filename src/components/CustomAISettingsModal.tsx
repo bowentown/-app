@@ -61,10 +61,11 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
   const [queriedModels, setQueriedModels] = useState<string[]>([]);
   const [queryError, setQueryError] = useState<string | null>(null);
 
-  // 端侧小模型状态（支持性 / 缓存 / 下载进度）
+  // 端侧小模型状态（支持性 / 缓存 / 下载进度 / 错误）
   const [llmSupport, setLlmSupport] = useState<LocalLlmSupport | null>(null);
   const [llmCache, setLlmCache] = useState<LocalLlmCacheState | null>(null);
   const [llmProgress, setLlmProgress] = useState<number | null>(null);
+  const [llmError, setLlmError] = useState<string | null>(null);
   const llmAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -82,14 +83,20 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
   }, [isOpen]);
 
   const handleDownloadLlm = async () => {
+    setLlmError(null);
     await ensureStoragePersistence();
     setLlmProgress(0);
     const ac = new AbortController();
     llmAbortRef.current = ac;
     try {
       await downloadLocalLlm((percent) => setLlmProgress(percent), ac.signal);
-    } catch {
-      // 用户取消或网络失败：状态由进度条复位与缓存查询体现
+    } catch (e: any) {
+      if (!ac.signal.aborted) {
+        const detail = e?.message || String(e);
+        setLlmError(
+          `下载失败：${detail}。请检查网络能否访问 hf-mirror.com；若持续失败，请换 Chrome 浏览器重试，并把浏览器控制台（F12）里的红色报错发给我。`
+        );
+      }
     }
     llmAbortRef.current = null;
     setLlmProgress(null);
@@ -99,7 +106,12 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
   };
 
   const handleDeleteLlm = async () => {
-    await deleteLocalLlm();
+    setLlmError(null);
+    try {
+      await deleteLocalLlm();
+    } catch (e: any) {
+      setLlmError(`删除模型失败：${e?.message || e}`);
+    }
     const [s, c] = await Promise.all([getLocalLlmSupport(), getLocalLlmCacheState()]);
     setLlmSupport(s);
     setLlmCache(c);
@@ -311,6 +323,18 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
                   ) : (
                     <>⚠ 本设备不建议启用：{llmSupport.reason}。聊天仍可使用规则引擎档位。</>
                   )}
+                </div>
+              )}
+              {!llmSupport && !llmError && (
+                <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-700 text-[11px] text-slate-400">
+                  正在检测设备支持性...
+                </div>
+              )}
+
+              {/* 错误信息 */}
+              {llmError && (
+                <div className="p-2.5 rounded-xl bg-rose-950/40 border border-rose-800/60 text-[11px] text-rose-200 leading-relaxed">
+                  ❌ {llmError}
                 </div>
               )}
 

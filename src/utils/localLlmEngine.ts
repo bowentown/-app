@@ -12,7 +12,8 @@ import wasmUrl from '@wllama/wllama/esm/wasm/wllama.wasm?url';
  */
 
 export const LOCAL_LLM_MODEL = {
-  // 主源走 hf-mirror（中国大陆可达），备用源为 Hugging Face 官方
+  // 多源下载：hf-mirror 在中国大陆可达，但其 308 跳转响应可能缺失 CORS 头，
+  // 失败时自动降级到 Hugging Face 官方源（响应带 CORS 头），反之亦然。
   url: 'https://hf-mirror.com/bartowski/Qwen_Qwen3-0.6B-GGUF/resolve/main/Qwen_Qwen3-0.6B-Q4_K_M.gguf',
   fallbackUrl:
     'https://huggingface.co/bartowski/Qwen_Qwen3-0.6B-GGUF/resolve/main/Qwen_Qwen3-0.6B-Q4_K_M.gguf',
@@ -22,6 +23,9 @@ export const LOCAL_LLM_MODEL = {
   minFreeStorageBytes: 1_200_000_000, // 下载 + 解压缓冲余量
   minDeviceMemoryGB: 4,
 };
+
+/** 依次尝试的下载源 */
+const MODEL_SOURCES: string[] = [LOCAL_LLM_MODEL.url, LOCAL_LLM_MODEL.fallbackUrl];
 
 export interface LocalLlmSupport {
   supported: boolean;
@@ -88,15 +92,40 @@ export async function ensureStoragePersistence(): Promise<boolean> {
   return false;
 }
 
+/** 找出已成功缓存到本地的模型源 URL（可能来自任一下载源） */
+async function findCachedModelUrl(): Promise<string | null> {
+  const probe = new Wllama({ default: wasmUrl });
+  try {
+    for (const url of MODEL_SOURCES) {
+      try {
+        const name = await probe.cacheManager.getNameFromURL(url);
+        const size = await probe.cacheManager.getSize(name);
+        if (size !== null && size > 0) return url;
+      } catch {
+        // 该源未缓存，继续检查下一个
+      }
+    }
+  } finally {
+    await probe.exit();
+  }
+  return null;
+}
+
 /** 查询模型缓存状态（wllama 默认后端为 OPFS，按原始 URL 寻址） */
 export async function getLocalLlmCacheState(): Promise<LocalLlmCacheState> {
   try {
-    const probe = new Wllama({ default: wasmUrl });
-    const name = await probe.cacheManager.getNameFromURL(LOCAL_LLM_MODEL.url);
-    const size = await probe.cacheManager.getSize(name);
-    await probe.exit();
-    if (size !== null && size > 0) {
-      return { cached: true, cachedBytes: size };
+    const cachedUrl = await findCachedModelUrl();
+    if (cachedUrl) {
+      const probe = new Wllama({ default: wasmUrl });
+      try {
+        const name = await probe.cacheManager.getNameFromURL(cachedUrl);
+        const size = await probe.cacheManager.getSize(name);
+        if (size !== null && size > 0) {
+          return { cached: true, cachedBytes: size };
+        }
+      } finally {
+        await probe.exit();
+      }
     }
   } catch {
     // 查询失败按未下载处理
@@ -106,7 +135,7 @@ export async function getLocalLlmCacheState(): Promise<LocalLlmCacheState> {
 
 /**
  * 下载模型到本地缓存（仅落盘，不载入内存，避免数百 MB 的内存尖峰）。
- * 真正的加载发生在首次对话时。
+ * 多源依次尝试：任一源成功即返回；用户取消时立即中断不再尝试下一源。
  */
 export async function downloadLocalLlm(
   onProgress: (percent: number) => void,
@@ -116,13 +145,25 @@ export async function downloadLocalLlm(
     { default: wasmUrl },
     { allowOffline: true, parallelDownloads: 3 }
   );
+  let lastError: unknown = null;
   try {
-    await wllama.cacheManager.download(LOCAL_LLM_MODEL.url, {
-      progressCallback: ({ loaded, total }) => {
-        if (total > 0) onProgress(Math.min(100, Math.round((loaded / total) * 100)));
-      },
-      signal,
-    });
+    for (const url of MODEL_SOURCES) {
+      if (signal?.aborted) throw lastError ?? new Error('下载已取消');
+      try {
+        await wllama.cacheManager.download(url, {
+          progressCallback: ({ loaded, total }) => {
+            if (total > 0) onProgress(Math.min(100, Math.round((loaded / total) * 100)));
+          },
+          signal,
+        });
+        return; // 当前源下载成功
+      } catch (e: any) {
+        if (signal?.aborted) throw e; // 用户主动取消，不换源重试
+        lastError = e;
+        onProgress(0); // 复位进度，换下一源
+      }
+    }
+    throw lastError ?? new Error('所有下载源均不可用');
   } finally {
     await wllama.exit();
   }
@@ -168,12 +209,15 @@ export async function generateLocalLlmReply(
     }
     if (!loadedUrl) {
       handlers.onStage?.('loading');
-      await instance.loadModelFromUrl(LOCAL_LLM_MODEL.url, {
+      // 优先加载已缓存的源；本地没有任何缓存时才回退到主源（会触发在线下载）
+      const cachedUrl = await findCachedModelUrl();
+      const loadFrom = cachedUrl ?? LOCAL_LLM_MODEL.url;
+      await instance.loadModelFromUrl(loadFrom, {
         useCache: true,
         n_ctx: 1024,
         n_gpu_layers: 0,
       });
-      loadedUrl = LOCAL_LLM_MODEL.url;
+      loadedUrl = loadFrom;
     }
     handlers.onStage?.('generating');
 
