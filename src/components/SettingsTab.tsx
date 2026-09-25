@@ -141,10 +141,10 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   {userProfile.aiConfig?.provider === 'deepseek'
                     ? `DeepSeek (${userProfile.aiConfig.deepseekModel || 'deepseek-flash'})`
                     : userProfile.aiConfig?.provider === 'local_llm'
-                    ? '端侧小模型 (Qwen/Gemma)'
+                    ? '端侧小模型 (Qwen3)'
                     : userProfile.aiConfig?.provider === 'custom_openai'
-                    ? '自建 API 接口'
-                    : '极光本地医学规则引擎'}
+                    ? '自建 API'
+                    : '本地医学规则引擎'}
                 </span>
               </p>
             </div>
@@ -153,7 +153,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           <button
             type="button"
             onClick={() => setIsAIConfigOpen(true)}
-            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs shadow-md shadow-indigo-950 active:scale-95 transition-all cursor-pointer"
+            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs shadow-md shadow-indigo-950 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
           >
             配置与探查
           </button>

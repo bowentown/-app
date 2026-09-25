@@ -246,7 +246,7 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
             }
             setIsAdding(!isAdding);
           }}
-          className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black flex items-center gap-1.5 transition-colors cursor-pointer shadow-md"
+          className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black flex items-center gap-1.5 transition-colors cursor-pointer shadow-md whitespace-nowrap"
         >
           {isAdding ? '取消' : <><Plus className="w-3.5 h-3.5 stroke-[3]" /><span>添加闹钟</span></>}
         </button>
@@ -448,8 +448,8 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
                       </span>
                       <span className="text-xs text-white font-bold">{alarm.label}</span>
                     </div>
-                    <div className="text-xs text-slate-300 mt-0.5 flex items-center gap-2 font-medium">
-                      <span>{dayText}</span>
+                    <div className="text-xs text-slate-300 mt-0.5 flex items-center flex-wrap gap-x-2 gap-y-1 font-medium">
+                      <span className="whitespace-nowrap">{dayText}</span>
                       {alarm.smartWakeEnabled && (
                         <span className="inline-flex items-center text-indigo-300 bg-indigo-950 border border-indigo-600 px-1 py-0.5 rounded text-[11px] font-bold">
                           <button
