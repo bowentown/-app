@@ -1,5 +1,6 @@
 package com.somnacare.gemmallm;
 
+import android.app.ActivityManager;
 import android.content.Context;
 
 import com.getcapacitor.JSArray;
