@@ -1,8 +1,10 @@
 import React from 'react';
 import { SleepRecord, SleepStage } from '../types/sleep';
+import { ThemeConfig } from '../utils/themeStyles';
 
 interface SleepHypnogramProps {
   record: SleepRecord;
+  theme?: ThemeConfig;
 }
 
 const STAGE_CONFIG: Record<SleepStage, { label: string; color: string; yOffset: number; height: number }> = {
@@ -12,7 +14,12 @@ const STAGE_CONFIG: Record<SleepStage, { label: string; color: string; yOffset: 
   deep: { label: '深睡', color: '#6366f1', yOffset: 125, height: 26 },
 };
 
-export const SleepHypnogram: React.FC<SleepHypnogramProps> = ({ record }) => {
+export const SleepHypnogram: React.FC<SleepHypnogramProps> = ({ record, theme }) => {
+  const innerBg = theme?.cardInnerBg || 'bg-[#090d1a]';
+  const innerBorder = theme?.cardInnerBorder || 'border-slate-700/80';
+  const textSecondary = theme?.textSecondary || 'text-slate-300';
+  const textMuted = theme?.textMuted || 'text-slate-400';
+  const statBg = theme?.cardInnerBg || 'bg-[#0f172a]';
   const stages = record.stages || [];
   const totalMin = record.durationMinutes + record.awakeMinutes;
 
@@ -72,8 +79,8 @@ export const SleepHypnogram: React.FC<SleepHypnogramProps> = ({ record }) => {
     <div className="w-full space-y-3">
       <div className="flex items-center justify-between mb-2 text-xs">
         <div>
-          <span className="font-black text-white text-sm">90分钟脑波睡眠周期分布</span>
-          <span className="text-slate-300 font-mono ml-2 font-bold">
+          <span className={`font-black ${theme?.textPrimary || 'text-white'} text-sm`}>90分钟脑波睡眠周期分布</span>
+          <span className={`${textSecondary} font-mono ml-2 font-bold`}>
             {record.bedtime} - {record.wakeTime}
           </span>
         </div>
@@ -83,9 +90,9 @@ export const SleepHypnogram: React.FC<SleepHypnogramProps> = ({ record }) => {
       </div>
 
       {/* SVG Timeline Chart */}
-      <div className="relative w-full h-36 select-none bg-[#090d1a] rounded-2xl p-2.5 border border-slate-700/80 shadow-inner">
+      <div className={`relative w-full h-36 select-none ${innerBg} rounded-2xl p-2.5 border ${innerBorder} shadow-inner`}>
         {/* Stage Y-axis labels */}
-        <div className="absolute left-2.5 top-2.5 bottom-6 flex flex-col justify-between text-[10px] text-slate-400 font-semibold pointer-events-none z-10">
+        <div className={`absolute left-2.5 top-2.5 bottom-6 flex flex-col justify-between text-[10px] ${textMuted} font-semibold pointer-events-none z-10`}>
           <span className="text-rose-400">清醒</span>
           <span className="text-indigo-300">REM</span>
           <span className="text-sky-300">浅睡</span>
@@ -105,7 +112,7 @@ export const SleepHypnogram: React.FC<SleepHypnogramProps> = ({ record }) => {
         </svg>
 
         {/* Time X-axis */}
-        <div className="absolute left-10 right-2 bottom-1 flex justify-between text-[10px] text-slate-300 font-mono font-medium">
+        <div className={`absolute left-10 right-2 bottom-1 flex justify-between text-[10px] ${textSecondary} font-mono font-medium`}>
           <span>{record.bedtime}</span>
           <span>{getMidpointTime(record.bedtime, record.wakeTime)}</span>
           <span>{record.wakeTime}</span>
@@ -123,39 +130,39 @@ export const SleepHypnogram: React.FC<SleepHypnogramProps> = ({ record }) => {
 
         {/* Breakdown Legend */}
         <div className="grid grid-cols-4 gap-2 mt-3 text-center text-xs">
-          <div className="p-2 rounded-xl bg-[#0f172a] border border-slate-700/60 shadow-inner">
+          <div className={`p-2 rounded-xl ${statBg} border ${innerBorder} shadow-inner`}>
             <div className="flex items-center justify-center gap-1">
               <span className="w-2 h-2 rounded-full bg-indigo-500" />
-              <span className="text-xs text-slate-300 font-medium">深睡</span>
+              <span className={`text-xs ${textSecondary} font-medium`}>深睡</span>
             </div>
-            <span className="font-bold text-white mt-0.5 block tabular-nums text-sm">{record.deepSleepMinutes}分</span>
+            <span className={`font-bold ${theme?.textPrimary || 'text-white'} mt-0.5 block tabular-nums text-sm`}>{record.deepSleepMinutes}分</span>
             <span className="text-[10px] text-indigo-300 font-mono font-medium">{deepPercent}% (目标&gt;18%)</span>
           </div>
 
-          <div className="p-2 rounded-xl bg-[#0f172a] border border-slate-700/60 shadow-inner">
+          <div className={`p-2 rounded-xl ${statBg} border ${innerBorder} shadow-inner`}>
             <div className="flex items-center justify-center gap-1">
               <span className="w-2 h-2 rounded-full bg-sky-400" />
-              <span className="text-xs text-slate-300 font-medium">浅睡</span>
+              <span className={`text-xs ${textSecondary} font-medium`}>浅睡</span>
             </div>
-            <span className="font-bold text-white mt-0.5 block tabular-nums text-sm">{record.lightSleepMinutes}分</span>
+            <span className={`font-bold ${theme?.textPrimary || 'text-white'} mt-0.5 block tabular-nums text-sm`}>{record.lightSleepMinutes}分</span>
             <span className="text-[10px] text-sky-300 font-mono font-medium">{lightPercent}%</span>
           </div>
 
-          <div className="p-2 rounded-xl bg-[#0f172a] border border-slate-700/60 shadow-inner">
+          <div className={`p-2 rounded-xl ${statBg} border ${innerBorder} shadow-inner`}>
             <div className="flex items-center justify-center gap-1">
               <span className="w-2 h-2 rounded-full bg-indigo-300" />
-              <span className="text-xs text-slate-300 font-medium">REM</span>
+              <span className={`text-xs ${textSecondary} font-medium`}>REM</span>
             </div>
-            <span className="font-bold text-white mt-0.5 block tabular-nums text-sm">{record.remSleepMinutes}分</span>
+            <span className={`font-bold ${theme?.textPrimary || 'text-white'} mt-0.5 block tabular-nums text-sm`}>{record.remSleepMinutes}分</span>
             <span className="text-[10px] text-indigo-300 font-mono font-medium">{remPercent}% (目标&gt;20%)</span>
           </div>
 
-          <div className="p-2 rounded-xl bg-[#0f172a] border border-slate-700/60 shadow-inner">
+          <div className={`p-2 rounded-xl ${statBg} border ${innerBorder} shadow-inner`}>
             <div className="flex items-center justify-center gap-1">
               <span className="w-2 h-2 rounded-full bg-rose-400" />
-              <span className="text-xs text-slate-300 font-medium">清醒</span>
+              <span className={`text-xs ${textSecondary} font-medium`}>清醒</span>
             </div>
-            <span className="font-bold text-white mt-0.5 block tabular-nums text-sm">{record.awakeMinutes}分</span>
+            <span className={`font-bold ${theme?.textPrimary || 'text-white'} mt-0.5 block tabular-nums text-sm`}>{record.awakeMinutes}分</span>
             <span className="text-[10px] text-rose-300 font-mono font-medium">{awakePercent}%</span>
           </div>
         </div>

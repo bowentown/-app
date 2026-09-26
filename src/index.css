@@ -13,8 +13,35 @@
   /* Hide scrollbar for IE, Edge and Firefox */
   .no-scrollbar {
     -ms-overflow-style: none;  /* IE and Edge */
-    scrollbar-width: none;  /* Firefox */
+    scrollbar-width: none;  /* Firefox and Safari */
   }
+}
+
+/* 监测页：月亮呼吸（4s 一轮，幅度极小，助眠而非干扰） */
+@keyframes moon-breathe {
+  0%, 100% { transform: scale(1); opacity: 0.9; }
+  50% { transform: scale(1.05); opacity: 1; }
+}
+.animate-moon-breathe {
+  animation: moon-breathe 4s ease-in-out infinite;
+}
+
+/* 监测页：星点闪烁（配 transform: translate 定位使用） */
+@keyframes star-twinkle {
+  0%, 100% { opacity: 0.15; }
+  50% { opacity: 0.85; }
+}
+.animate-star-twinkle {
+  animation: star-twinkle 3s ease-in-out infinite;
+}
+
+/* Tab 切换淡入上浮（App.tsx 以 key 重挂载触发） */
+@keyframes tab-fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-tab-fade-in {
+  animation: tab-fade-in 180ms ease-out;
 }
 
 body {

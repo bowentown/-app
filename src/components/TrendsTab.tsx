@@ -30,6 +30,12 @@ interface TrendsTabProps {
 type MetricViewMode = 'quality' | 'stages' | 'circadian';
 
 export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, theme }) => {
+  const innerBg = theme?.cardInnerBg || 'bg-[#0a0f1d]';
+  const innerBorder = theme?.cardInnerBorder || 'border-slate-700/80';
+  const accentText = theme?.accentText || 'text-indigo-400';
+  const textMuted = theme?.textMuted || 'text-slate-400';
+  const textSecondary = theme?.textSecondary || 'text-slate-300';
+  const accentBg = theme.accentBg;
   const [viewMode, setViewMode] = useState<MetricViewMode>('quality');
   const [hoveredRecord, setHoveredRecord] = useState<SleepRecord | null>(null);
   const [isHistoryExpanded, setIsHistoryExpanded] = useState(false);
@@ -69,7 +75,7 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
       <div className="grid grid-cols-3 gap-2">
         <div className={`${theme.cardBg} rounded-2xl p-3 border ${theme.cardBorder} text-center`}>
           <span className={`text-[11px] font-medium ${theme.textMuted} block`}>近7日均分</span>
-          <span className="text-xl font-black font-mono text-indigo-400 tabular-nums">{avgScore}</span>
+          <span className={`text-xl font-black font-mono ${accentText} tabular-nums`}>{avgScore}</span>
         </div>
 
         <div className={`${theme.cardBg} rounded-2xl p-3 border ${theme.cardBorder} text-center`}>
@@ -88,16 +94,16 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
       {/* 2. Visual Trends Container */}
       <div className={`${theme.cardBg} rounded-3xl p-4 border ${theme.cardBorder} space-y-3`}>
         {/* Toggle Switch */}
-        <div className="flex items-center justify-between pb-2 border-b border-slate-700/50">
+        <div className={`flex items-center justify-between pb-2 border-b ${innerBorder}`}>
           <span className="text-xs font-bold text-white">趋势与结构</span>
 
-          <div className="flex bg-[#0a0f1d] p-1 rounded-xl border border-slate-700/80 text-[11px]">
+          <div className={`flex ${innerBg} p-1 rounded-xl border ${innerBorder} text-[11px]`}>
             <button
               type="button"
               onClick={() => setViewMode('quality')}
               className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer ${
                 viewMode === 'quality'
-                  ? 'bg-indigo-600 text-white shadow'
+                  ? accentBg + ' text-white shadow'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
@@ -108,7 +114,7 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
               onClick={() => setViewMode('stages')}
               className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer ${
                 viewMode === 'stages'
-                  ? 'bg-indigo-600 text-white shadow'
+                  ? accentBg + ' text-white shadow'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
@@ -119,7 +125,7 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
               onClick={() => setViewMode('circadian')}
               className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer ${
                 viewMode === 'circadian'
-                  ? 'bg-indigo-600 text-white shadow'
+                  ? accentBg + ' text-white shadow'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
@@ -135,7 +141,7 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
               <div className="absolute inset-x-3 top-4 border-b border-dashed border-emerald-500/30 flex justify-between text-[10px] text-emerald-400 font-mono">
                 <span>90分 达标线</span>
               </div>
-              <div className="absolute inset-x-3 top-18 border-b border-dashed border-slate-700/80 flex justify-between text-[10px] text-slate-500 font-mono">
+              <div className={`absolute inset-x-3 top-18 border-b border-dashed ${innerBorder} flex justify-between text-[10px] ${textMuted} font-mono`}>
                 <span>75分 警戒线</span>
               </div>
 
@@ -156,7 +162,7 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
 
                 <polyline
                   fill="none"
-                  stroke="#818cf8"
+                  stroke={theme.accentHex}
                   strokeWidth="3"
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -176,8 +182,8 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
                         cx={x}
                         cy={y}
                         r={isHovered ? 5.5 : 4}
-                        fill={isHovered ? '#ffffff' : '#818cf8'}
-                        stroke="#0f172a"
+                        fill={isHovered ? '#ffffff' : theme.accentHex}
+                        stroke={theme.accentHex}
                         strokeWidth="2"
                       />
                       {isHovered && (
@@ -198,13 +204,13 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
                 })}
               </svg>
 
-              <div className="flex justify-between text-[10px] text-slate-400 font-mono pt-1 border-t border-slate-800">
+              <div className={`flex justify-between text-[10px] ${textMuted} font-mono pt-1 border-t ${innerBorder}`}>
                 {last7Records.map((r) => (
                   <span
                     key={r.id}
                     onClick={() => setHoveredRecord(r)}
                     className={`cursor-pointer ${
-                      activeRecord?.id === r.id ? 'text-indigo-400 font-bold' : 'hover:text-white'
+                      activeRecord?.id === r.id ? accentText + ' font-bold' : 'hover:text-white'
                     }`}
                   >
                     {r.date.slice(5)}
@@ -239,7 +245,7 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
                           isHovered ? 'ring-2 ring-indigo-400 shadow' : ''
                         }`}
                       >
-                        <div style={{ height: `${deepPct}%` }} className="bg-indigo-600" />
+                        <div style={{ height: `${deepPct}%`, backgroundColor: theme.accentHex }} />
                         <div style={{ height: `${lightPct}%` }} className="bg-sky-400" />
                         <div style={{ height: `${remPct}%` }} className="bg-indigo-300" />
                         <div style={{ height: `${awakePct}%` }} className="bg-rose-400" />
@@ -247,7 +253,7 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
 
                       <span
                         className={`text-[9px] font-mono mt-1 ${
-                          isHovered ? 'text-indigo-400 font-bold' : 'text-slate-400'
+                          isHovered ? accentText + ' font-bold' : textMuted
                         }`}
                       >
                         {r.date.slice(5)}
@@ -257,10 +263,10 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
                 })}
               </div>
 
-              <div className="flex flex-col items-center gap-1 pt-1 border-t border-slate-800 text-[10px] text-slate-300">
+              <div className={`flex flex-col items-center gap-1 pt-1 border-t ${innerBorder} text-[10px] ${textSecondary}`}>
                 <div className="flex justify-center gap-3">
                   <span className="flex items-center gap-1">
-                    <span className="w-2.5 h-2.5 rounded-sm bg-indigo-600" />深睡
+                    <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: theme.accentHex }} />深睡
                   </span>
                   <span className="flex items-center gap-1">
                     <span className="w-2.5 h-2.5 rounded-sm bg-indigo-300" />REM
@@ -272,7 +278,7 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
                     <span className="w-2.5 h-2.5 rounded-sm bg-rose-400" />清醒
                   </span>
                 </div>
-                <span className="text-[9px] text-slate-500 font-sans">
+                <span className={`text-[9px] ${textMuted} font-sans`}>
                   * 睡眠分期为基于作息起止点与超昼夜节律的模型估算值，非临床医疗设备检测
                 </span>
               </div>
@@ -284,7 +290,7 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
         {viewMode === 'circadian' && (
           <div className="space-y-2 animate-in fade-in">
             <div className={`${theme.cardInnerBg} rounded-2xl p-3 border ${theme.cardInnerBorder} space-y-2`}>
-              <div className="flex justify-between text-[10px] text-slate-400 font-mono pb-1 border-b border-slate-800">
+              <div className={`flex justify-between text-[10px] ${textMuted} font-mono pb-1 border-b ${innerBorder}`}>
                 <span>21:00</span>
                 <span>00:00</span>
                 <span>03:00</span>
@@ -313,20 +319,20 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
                   >
                     <span
                       className={`w-9 text-[10px] font-mono shrink-0 ${
-                        isHovered ? 'text-indigo-400 font-bold' : 'text-slate-400'
+                        isHovered ? accentText + ' font-bold' : textMuted
                       }`}
                     >
                       {r.date.slice(5)}
                     </span>
 
-                    <div className="flex-1 h-5 bg-slate-950 rounded-lg relative overflow-hidden border border-slate-800">
+                    <div className={`flex-1 h-5 bg-slate-950 rounded-lg relative overflow-hidden border ${innerBorder}`}>
                       <div
-                        style={{ left: `${leftPercent}%`, width: `${widthPercent}%` }}
-                        className={`absolute top-0.5 bottom-0.5 rounded flex items-center justify-between px-1.5 ${
-                          isHovered
-                            ? 'bg-indigo-500 ring-1 ring-white'
-                            : 'bg-indigo-600/90 group-hover:bg-indigo-500'
-                        }`}
+                        style={{
+                          left: `${leftPercent}%`,
+                          width: `${widthPercent}%`,
+                          backgroundColor: isHovered ? theme.accentHex : `${theme.accentHex}99`,
+                        }}
+                        className="absolute top-0.5 bottom-0.5 rounded flex items-center justify-between px-1.5"
                       >
                         <span className="text-[9px] font-mono text-white">{r.bedtime}</span>
                         <span className="text-[9px] font-mono text-white">{r.wakeTime}</span>
@@ -349,12 +355,12 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
         >
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold text-white">历史睡眠数据记录</span>
-            <span className="text-[10px] text-slate-400 font-mono bg-[#0a0f1d] px-2 py-0.5 rounded-full border border-slate-800">
+            <span className={`text-[10px] ${textMuted} font-mono ${innerBg} px-2 py-0.5 rounded-full border ${innerBorder}`}>
               共 {records.length} 条
             </span>
           </div>
 
-          <div className="flex items-center gap-1 text-xs text-indigo-400 font-medium">
+          <div className={`flex items-center gap-1 text-xs ${accentText} font-medium`}>
             <span>{isHistoryExpanded ? '收起列表' : '展开查看与管理'}</span>
             {isHistoryExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </div>
@@ -364,7 +370,7 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
         {isHistoryExpanded && (
           <div className="mt-3 pt-3 border-t border-slate-700/60 divide-y divide-slate-800 text-xs animate-in fade-in duration-150">
             {records.length === 0 ? (
-              <div className="py-4 text-center text-slate-400">暂无数据记录</div>
+              <div className={`py-4 text-center ${textMuted}`}>暂无数据记录</div>
             ) : (
               records.map((r) => (
                 <div
@@ -374,9 +380,9 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-white text-xs">{r.date}</span>
-                      <span className="font-mono text-indigo-400 font-bold text-xs">{r.sleepScore}分</span>
+                      <span className={`font-mono ${accentText} font-bold text-xs`}>{r.sleepScore}分</span>
                     </div>
-                    <div className="text-[11px] text-slate-400 flex items-center gap-2 mt-0.5 font-mono">
+                    <div className={`text-[11px] ${textMuted} flex items-center gap-2 mt-0.5 font-mono`}>
                       <span>{r.bedtime} - {r.wakeTime}</span>
                       <span>·</span>
                       <span>{formatDurationChinese(r.durationMinutes)}</span>
@@ -396,7 +402,7 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
                         }
                       }}
                       title="删除此条记录"
-                      className="p-2 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer"
+                      className={`p-2 ${textMuted} hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer`}
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>

@@ -20,6 +20,8 @@ export interface ThemeConfig {
   accentBg: string;
   accentText: string;
   accentRing: string;
+  /** 原始十六进制强调色：供 SVG 描边、图表与氛围光等内联样式使用 */
+  accentHex: string;
   // Nav bar
   navBg: string;
   navBorder: string;
@@ -48,6 +50,7 @@ export const APP_THEMES: Record<ThemeMode, ThemeConfig> = {
     accentBg: 'bg-indigo-600 hover:bg-indigo-500',
     accentText: 'text-indigo-400',
     accentRing: 'ring-indigo-400',
+    accentHex: '#818cf8',
     navBg: 'bg-[#0f172a]',
     navBorder: 'border-slate-800',
     navActiveBg: 'bg-indigo-600/25',
@@ -72,6 +75,7 @@ export const APP_THEMES: Record<ThemeMode, ThemeConfig> = {
     accentBg: 'bg-zinc-800 hover:bg-zinc-700',
     accentText: 'text-zinc-200',
     accentRing: 'ring-zinc-500',
+    accentHex: '#d4d4d8',
     navBg: 'bg-[#000000]',
     navBorder: 'border-zinc-800',
     navActiveBg: 'bg-zinc-800/80',
@@ -96,6 +100,7 @@ export const APP_THEMES: Record<ThemeMode, ThemeConfig> = {
     accentBg: 'bg-amber-600 hover:bg-amber-500',
     accentText: 'text-amber-300',
     accentRing: 'ring-amber-400',
+    accentHex: '#fcd34d',
     navBg: 'bg-[#1f1610]',
     navBorder: 'border-amber-950',
     navActiveBg: 'bg-amber-600/30',
@@ -120,6 +125,7 @@ export const APP_THEMES: Record<ThemeMode, ThemeConfig> = {
     accentBg: 'bg-cyan-600 hover:bg-cyan-500',
     accentText: 'text-cyan-300',
     accentRing: 'ring-cyan-400',
+    accentHex: '#67e8f9',
     navBg: 'bg-[#07192b]',
     navBorder: 'border-cyan-950',
     navActiveBg: 'bg-cyan-600/30',

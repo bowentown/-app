@@ -133,7 +133,7 @@ export const TodayTab: React.FC<TodayTabProps> = ({
       {/* 3. Hypnogram Chart (Tonight Stage Distribution) */}
       {latestRecord && (
         <div className={`${theme.cardBg} rounded-3xl p-5 border ${theme.cardBorder} shadow-xl transition-colors`}>
-          <SleepHypnogram record={latestRecord} />
+          <SleepHypnogram record={latestRecord} theme={theme} />
         </div>
       )}
 

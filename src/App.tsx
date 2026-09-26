@@ -186,8 +186,8 @@ export const App: React.FC = () => {
           </div>
         </header>
 
-        {/* Tab View Container */}
-        <main className="p-4 space-y-4 flex-1">
+        {/* Tab View Container（key 重挂载触发 180ms 淡入上浮动效） */}
+        <main key={activeTab} className="animate-tab-fade-in p-4 space-y-4 flex-1">
           {activeTab === 'today' && (
             <TodayTab
               records={records}
@@ -240,6 +240,7 @@ export const App: React.FC = () => {
         isOpen={isActiveSleepOpen}
         onClose={() => setIsActiveSleepOpen(false)}
         onFinishSleep={handleSaveActiveSleep}
+        theme={currentTheme}
       />
 
       {/* Manual Sleep Log Modal */}
