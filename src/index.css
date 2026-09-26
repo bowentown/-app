@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+/* 页面本身即为暗色主题：禁用 WebView Force Dark 的二次压暗（Android/国产 ROM 深色模式） */
+:root {
+  color-scheme: dark;
+}
+
 @layer utilities {
   /* Hide scrollbar for Chrome, Safari and Opera */
   .no-scrollbar::-webkit-scrollbar {
