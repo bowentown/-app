@@ -95,16 +95,9 @@ jobs:
           <uses-permission android:name="android.permission.RECORD_AUDIO" />\
           <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />\
           <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />' android/app/src/main/AndroidManifest.xml
-          
-          # 统一 Kotlin 依赖，避免 duplicate class
-          sed -i '/dependencies {/i \
-          configurations.all {\
-              resolutionStrategy {\
-                  force "org.jetbrains.kotlin:kotlin-stdlib:1.8.22"\
-                  force "org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22"\
-                  force "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22"\
-              }\
-          }' android/app/build.gradle
+
+          # MediaPipe 要求 minSdk ≥ 24（Capacitor 模板默认 23）
+          sed -i 's/minSdkVersion = 23/minSdkVersion = 24/' android/variables.gradle
 
           echo "android.useAndroidX=true" >> android/gradle.properties
           echo "android.enableJetifier=true" >> android/gradle.properties
