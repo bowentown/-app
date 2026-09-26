@@ -49,6 +49,44 @@ let instance: Wllama | null = null;
 let loadedUrl: string | null = null;
 let busy = false;
 
+const LLM_STATE_KEY = 'somnacare_llm_state';
+
+function setLlmState(state: 'idle' | 'loading' | 'generating' | 'ready') {
+  try {
+    localStorage.setItem(LLM_STATE_KEY, state);
+  } catch {
+    // 存储不可用时忽略
+  }
+}
+
+/**
+ * 崩溃取证：应用被系统杀死时 localStorage 中的状态不会清除。
+ * 若上次会话停留在 loading/generating，说明大概率是 WASM 峰值内存触发了 OOM 击杀。
+ * 在设置页展示警告，并据此保持更保守的内存配置。
+ */
+export function consumeLlmCrashFlag(): 'loading' | 'generating' | null {
+  try {
+    const state = localStorage.getItem(LLM_STATE_KEY);
+    if (state === 'loading' || state === 'generating') {
+      localStorage.removeItem(LLM_STATE_KEY);
+      return state;
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+// 应用切到后台时卸载模型，释放约 1GB 峰值内存（下次对话从缓存数秒内重载），
+// 同时避免后台状态被系统因内存压力击杀。
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && !busy) {
+      unloadLocalLlm();
+    }
+  });
+}
+
 /**
  * 直通缓存后端：wllama 构造时会急切创建 CacheManager 并探测 OPFS，
  * 在缺失 OPFS 的 WebView 上会直接抛错。模型缓存由本模块的 Cache API 自管，
@@ -225,6 +263,7 @@ export async function generateLocalLlmReply(
     }
     if (!loadedUrl) {
       handlers.onStage?.('loading');
+      setLlmState('loading');
       const cachedUrl = await findCachedModelUrl();
       if (!cachedUrl) {
         throw new Error('模型尚未下载，请先在设置中下载');
@@ -235,10 +274,13 @@ export async function generateLocalLlmReply(
       if (!blob || blob.size === 0) {
         throw new Error('本地模型缓存读取失败，请删除后重新下载');
       }
-      await instance.loadModel([blob], { n_ctx: 1024, n_gpu_layers: 0 });
+      // 低内存配置：n_ctx 512 + 小 batch，压制 WASM 峰值内存（GGUF 经 MEMFS + 权重会双重驻留）
+      await instance.loadModel([blob], { n_ctx: 512, n_batch: 128, n_gpu_layers: 0 });
       loadedUrl = cachedUrl;
+      setLlmState('ready');
     }
     handlers.onStage?.('generating');
+    setLlmState('generating');
 
     let full = '';
     await instance.createChatCompletion({
@@ -256,6 +298,7 @@ export async function generateLocalLlmReply(
       cache_prompt: true,
       abortSignal: signal,
     } as any);
+    setLlmState('ready');
     return full;
   } finally {
     busy = false;

@@ -10,6 +10,7 @@ interface ActiveSleepModalProps {
   onClose: () => void;
   onFinishSleep: (record: SleepRecord) => void;
   theme: ThemeConfig;
+  targetDurationHours?: number;
 }
 
 export const ActiveSleepModal: React.FC<ActiveSleepModalProps> = ({
@@ -17,6 +18,7 @@ export const ActiveSleepModal: React.FC<ActiveSleepModalProps> = ({
   onClose,
   onFinishSleep,
   theme,
+  targetDurationHours,
 }) => {
   const [currentTime, setCurrentTime] = useState('');
   const [currentDate, setCurrentDate] = useState('');
@@ -241,7 +243,8 @@ export const ActiveSleepModal: React.FC<ActiveSleepModalProps> = ({
       stagesData.remMinutes,
       stagesData.awakeMinutes,
       wakeCount,
-      14
+      14,
+      Math.round((targetDurationHours || 8) * 60)
     );
 
     const now = new Date();

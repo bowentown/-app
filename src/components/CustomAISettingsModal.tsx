@@ -21,6 +21,7 @@ import {
   downloadLocalLlm,
   deleteLocalLlm,
   ensureStoragePersistence,
+  consumeLlmCrashFlag,
   type LocalLlmSupport,
   type LocalLlmCacheState,
 } from '../utils/localLlmEngine';
@@ -66,11 +67,20 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
   const [llmCache, setLlmCache] = useState<LocalLlmCacheState | null>(null);
   const [llmProgress, setLlmProgress] = useState<number | null>(null);
   const [llmError, setLlmError] = useState<string | null>(null);
+  const [llmCrashNote, setLlmCrashNote] = useState<string | null>(null);
   const llmAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
     let cancelled = false;
+    const crash = consumeLlmCrashFlag();
+    if (crash && !cancelled) {
+      setLlmCrashNote(
+        crash === 'loading'
+          ? '上次会话在加载端侧模型时被系统终止（大概率内存不足）。已自动改用更保守的内存配置；若再次发生，建议删除模型并改用规则引擎档位。'
+          : '上次会话在端侧模型生成回复时被系统终止（大概率内存不足）。若反复出现，建议删除模型并改用规则引擎档位。'
+      );
+    }
     Promise.all([getLocalLlmSupport(), getLocalLlmCacheState()]).then(([s, c]) => {
       if (!cancelled) {
         setLlmSupport(s);
@@ -305,6 +315,13 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
                 基于 llama.cpp WASM 在本机推理（Qwen3-0.6B Q4 量化，约 462 MB），中文表达优于同级 Gemma。
                 仅接管日常聊天；睡眠生理报告始终由规则引擎完成；命中自伤或药物处方疑问时安全护栏优先于模型。
               </p>
+
+              {/* 上次崩溃警告 */}
+              {llmCrashNote && provider === 'local_llm' && (
+                <div className="p-2.5 rounded-xl bg-amber-950/40 border border-amber-800/60 text-[11px] text-amber-200 leading-relaxed">
+                  ⚠️ {llmCrashNote}
+                </div>
+              )}
 
               {/* 设备支持性 */}
               {llmSupport && (

@@ -9,6 +9,7 @@ interface ManualLogModalProps {
   onClose: () => void;
   onSaveRecord: (record: SleepRecord) => void;
   theme?: ThemeConfig;
+  targetDurationHours?: number;
 }
 
 const HABIT_OPTIONS = [
@@ -27,6 +28,7 @@ export const ManualLogModal: React.FC<ManualLogModalProps> = ({
   onClose,
   onSaveRecord,
   theme,
+  targetDurationHours,
 }) => {
   const [date, setDate] = useState(() => {
     const d = new Date();
@@ -72,7 +74,8 @@ export const ManualLogModal: React.FC<ManualLogModalProps> = ({
       stagesData.remMinutes,
       stagesData.awakeMinutes,
       wakeCount,
-      latencyMinutes
+      latencyMinutes,
+      Math.round((targetDurationHours || 8) * 60)
     );
 
     const record: SleepRecord = {

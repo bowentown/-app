@@ -46,7 +46,7 @@ export const TodayTab: React.FC<TodayTabProps> = ({
   return (
     <div className={`space-y-4 pb-28 ${theme.textPrimary}`}>
       {/* 1. Primary One-Tap Sleep Tracker */}
-      {onSaveRecord && <OneTapSleepTracker onSaveRecord={onSaveRecord} theme={theme} />}
+      {onSaveRecord && <OneTapSleepTracker onSaveRecord={onSaveRecord} theme={theme} targetDurationHours={userProfile.targetDurationHours} />}
 
       {/* 2. Last Sleep Overview Card with Unified Theme Colors */}
       {latestRecord ? (
@@ -106,6 +106,22 @@ export const TodayTab: React.FC<TodayTabProps> = ({
                   {latestRecord.deepSleepMinutes}分 · {Math.round((latestRecord.deepSleepMinutes / Math.max(1, latestRecord.durationMinutes)) * 100)}%
                 </span>
               </div>
+              {userProfile.targetBedtime && (() => {
+                const [bh, bm] = latestRecord.bedtime.split(':').map(Number);
+                const [th, tm] = userProfile.targetBedtime.split(':').map(Number);
+                let diff = bh * 60 + bm - (th * 60 + tm);
+                if (diff > 720) diff -= 1440;
+                if (diff < -720) diff += 1440;
+                const txt = diff === 0 ? '与目标一致' : diff > 0 ? `晚于目标 ${diff} 分钟` : `早于目标 ${-diff} 分钟`;
+                return (
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-slate-300 font-bold">就寝 vs 目标</span>
+                    <span className={`font-mono font-bold text-sm ${diff > 30 ? 'text-rose-400' : diff < -30 ? 'text-sky-400' : 'text-emerald-400'}`}>
+                      {txt}
+                    </span>
+                  </div>
+                );
+              })()}
               {latestRecord.sleepScore < 75 && (
                 <div className="pt-1 text-[11px] text-amber-300/90 font-medium">
                   💡 提示：睡眠评分自然波动属正常现象，身体今夜会自动通过增加深睡代偿，无需担忧。

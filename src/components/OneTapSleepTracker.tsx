@@ -7,9 +7,10 @@ import { ThemeConfig } from '../utils/themeStyles';
 interface OneTapSleepTrackerProps {
   onSaveRecord: (record: SleepRecord) => void;
   theme: ThemeConfig;
+  targetDurationHours?: number;
 }
 
-export const OneTapSleepTracker: React.FC<OneTapSleepTrackerProps> = ({ onSaveRecord, theme }) => {
+export const OneTapSleepTracker: React.FC<OneTapSleepTrackerProps> = ({ onSaveRecord, theme, targetDurationHours }) => {
   const [sleepStartTime, setSleepStartTime] = useState<number | null>(() => {
     const saved = localStorage.getItem('somnacare_bedtime_start');
     return saved ? Number(saved) : null;
@@ -79,7 +80,8 @@ export const OneTapSleepTracker: React.FC<OneTapSleepTrackerProps> = ({ onSaveRe
       remMin,
       awakeMin,
       exactDurationMinutes < 15 ? 0 : 1,
-      exactDurationMinutes < 15 ? 2 : 12
+      exactDurationMinutes < 15 ? 2 : 12,
+      Math.round((targetDurationHours || 8) * 60)
     );
 
     const recordDate = new Date().toISOString().split('T')[0];

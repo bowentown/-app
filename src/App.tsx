@@ -241,6 +241,7 @@ export const App: React.FC = () => {
         onClose={() => setIsActiveSleepOpen(false)}
         onFinishSleep={handleSaveActiveSleep}
         theme={currentTheme}
+        targetDurationHours={userProfile.targetDurationHours}
       />
 
       {/* Manual Sleep Log Modal */}
@@ -249,6 +250,7 @@ export const App: React.FC = () => {
         onClose={() => setIsManualLogOpen(false)}
         onSaveRecord={handleSaveManualRecord}
         theme={currentTheme}
+        targetDurationHours={userProfile.targetDurationHours}
       />
     </div>
   );

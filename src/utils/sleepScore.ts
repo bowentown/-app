@@ -2,7 +2,8 @@ import { SleepRecord, SleepStageSegment, WakingMood } from '../types/sleep';
 
 /**
  * Calculates a 0-100 scientific sleep score based on:
- * - Total duration (40 pts) - optimal 7h-9h
+ * - Total duration (40 pts) - scored against the user's own target (CBT-I sleep diary
+ *   convention: compare against the prescribed window, not a population constant)
  * - Deep sleep ratio (20 pts) - optimal 15%-25%
  * - REM sleep ratio (20 pts) - optimal 20%-25%
  * - Sleep efficiency & awakenings (20 pts) - awakenings penalty, latency
@@ -13,26 +14,27 @@ export function calculateSleepScore(
   remSleepMinutes: number,
   awakeMinutes: number,
   wakeCount: number,
-  latencyMinutes: number
+  latencyMinutes: number,
+  targetDurationMinutes: number = 480
 ): { score: number; efficiency: number } {
   const totalBedMinutes = durationMinutes + awakeMinutes + latencyMinutes;
   const efficiency = totalBedMinutes > 0 ? Math.round((durationMinutes / totalBedMinutes) * 100) : 0;
 
-  // 1. Duration score (max 40)
+  // 1. Duration score (max 40) — 相对用户自设目标的偏差计分；过长与过短对称扣分
+  //    （睡眠科学与流行病学研究均支持时长过短与过长关联更差结局）
   const durationHours = durationMinutes / 60;
+  const absDiffHours = Math.abs(durationHours - targetDurationMinutes / 60);
   let durationScore = 0;
-  if (durationHours >= 7 && durationHours <= 8.5) {
+  if (absDiffHours <= 0.5) {
     durationScore = 40;
-  } else if (durationHours >= 6.5 && durationHours < 7) {
+  } else if (absDiffHours <= 1) {
     durationScore = 35;
-  } else if (durationHours > 8.5 && durationHours <= 9.5) {
-    durationScore = 36;
-  } else if (durationHours >= 5.5 && durationHours < 6.5) {
+  } else if (absDiffHours <= 1.5) {
     durationScore = 28;
-  } else if (durationHours < 5.5) {
-    durationScore = Math.max(10, Math.round(durationHours * 5));
+  } else if (absDiffHours <= 2.5) {
+    durationScore = 18;
   } else {
-    durationScore = 30;
+    durationScore = 10;
   }
 
   // 2. Deep sleep ratio score (max 20)
