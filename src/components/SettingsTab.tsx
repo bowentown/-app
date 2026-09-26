@@ -17,6 +17,7 @@ import { UserProfile, CustomAlarmSetting, CustomAIConfig, SleepRecord } from '..
 import { AlarmManager } from './AlarmManager';
 import { CustomAISettingsModal } from './CustomAISettingsModal';
 import { APP_THEMES, ThemeConfig } from '../utils/themeStyles';
+import { getActiveModelLabel } from '../utils/localLlmEngine';
 
 // 作息目标联动工具：HH:MM ↔ 当日分钟数（跨午夜安全）
 const toMin = (t: string): number => {
@@ -151,7 +152,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   {userProfile.aiConfig?.provider === 'deepseek'
                     ? `DeepSeek (${userProfile.aiConfig.deepseekModel || 'deepseek-flash'})`
                     : userProfile.aiConfig?.provider === 'local_llm'
-                    ? '端侧小模型 (Qwen3)'
+                    ? `端侧小模型 (${getActiveModelLabel()})`
                     : userProfile.aiConfig?.provider === 'custom_openai'
                     ? '自建 API'
                     : '本地医学规则引擎'}

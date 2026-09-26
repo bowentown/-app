@@ -16,6 +16,11 @@ import { CustomAIConfig, AIProvider } from '../types/sleep';
 import { ThemeConfig } from '../utils/themeStyles';
 import {
   LOCAL_LLM_MODEL,
+  NATIVE_LLM_MODEL,
+  getActiveModelLabel,
+  isNativeLlmAvailable,
+  getHfToken,
+  setHfToken,
   getLocalLlmSupport,
   getLocalLlmCacheState,
   downloadLocalLlm,
@@ -67,6 +72,7 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
   const [llmCache, setLlmCache] = useState<LocalLlmCacheState | null>(null);
   const [llmProgress, setLlmProgress] = useState<number | null>(null);
   const [llmError, setLlmError] = useState<string | null>(null);
+  const [hfTokenVal, setHfTokenVal] = useState(getHfToken());
   const [llmCrashNote, setLlmCrashNote] = useState<string | null>(null);
   const llmAbortRef = useRef<AbortController | null>(null);
 
@@ -304,7 +310,7 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Cpu className="w-4 h-4 text-indigo-400" />
-                  <span className="font-bold text-white">端侧小模型 · {LOCAL_LLM_MODEL.label}</span>
+                  <span className="font-bold text-white">端侧小模型 · {getActiveModelLabel()}</span>
                 </div>
                 <span className="text-[10px] text-indigo-300 bg-indigo-950 px-2 py-0.5 rounded border border-indigo-600">
                   离线可用 · 隐私不上传
@@ -312,8 +318,9 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
               </div>
 
               <p className="text-[11px] text-slate-300 leading-relaxed">
-                基于 llama.cpp WASM 在本机推理（Qwen3-0.6B Q4 量化，约 462 MB），中文表达优于同级 Gemma。
-                仅接管日常聊天；睡眠生理报告始终由规则引擎完成；命中自伤或药物处方疑问时安全护栏优先于模型。
+                {isNativeLlmAvailable()
+                  ? 'APK 内使用原生 MediaPipe 引擎在本机推理（Gemma 3 1B int4，约 529 MB，mmap 加载），稳定性优于 WASM 方案。仅接管日常聊天；报告始终由规则引擎完成；危机与用药安全护栏优先于模型。'
+                  : '基于 llama.cpp WASM 在本机推理（Qwen3-0.6B Q4 量化，约 462 MB）。仅接管日常聊天；睡眠生理报告始终由规则引擎完成；命中自伤或药物处方疑问时安全护栏优先于模型。'}
               </p>
 
               {/* 上次崩溃警告 */}
@@ -352,6 +359,27 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
               {llmError && (
                 <div className="p-2.5 rounded-xl bg-rose-950/40 border border-rose-800/60 text-[11px] text-rose-200 leading-relaxed">
                   ❌ {llmError}
+                </div>
+              )}
+
+              {/* HF 门控模型令牌（仅原生） */}
+              {isNativeLlmAvailable() && (
+                <div className={`p-3 rounded-xl bg-[#0a0f1d] border border-slate-700 space-y-2`}>
+                  <span className="text-[11px] font-bold text-white block">HuggingFace 访问令牌（首次下载需要）</span>
+                  <input
+                    type="password"
+                    value={hfTokenVal}
+                    onChange={(e) => {
+                      setHfTokenVal(e.target.value);
+                      setHfToken(e.target.value);
+                    }}
+                    placeholder="hf_xxxxxxxxxxxx"
+                    className="w-full bg-[#0a0f1d] border border-slate-600 rounded-xl px-2.5 py-2 text-xs text-white font-mono placeholder-slate-500 focus:outline-none focus:border-indigo-400"
+                  />
+                  <p className="text-[10px] text-slate-500 leading-relaxed">
+                    Gemma 为门控模型：在 huggingface.co 登录 → 打开 litert-community/gemma-3-1b-it →
+                    同意许可 → Settings → Access Tokens 生成只读令牌粘贴于此。令牌仅保存在本机。
+                  </p>
                 </div>
               )}
 

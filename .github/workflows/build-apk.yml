@@ -61,6 +61,8 @@ jobs:
       - name: Install Capacitor Core & Android & Local Notifications Plugin
         run: |
           npm install --save-dev @capacitor/cli @capacitor/core @capacitor/android @capacitor/local-notifications
+          # 本地原生插件：MediaPipe LLM Inference（Gemma .task 端侧推理）
+          npm install --legacy-peer-deps --save-dev ./plugins/cap-gemma-llm
 
       - name: Configure Capacitor for 100% Local Offline App
         run: |

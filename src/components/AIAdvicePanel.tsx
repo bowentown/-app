@@ -15,6 +15,7 @@ import {
 import { SleepRecord, SleepAnalysisResult, ChatMessage, UserProfile } from '../types/sleep';
 import { generateLocalClinicalAnalysis, generateLocalChatReply, classifyIntent } from '../utils/clinicalSleepEngine';
 import {
+  getActiveModelLabel,
   generateLocalLlmReply,
   getLocalLlmSupport,
   getLocalLlmCacheState,
@@ -34,7 +35,7 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
     // 初始标签反映用户已保存的档位，而非写死的默认值
     switch (userProfile.aiConfig?.provider) {
       case 'local_llm':
-        return 'Qwen3-0.6B 端侧模型';
+        return getActiveModelLabel();
       case 'local_rules':
         return '本地临床规则引擎';
       case 'custom_openai':
@@ -155,7 +156,7 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
           return;
         }
 
-        setActiveProviderName('Qwen3-0.6B 端侧模型');
+        setActiveProviderName(getActiveModelLabel());
         const aiId = `ai-${Date.now()}`;
         setChatMessages((prev) => [
           ...prev,
