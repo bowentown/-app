@@ -22,6 +22,7 @@ export const ActiveSleepModal: React.FC<ActiveSleepModalProps> = ({
   const [decibels, setDecibels] = useState<number | null>(null);
   const [soundBars, setSoundBars] = useState<number[]>(Array(10).fill(6));
   const [micStatus, setMicStatus] = useState<'requesting' | 'active' | 'unavailable'>('requesting');
+  const [micError, setMicError] = useState<string | null>(null);
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   const [activeSound, setActiveSound] = useState<'rain' | 'ocean' | 'bowl'>('rain');
 
@@ -74,18 +75,56 @@ export const ActiveSleepModal: React.FC<ActiveSleepModalProps> = ({
     };
   }, [isOpen]);
 
+  // 将 getUserMedia 的错误码翻译为可行动的提示（此前所有失败都被折叠成"未授权"，无法定位）
+  const humanizeMicError = (name: string): string => {
+    switch (name) {
+      case 'NotAllowedError':
+      case 'PermissionDeniedError':
+        return '麦克风权限被拒绝。请到 系统设置 → 应用管理 → 极光睡眠 → 权限 中开启麦克风，再点下方重试';
+      case 'NotFoundError':
+      case 'DevicesNotFoundError':
+        return '未找到可用麦克风设备';
+      case 'NotReadableError':
+      case 'TrackStartError':
+        return '麦克风被其他应用占用（如语音助手、录音软件），请关闭后重试';
+      case 'OverconstrainedError':
+        return '麦克风不支持所需配置';
+      case 'SecurityError':
+        return '当前页面运行环境不安全，无法访问麦克风';
+      default:
+        return `无法访问麦克风（${name}）——若已在系统设置授权仍失败，请杀掉应用后重开一次`;
+    }
+  };
+
   // 真实麦克风采样：时域 RMS → dBFS → 估算环境声级；频域分桶 → 实时频谱柱。
-  // 关闭 AGC/降噪/回声消除，避免系统算法拉伸真实声级。数据仅在本机内存实时计算，不录制、不存储。
+  // 优先关闭 AGC/降噪/回声消除以保证声级测量不被系统算法拉伸；失败则退回普通约束再试一次。
   const startNoiseDetection = async () => {
     setMicStatus('requesting');
+    setMicError(null);
     try {
       if (!navigator.mediaDevices?.getUserMedia) {
         setMicStatus('unavailable');
+        setMicError(humanizeMicError('TypeError'));
         return;
       }
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
-      });
+      let stream: MediaStream | null = null;
+      let failName = 'UnknownError';
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+        });
+      } catch (e1: any) {
+        failName = e1?.name || String(e1);
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true }).catch((e2: any) => {
+          failName = e2?.name || String(e2);
+          return null;
+        });
+      }
+      if (!stream) {
+        setMicStatus('unavailable');
+        setMicError(humanizeMicError(failName));
+        return;
+      }
       audioStreamRef.current = stream;
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
       const ctx = new AudioContextClass();
@@ -126,9 +165,10 @@ export const ActiveSleepModal: React.FC<ActiveSleepModalProps> = ({
       };
       rafRef.current = requestAnimationFrame(pollAudio);
       setMicStatus('active');
-    } catch {
-      // 权限被拒或设备不支持：诚实降级，不伪造数据
+    } catch (e: any) {
+      // 权限被拒或设备不支持：诚实降级并显示具体原因，不伪造数据
       setMicStatus('unavailable');
+      setMicError(humanizeMicError(e?.name || String(e)));
     }
   };
 
@@ -298,8 +338,17 @@ export const ActiveSleepModal: React.FC<ActiveSleepModalProps> = ({
                     : '🟡 检测到枕边环境动静或杂音'
                   : micStatus === 'requesting'
                   ? '🎙️ 正在请求麦克风权限...'
-                  : '🔕 麦克风未授权或不可用 · 无声级监测'}
+                  : `🔕 ${micError || '麦克风不可用 · 无声级监测'}`}
               </p>
+              {micStatus === 'unavailable' && (
+                <button
+                  type="button"
+                  onClick={startNoiseDetection}
+                  className="text-[11px] text-indigo-300 hover:text-white underline cursor-pointer"
+                >
+                  重新尝试访问麦克风
+                </button>
+              )}
               <p className="text-[10px] text-slate-500">
                 （真实麦克风采样估算，未声学校准 ±10 dB；数据仅本机实时计算，不录制不存储）
               </p>
