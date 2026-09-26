@@ -1,7 +1,5 @@
 package com.somnacare.gemmallm;
 
-import android.app.Activity;
-import android.app.ActivityManager;
 import android.content.Context;
 
 import com.getcapacitor.JSArray;
@@ -28,17 +26,20 @@ import java.util.concurrent.Future;
  * 与 WebView/WASM 方案的本质区别：
  * - 模型文件经 mmap 直接映射（无 MEMFS 双重驻留），峰值内存约为模型体积 + KV 缓存；
  * - 运行在 App 进程的原生层，不受 WebView 渲染进程的内存限制（此前 WASM 方案闪退的根因）；
- * - 下载支持 Bearer 令牌（Gemma 门控模型需要一次性 HF 授权）。
+ * - 下载支持 Bearer 令牌（Gemma 门控模型需要一次性 HF 授权）与断点续传。
  *
- * 流式输出：generateResponseAsync 的 ProgressListener 回调逐段通知 llmToken 事件。
+ * API 对齐 tasks-genai 0.10.32（经 AAR 反编译核对）：
+ * - LlmInference.createFromOptions(Context, LlmInferenceOptions)
+ * - LlmInferenceSession.createFromOptions(LlmInference, SessionOptions)
+ * - session.generateResponseAsync(ProgressListener<String>)，监听器为 (String partial, boolean done)
  */
 @CapacitorPlugin(name = "GemmaLLM")
 public class GemmaLLMPlugin extends Plugin {
 
     private LlmInference llmInference;
-    private LlmInferenceSession session;
-    private Future<?> activeGeneration;
     private volatile boolean downloadCancelled = false;
+    private static final java.util.concurrent.ExecutorService BACKGROUND =
+            java.util.concurrent.Executors.newSingleThreadExecutor();
 
     // ==== 能力探测与内存门控 ====
 
@@ -59,7 +60,7 @@ public class GemmaLLMPlugin extends Plugin {
         return info.availMem / (1024 * 1024);
     }
 
-    // ==== 模型下载（带进度、Bearer 令牌、原子落盘、可取消） ====
+    // ==== 模型下载（带进度、Bearer 令牌、断点续传、原子落盘、可取消） ====
 
     @PluginMethod
     public void downloadModel(PluginCall call) {
@@ -73,7 +74,7 @@ public class GemmaLLMPlugin extends Plugin {
         downloadCancelled = false;
         final String fToken = (token == null || token.trim().isEmpty()) ? null : token.trim();
 
-        getBridge().execute(() -> {
+        BACKGROUND.execute(() -> {
             File finalFile = new File(getContext().getFilesDir(), filename);
             File tempFile = new File(getContext().getFilesDir(), filename + ".part");
             long existing = tempFile.exists() ? tempFile.length() : 0L;
@@ -82,11 +83,12 @@ public class GemmaLLMPlugin extends Plugin {
                 HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
                 conn.setConnectTimeout(20000);
                 conn.setReadTimeout(30000);
+                conn.setInstanceFollowRedirects(true);
                 if (fToken != null) conn.setRequestProperty("Authorization", "Bearer " + fToken);
                 if (existing > 0) conn.setRequestProperty("Range", "bytes=" + existing + "-");
 
                 int code = conn.getResponseCode();
-                if (code == 416) { // 断点续传越界 = 已下完
+                if (code == 416) { // 断点续传越界 = 文件已下完
                     if (!tempFile.renameTo(finalFile)) {
                         throw new IOException("重命名临时文件失败");
                     }
@@ -100,12 +102,12 @@ public class GemmaLLMPlugin extends Plugin {
                 }
 
                 long total = conn.getContentLengthLong();
-                boolean append = code == 206 && existing > 0;
-                long base = append ? existing : 0;
-                if (!append && tempFile.exists()) tempFile.delete();
+                boolean resume = code == 206 && existing > 0;
+                long base = resume ? existing : 0;
+                if (!resume && tempFile.exists()) tempFile.delete();
 
                 InputStream in = conn.getInputStream();
-                FileOutputStream out = new FileOutputStream(tempFile, append);
+                FileOutputStream out = new FileOutputStream(tempFile, resume);
                 byte[] buf = new byte[64 * 1024];
                 long loaded = base;
                 int lastPercent = -1;
@@ -122,7 +124,7 @@ public class GemmaLLMPlugin extends Plugin {
                     loaded += n;
                     out.write(buf, 0, n);
                     if (total > 0) {
-                        int percent = (int) Math.min(99, (loaded * 100) / total);
+                        int percent = (int) Math.min(99, ((loaded * 100) / total));
                         if (percent != lastPercent) {
                             lastPercent = percent;
                             JSObject p = new JSObject();
@@ -203,14 +205,13 @@ public class GemmaLLMPlugin extends Plugin {
         }
         try {
             unloadInternal();
-            Activity activity = getActivity();
+            Context context = getContext();
             LlmInference.LlmInferenceOptions options = LlmInference.LlmInferenceOptions.builder()
                     .setModelPath(f.getAbsolutePath())
                     .setMaxTokens(maxTokens)
                     .setPreferredBackend(LlmInference.Backend.CPU)
                     .build();
-            llmInference = LlmInference.createFromOptions(activity, options);
-            session = new LlmInferenceSession(llmInference);
+            llmInference = LlmInference.createFromOptions(context, options);
             JSObject ret = new JSObject();
             ret.put("ok", true);
             ret.put("freeMemoryMb", getFreeMemoryMb());
@@ -224,8 +225,7 @@ public class GemmaLLMPlugin extends Plugin {
     @PluginMethod
     public void generate(PluginCall call) {
         JSArray messages = call.getArray("messages");
-        int maxTokens = call.getInt("maxTokens", 220);
-        if (llmInference == null || session == null) {
+        if (llmInference == null) {
             call.reject("模型尚未加载");
             return;
         }
@@ -233,42 +233,45 @@ public class GemmaLLMPlugin extends Plugin {
             call.reject("messages 必填");
             return;
         }
-        getBridge().execute(() -> {
+        BACKGROUND.execute(() -> {
             StringBuilder full = new StringBuilder();
+            LlmInferenceSession session = null;
             try {
+                // 每轮生成使用全新 session（JS 侧每次都传完整历史，避免原生上下文无界增长）
+                LlmInferenceSession.LlmInferenceSessionOptions sessionOptions =
+                        LlmInferenceSession.LlmInferenceSessionOptions.builder()
+                                .setTemperature(0.7f)
+                                .setTopK(40)
+                                .build();
+                session = LlmInferenceSession.createFromOptions(llmInference, sessionOptions);
+
                 for (Object o : messages.toList()) {
                     if (o instanceof JSObject) {
                         String content = ((JSObject) o).getString("content", "");
                         if (content != null && !content.isEmpty()) session.addQueryChunk(content);
                     }
                 }
-                Future<String> future = session.generateResponseAsync(
-                        partial -> {
-                            JSObject p = new JSObject();
-                            p.put("text", partial);
-                            notifyListeners("llmToken", p);
-                        });
+
+                Future<String> future = session.generateResponseAsync((String partial, boolean done) -> {
+                    JSObject p = new JSObject();
+                    p.put("text", partial == null ? "" : partial);
+                    p.put("done", done);
+                    notifyListeners("llmToken", p);
+                });
                 String result = future.get();
-                full.append(result);
-                setLlmState("ready");
+                if (result != null) full.append(result);
                 JSObject ret = new JSObject();
-                ret.put("text", result);
+                ret.put("text", full.toString());
                 call.resolve(ret);
             } catch (Exception e) {
-                // 会话状态可能已被污染，重建会话以保后续可用
-                recreateSession();
                 call.reject("生成失败: " + e.getMessage());
+            } finally {
+                try {
+                    if (session != null) session.close();
+                } catch (Exception ignored) {
+                }
             }
         });
-    }
-
-    private void recreateSession() {
-        try {
-            if (llmInference != null) {
-                session = new LlmInferenceSession(llmInference);
-            }
-        } catch (Exception ignored) {
-        }
     }
 
     @PluginMethod
@@ -279,24 +282,10 @@ public class GemmaLLMPlugin extends Plugin {
 
     private void unloadInternal() {
         try {
-            if (session != null) session.close();
-        } catch (Exception ignored) {
-        }
-        try {
             if (llmInference != null) llmInference.close();
         } catch (Exception ignored) {
         }
-        session = null;
         llmInference = null;
-    }
-
-    private void setLlmState(String state) {
-        try {
-            android.content.SharedPreferences sp = getContext()
-                    .getSharedPreferences("somnacare_native_llm", Context.MODE_PRIVATE);
-            sp.edit().putString("state", state).apply();
-        } catch (Exception ignored) {
-        }
     }
 
     @Override
