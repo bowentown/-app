@@ -18,6 +18,16 @@ import { AlarmManager } from './AlarmManager';
 import { CustomAISettingsModal } from './CustomAISettingsModal';
 import { APP_THEMES, ThemeConfig } from '../utils/themeStyles';
 
+// 作息目标联动工具：HH:MM ↔ 当日分钟数（跨午夜安全）
+const toMin = (t: string): number => {
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + m;
+};
+const toClock = (min: number): string => {
+  const norm = ((min % 1440) + 1440) % 1440;
+  return `${String(Math.floor(norm / 60)).padStart(2, '0')}:${String(norm % 60).padStart(2, '0')}`;
+};
+
 interface SettingsTabProps {
   records: SleepRecord[];
   userProfile: UserProfile;
@@ -164,7 +174,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         </p>
       </div>
 
-      {/* 4. Biological Target Rhythm */}
+      {/* 4. Schedule Target — 三字段联动编辑器：改其一，其余自动推算 */}
       <div className={`${theme.cardBg} rounded-3xl p-5 border ${theme.cardBorder} shadow-xl space-y-4`}>
         <div className="flex items-center gap-2.5 pb-3 border-b border-slate-700/60">
           <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-300 flex items-center justify-center border border-amber-400">
@@ -177,21 +187,30 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
 
         <div className="grid grid-cols-2 gap-3">
           <div className={`${theme.cardInnerBg} border ${theme.cardInnerBorder} rounded-2xl p-3.5 shadow-inner`}>
-            <span className="text-xs font-bold text-slate-200 block mb-1">目标就寝时间</span>
+            <span className="text-xs font-bold text-slate-200 block mb-1">目标就寝</span>
             <input
               type="time"
               value={userProfile.targetBedtime}
-              onChange={(e) => onUpdateProfile({ targetBedtime: e.target.value })}
+              onChange={(e) =>
+                onUpdateProfile({
+                  targetBedtime: e.target.value,
+                  targetWakeTime: toClock(toMin(e.target.value) + Math.round(userProfile.targetDurationHours * 60)),
+                })
+              }
               className="w-full bg-transparent text-2xl font-black text-white font-mono focus:outline-none cursor-pointer"
             />
           </div>
 
           <div className={`${theme.cardInnerBg} border ${theme.cardInnerBorder} rounded-2xl p-3.5 shadow-inner`}>
-            <span className="text-xs font-bold text-slate-200 block mb-1">目标醒来时间</span>
+            <span className="text-xs font-bold text-slate-200 block mb-1">目标醒来</span>
             <input
               type="time"
               value={userProfile.targetWakeTime}
-              onChange={(e) => onUpdateProfile({ targetWakeTime: e.target.value })}
+              onChange={(e) => {
+                // 反推时长（跨午夜安全），对齐 0.5h 步进并夹在滑杆范围内
+                const durH = Math.min(12, Math.max(4, Math.round(((toMin(e.target.value) - toMin(userProfile.targetBedtime) + 1440) % 1440) / 30) * 0.5));
+                onUpdateProfile({ targetWakeTime: e.target.value, targetDurationHours: durH });
+              }}
               className="w-full bg-transparent text-2xl font-black text-white font-mono focus:outline-none cursor-pointer"
             />
           </div>
@@ -204,13 +223,41 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           </div>
           <input
             type="range"
-            min={5}
-            max={10}
+            min={4}
+            max={12}
             step={0.5}
             value={userProfile.targetDurationHours}
-            onChange={(e) => onUpdateProfile({ targetDurationHours: Number(e.target.value) })}
+            onChange={(e) => {
+              const h = Number(e.target.value);
+              onUpdateProfile({
+                targetDurationHours: h,
+                targetWakeTime: toClock(toMin(userProfile.targetBedtime) + Math.round(h * 60)),
+              });
+            }}
             className="w-full accent-indigo-500 cursor-pointer h-2 bg-slate-700 rounded-lg"
           />
+        </div>
+
+        {/* 实时摘要 + 距离下一次目标就寝的提示 */}
+        <div className={`${theme.cardInnerBg} border ${theme.cardInnerBorder} rounded-2xl p-3.5 space-y-1.5`}>
+          <p className={`text-xs font-mono font-bold ${theme.accentText}`}>
+            {userProfile.targetBedtime} 入睡 · {userProfile.targetDurationHours} 小时 · {userProfile.targetWakeTime} 醒来
+          </p>
+          <p className="text-[11px] text-slate-400 leading-relaxed">
+            {(() => {
+              const now = new Date();
+              const nowMin = now.getHours() * 60 + now.getMinutes();
+              let untilBed = toMin(userProfile.targetBedtime) - nowMin;
+              if (untilBed < 0) untilBed += 1440;
+              if (untilBed <= 90) {
+                return untilBed <= 15
+                  ? `⏰ 距目标就寝仅剩约 ${untilBed} 分钟——该开始减速了`
+                  : `🌙 距目标就寝约 ${Math.floor(untilBed / 60)}小时${untilBed % 60}分——适合现在启动睡前流程`;
+              }
+              return `🕐 距今晚目标就寝约 ${Math.floor(untilBed / 60)} 小时${untilBed % 60} 分`;
+            })()}
+            。此目标将用于：睡眠评分基准、报告偏差分析与 AI 建议。
+          </p>
         </div>
       </div>
 
