@@ -17,6 +17,18 @@ import { UserProfile, CustomAlarmSetting, CustomAIConfig, SleepRecord } from '..
 import { AlarmManager } from './AlarmManager';
 import { CustomAISettingsModal } from './CustomAISettingsModal';
 import { APP_THEMES, ThemeConfig } from '../utils/themeStyles';
+
+// 主题切换时同步切换桌面图标（原生 activity-alias 启停；Web 环境跳过）
+function switchLauncherIcon(themeId: string) {
+  try {
+    const cap = (window as any).Capacitor;
+    if (cap?.isNativePlatform?.() && cap.Plugins?.GemmaLLM) {
+      cap.Plugins.GemmaLLM.setLauncherIcon({ theme: themeId });
+    }
+  } catch {
+    // 图标切换失败不影响主题应用
+  }
+}
 import { getActiveModelLabel } from '../utils/localLlmEngine';
 
 // 作息目标联动工具：HH:MM ↔ 当日分钟数（跨午夜安全）
@@ -100,7 +112,10 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               <button
                 key={t.id}
                 type="button"
-                onClick={() => onUpdateProfile({ themeColor: t.id as any })}
+                onClick={() => {
+                  onUpdateProfile({ themeColor: t.id as any });
+                  switchLauncherIcon(t.id);
+                }}
                 className={`p-3.5 rounded-2xl border text-left transition-all relative cursor-pointer ${
                   isSelected
                     ? `border-indigo-400 ${theme.cardInnerBg} shadow-lg ring-1 ring-indigo-400/50`

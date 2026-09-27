@@ -128,6 +128,20 @@ jobs:
           rm -f android/app/src/main/res/values/colors.xml
           mkdir -p android/app/src/main/res/drawable-night
           cp native-resources/splash.png android/app/src/main/res/drawable-night/splash.png
+          # 四主题启动图标（activity-alias 换图标机制）+ 各主题自适应图标 XML + 主题底色
+          cp -r native-resources/themes/*/mipmap-* android/app/src/main/res/
+          cp native-resources/adaptive/ic_launcher_*.xml android/app/src/main/res/mipmap-anydpi-v26/
+          cat > android/app/src/main/res/values/somnacare_colors.xml <<'XMLEOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <color name="somnacare_icon_bg_midnight">#060B1A</color>
+              <color name="somnacare_icon_bg_pure_dark">#000000</color>
+              <color name="somnacare_icon_bg_warm_amber">#1A110B</color>
+              <color name="somnacare_icon_bg_serene_blue">#04141F</color>
+          </resources>
+          XMLEOF
+          # 主入口 LAUNCHER 意图移至 4 个 activity-alias（主题换图标机制）
+          python3 tools/inject-aliases.py android/app/src/main/AndroidManifest.xml
 
           echo "android.useAndroidX=true" >> android/gradle.properties
           echo "android.enableJetifier=true" >> android/gradle.properties

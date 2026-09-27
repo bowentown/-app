@@ -1,7 +1,9 @@
 package com.somnacare.gemmallm;
 
 import android.app.ActivityManager;
+import android.content.ComponentName;
 import android.content.Context;
+import android.content.pm.PackageManager;
 
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
@@ -43,6 +45,51 @@ public class GemmaLLMPlugin extends Plugin {
             java.util.concurrent.Executors.newSingleThreadExecutor();
 
     // ==== 能力探测与内存门控 ====
+
+    /**
+     * 主题联动桌面图标：通过 activity-alias 启停切换启动器图标。
+     * 别名须在 Manifest 中预声明（CI 注入），目标先启用、其他后停用。
+     */
+    @PluginMethod
+    public void setLauncherIcon(PluginCall call) {
+        String theme = call.getString("theme", "midnight");
+        String pkg = getContext().getPackageName();
+        PackageManager pm = getContext().getPackageManager();
+        String[] themes = {"midnight", "pure_dark", "warm_amber", "serene_blue"};
+        String suffix;
+        switch (theme) {
+            case "pure_dark": suffix = "PureDark"; break;
+            case "warm_amber": suffix = "WarmAmber"; break;
+            case "serene_blue": suffix = "SereneBlue"; break;
+            default: suffix = "Midnight";
+        }
+        try {
+            pm.setComponentEnabledSetting(
+                    new ComponentName(pkg, pkg + ".MainActivity" + suffix),
+                    PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+                    PackageManager.DONT_KILL_APP);
+            for (String t : themes) {
+                if (t.equals(theme)) continue;
+                String sfx;
+                switch (t) {
+                    case "pure_dark": sfx = "PureDark"; break;
+                    case "warm_amber": sfx = "WarmAmber"; break;
+                    case "serene_blue": sfx = "SereneBlue"; break;
+                    default: sfx = "Midnight";
+                }
+                pm.setComponentEnabledSetting(
+                        new ComponentName(pkg, pkg + ".MainActivity" + sfx),
+                        PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                        PackageManager.DONT_KILL_APP);
+            }
+            JSObject ret = new JSObject();
+            ret.put("ok", true);
+            ret.put("theme", theme);
+            call.resolve(ret);
+        } catch (Exception e) {
+            call.reject("切换图标失败: " + e.getMessage());
+        }
+    }
 
     @PluginMethod
     public void isSupported(PluginCall call) {
