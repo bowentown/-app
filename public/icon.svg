@@ -1,22 +1,20 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#131a3d"/><stop offset="100%" stop-color="#05070f"/>
+      <stop offset="0%" stop-color="#141845"/><stop offset="100%" stop-color="#05060f"/>
     </linearGradient>
-    <linearGradient id="aur" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0%" stop-color="#46e0c0"/><stop offset="100%" stop-color="#818cf8"/>
-    </linearGradient>
-    <linearGradient id="moon" x1="0" y1="1" x2="1" y2="0">
-      <stop offset="0%" stop-color="#fde68a"/><stop offset="100%" stop-color="#f59e0b"/>
+    <radialGradient id="halo" cx="0.5" cy="0.52" r="0.55">
+      <stop offset="0%" stop-color="#6366f1" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="#6366f1" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="moon" x1="0" y1="1" x2="0.6" y2="0">
+      <stop offset="0%" stop-color="#f59e0b"/><stop offset="55%" stop-color="#fcd34d"/><stop offset="100%" stop-color="#fff7e0"/>
     </linearGradient>
   </defs>
   <rect width="512" height="512" rx="112" fill="url(#bg)"/>
-  <path d="M-20 168 C 90 96, 260 120, 532 196 L 532 260 C 280 190, 110 170, -20 226 Z" fill="url(#aur)" opacity="0.55"/>
-  <circle cx="88" cy="96" r="3" fill="#fff" opacity="0.8"/>
-  <circle cx="410" cy="120" r="2.5" fill="#fff" opacity="0.9"/>
-  <circle cx="350" cy="210" r="2" fill="#fff" opacity="0.55"/>
-  <circle cx="120" cy="200" r="2" fill="#fff" opacity="0.5"/>
-  <path d="M 321 204 A 116 116 0 1 0 205 438 A 98 98 0 0 1 321 204 Z" fill="url(#moon)"/>
-  <circle cx="455" cy="300" r="2" fill="#fff" opacity="0.45"/>
-  <circle cx="60" cy="420" r="2" fill="#fff" opacity="0.35"/>
+  <rect width="512" height="512" rx="112" fill="url(#halo)"/>
+  <circle cx="256" cy="266" r="148" fill="url(#moon)"/>
+  <circle cx="334" cy="193" r="182" fill="#0b1026"/>
+  <path d="M 338 82 L 352 130 L 400 144 L 352 158 L 338 206 L 324 158 L 276 144 L 324 130 Z" fill="#fff7e0" opacity="0.95"/>
+  <path d="M 392 150 L 400 172 L 422 180 L 400 188 L 392 210 L 384 188 L 362 180 L 384 172 Z" fill="#fff7e0" opacity="0.6"/>
 </svg>
