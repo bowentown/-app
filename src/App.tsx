@@ -14,6 +14,7 @@ import { ActiveSleepModal } from './components/ActiveSleepModal';
 import { ManualLogModal } from './components/ManualLogModal';
 import { APP_THEMES } from './utils/themeStyles';
 import { isNativePlatform, syncAlarmsToNative } from './utils/nativeAlarmScheduler';
+import { LaunchSplash } from './components/LaunchSplash';
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<NavTab>('today');
@@ -158,6 +159,7 @@ export const App: React.FC = () => {
     <div
       className={`min-h-screen w-full theme-${currentTheme.id} ${currentTheme.pageBg} ${currentTheme.textPrimary} selection:bg-indigo-500/30 relative flex flex-col transition-colors duration-300`}
     >
+      <LaunchSplash />
       {/* 夜间护眼：暖色滤镜 + 减光（强度在偏好区调节） */}
       {userProfile.warmthFilter && (
         <div className="fixed inset-0 z-[70] pointer-events-none" style={{ background: 'rgba(255,147,41,0.10)', mixBlendMode: 'multiply' }} />

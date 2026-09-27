@@ -111,6 +111,14 @@ jobs:
           cp -r native-resources/res/raw/* android/app/src/main/res/raw/
           cp -r native-resources/res/drawable/* android/app/src/main/res/drawable/
           cp native-resources/splash.png android/app/src/main/res/drawable/splash.png
+          # 品牌启动图标：全密度 + 自适应图标（前景/底色）+ 深色启动屏（含品牌图标居中）
+          cp -r native-resources/mipmap/* android/app/src/main/res/
+          mkdir -p android/app/src/main/res/mipmap-anydpi-v26
+          cp native-resources/adaptive/ic_launcher.xml android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+          cp native-resources/adaptive/ic_launcher_round.xml android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
+          sed -i 's/#FFFFFF/#0B1026/' android/app/src/main/res/values/colors.xml
+          mkdir -p android/app/src/main/res/drawable-night
+          cp native-resources/splash.png android/app/src/main/res/drawable-night/splash.png
 
           echo "android.useAndroidX=true" >> android/gradle.properties
           echo "android.enableJetifier=true" >> android/gradle.properties
