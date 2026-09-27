@@ -106,19 +106,10 @@ for y in range(S):
         r = lerp(r, ar, min(1, a_core + a_glow)); g = lerp(g, ag, min(1, a_core + a_glow)); b = lerp(b, ab, min(1, a_core + a_glow))
         # 弯刀月牙
         if crescent(x, y):
-            d1 = math.sqrt((x - C1X) ** 2 + (y - C1Y) ** 2)
-            tt = clamp((y - (C1Y - R1)) / (2 * R1), 0, 1)
-            if tt < 0.45:
-                k = tt / 0.45
-                cr, cg, cb = lerp(LIT_HI[0], LIT_MID[0], k), lerp(LIT_HI[1], LIT_MID[1], k), lerp(LIT_HI[2], LIT_MID[2], k)
-            else:
-                k = (tt - 0.45) / 0.55
-                cr, cg, cb = lerp(LIT_MID[0], LIT_LO[0], k), lerp(LIT_MID[1], LIT_LO[1], k), lerp(LIT_MID[2], LIT_LO[2], k)
-            edge = smooth(R1, R1 - 7, d1)
-            d2 = math.sqrt((x - C2X) ** 2 + (y - C2Y) ** 2)
-            edge2 = smooth(R2, R2 + 6, d2)
-            m = edge * edge2
-            r = lerp(r, cr, m); g = lerp(g, cg, m); b = lerp(b, cb, m)
+            # 纯位置渐变（无光照模型）：左下亮青 → 右上深蓝，与参考图一致的干净渐变
+            t = clamp(((x - (C1X - R1)) + (y - (C1Y - R1)) * 0.55) / (2 * R1 * 1.35), 0, 1)
+            cr = lerp(LIT_LO[0], LIT_HI[0], t); cg = lerp(LIT_LO[1], LIT_HI[1], t); cb = lerp(LIT_LO[2], LIT_HI[2], t)
+            r, g, b = cr, cg, cb
         # 暗角
         vx, vy = (x / S - 0.5) * 2, (y / S - 0.5) * 2
         vig = 1 - 0.30 * (vx * vx + vy * vy)
