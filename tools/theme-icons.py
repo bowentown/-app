@@ -45,6 +45,18 @@ C2X, C2Y, R2 = 345, 168, 142
 WATERLINE = 396
 STARS = ((92,74,2.6,0.9),(180,44,2.0,0.7),(300,36,2.8,0.85),(408,66,2.2,0.8),(452,140,2.0,0.55),(66,140,1.9,0.5),(252,72,1.7,0.55),(376,26,1.6,0.45))
 
+# ===== 自适应前景构图变换（与默认 fg 同构：构图中心对齐画布中心，缩放落安全圆）=====
+SC, CCX, CCY = 0.82, 256, 266
+FSC, CXC, CYC = 0.88, 267, 267
+def sc(v, base): return base + (v - base) * SC
+def T(vx, vy): return (256 + (vx - CXC) * FSC, 256 + (vy - CYC) * FSC)
+_p1 = T(sc(235, CCX), sc(218, CCY)); _p2 = T(sc(345, CCX), sc(168, CCY))
+FG_C1X, FG_C1Y, FG_R1 = _p1[0], _p1[1], 155 * SC * FSC
+FG_C2X, FG_C2Y, FG_R2 = _p2[0], _p2[1], 142 * SC * FSC
+FG_WL = T(256, sc(396, CCY))[1]
+_s1 = T(330, 120); _s2 = T(160, 118); _s3 = T(408, 214)
+FG_STARS = ((_s1[0], _s1[1], 3.0 * FSC, 0.95), (_s2[0], _s2[1], 2.0 * FSC, 0.6), (_s3[0], _s3[1], 1.8 * FSC, 0.5))
+
 # ===== 四主题月色调板 =====
 # bg_top/bg_bot 背景 · lo/mid/hi 月牙受光渐变（下亮→上深）· refl 倒影色 · star 星色
 PALETTES = {
@@ -54,8 +66,26 @@ PALETTES = {
     'serene_blue': dict(bg_top=(4,20,31),   bg_bot=(2,8,13),   lo=(204,251,241), mid=(45,212,191), hi=(13,148,136),  refl=(153,246,228), star=(230,255,250), glow=(45,180,170)),
 }
 
-def render_theme(P):
-    """渲染单主题 512 画布，返回 rows（0-255 RGB）"""
+def render_theme(P, fg=False):
+    """渲染单主题 512 画布，返回 rows（0-255 RGB）；fg=True 时输出居中缩放的自适应前景构图"""
+    if fg:
+        C1Xg, C1Yg, R1g = FG_C1X, FG_C1Y, FG_R1
+        C2Xg, C2Yg, R2g = FG_C2X, FG_C2Y, FG_R2
+        wl = FG_WL
+        stars = FG_STARS
+        halo_span = 46 * FSC
+    else:
+        C1Xg, C1Yg, R1g = C1X, C1Y, R1
+        C2Xg, C2Yg, R2g = C2X, C2Y, R2
+        wl = WATERLINE
+        stars = STARS
+        halo_span = 46
+
+    def in_crescent(x, y):
+        d1 = math.sqrt((x - C1Xg) ** 2 + (y - C1Yg) ** 2)
+        d2 = math.sqrt((x - C2Xg) ** 2 + (y - C2Yg) ** 2)
+        return d1 <= R1g and d2 > R2g
+
     random.seed(hash(theme_seed(P)) & 0xffff)
     noise = [(random.random() - 0.5) * 9 for _ in range(S * S)]
     ni = 0
@@ -68,38 +98,39 @@ def render_theme(P):
         base_b = lerp(P['bg_top'][2], P['bg_bot'][2], ty)
         for x in range(S):
             r, g, b = base_r, base_g, base_b
-            if crescent(x, y):
-                d1 = math.sqrt((x - C1X) ** 2 + (y - C1Y) ** 2)
-                tt = clamp((y - (C1Y - R1)) / (2 * R1), 0, 1)
+            if in_crescent(x, y):
+                d1 = math.sqrt((x - C1Xg) ** 2 + (y - C1Yg) ** 2)
+                tt = clamp((y - (C1Yg - R1g)) / (2 * R1g), 0, 1)
                 if tt < 0.45:
                     k = tt / 0.45
                     cr, cg, cb = lerp(P['hi'][0], P['mid'][0], k), lerp(P['hi'][1], P['mid'][1], k), lerp(P['hi'][2], P['mid'][2], k)
                 else:
                     k = (tt - 0.45) / 0.55
                     cr, cg, cb = lerp(P['mid'][0], P['lo'][0], k), lerp(P['mid'][1], P['lo'][1], k), lerp(P['mid'][2], P['lo'][2], k)
-                edge = smooth(R1, R1 - 7, d1)
-                d2 = math.sqrt((x - C2X) ** 2 + (y - C2Y) ** 2)
-                edge2 = smooth(R2, R2 + 6, d2)
+                edge = smooth(R1g, R1g - 7, d1)
+                d2 = math.sqrt((x - C2Xg) ** 2 + (y - C2Yg) ** 2)
+                edge2 = smooth(R2g, R2g + 6, d2)
                 m = edge * edge2
                 r = lerp(r, cr, m); g = lerp(g, cg, m); b = lerp(b, cb, m)
             else:
-                d1 = math.sqrt((x - C1X) ** 2 + (y - C1Y) ** 2)
-                if d1 <= R1 + 46:
-                    gl = smooth(R1 + 46, R1, d1) * 0.15
-                    r += (120 - r) * gl; g += (200 - g) * gl; b += (255 - b) * gl
-            # 水面镜像倒影：细波浪线（采样月牙，随深度衰减）
-            if y >= WATERLINE:
-                depth = (y - WATERLINE) / (S - WATERLINE)
-                src_y = WATERLINE - (y - WATERLINE) / 1.5
+                if not fg:
+                    d1 = math.sqrt((x - C1Xg) ** 2 + (y - C1Yg) ** 2)
+                    if d1 <= R1g + halo_span:
+                        gl = smooth(R1g + halo_span, R1g, d1) * 0.15
+                        r += (120 - r) * gl; g += (200 - g) * gl; b += (255 - b) * gl
+            # 水面镜像倒影（legacy：连续镜面带；fg：离散细波纹线，主循环后绘制）
+            if y >= wl and not fg:
+                depth = (y - wl) / (S - wl)
+                src_y = wl - (y - wl) / 1.5
                 if 0 <= src_y < S:
                     x_off = math.sin(y * 0.13 + 1.1) * (2 + depth * 9) + math.sin(y * 0.047 + 0.6) * (1.5 + depth * 6)
                     sx = int(x + x_off)
-                    if 0 <= sx < S and crescent(sx, int(src_y)):
+                    if 0 <= sx < S and in_crescent(sx, int(src_y)):
                         fade = (1 - depth * 0.9) * 0.7
                         r = lerp(r, P['refl'][0], fade); g = lerp(g, P['refl'][1], fade); b = lerp(b, P['refl'][2], fade)
             # 繁星
             st = P['star']
-            for sx, sy, sr, sa in STARS:
+            for sx, sy, sr, sa in stars:
                 dxs, dys = x - sx, y - sy
                 dd = math.sqrt(dxs * dxs + dys * dys)
                 if dd < sr * 3.2:
@@ -112,6 +143,30 @@ def render_theme(P):
             r += noise[ni]; g += noise[ni]; b += noise[ni]; ni += 1
             row[x] = (clamp(r, 0, 255), clamp(g, 0, 255), clamp(b, 0, 255))
         rows.append(row)
+
+    # fg 构图的离散波纹线（与默认 fg 同算法：镜像月牙采样，随深度变碎变淡）
+    if fg:
+        for i, yy in enumerate((402, 413, 425, 438, 452, 466, 480)):
+            yi = int(T(256, sc(yy, CCY))[1])
+            comp = 1.5 + i * 0.55
+            wave = (2.0 + i * 0.8) * SC * FSC
+            fade = 0.95 - i * 0.09
+            src_y = wl - (yi - wl) * comp
+            if not (0 <= src_y < S):
+                continue
+            for x in range(S):
+                xw = x + math.sin(x * 0.045 + yi * 0.21) * wave
+                if in_crescent(xw, src_y):
+                    for dyi, wv in ((0, 1.0), (-1, 0.55), (1, 0.55)):
+                        yy2 = yi + dyi
+                        if not (0 <= yy2 < S):
+                            continue
+                        px = rows[yy2][x]
+                        rows[yy2][x] = (
+                            lerp(px[0], P['refl'][0], fade * wv),
+                            lerp(px[1], P['refl'][1], fade * wv),
+                            lerp(px[2], P['refl'][2], fade * wv),
+                        )
     return rows
 
 def theme_seed(P):
@@ -132,9 +187,10 @@ for theme_id, P in PALETTES.items():
     for d, size in DENSITIES_LEGACY:
         write_png_rgb(f'{out}/mipmap-{d}/ic_launcher_{theme_id}.png', size, size, area_resize(rows, S, S, size, size))
         write_png_rgb(f'{out}/mipmap-{d}/ic_launcher_round_{theme_id}.png', size, size, area_resize(rows, S, S, size, size))
+    fg_rows = render_theme(P, fg=True)
     for d, size in DENSITIES_FG:
-        write_png_rgb(f'{out}/mipmap-{d}/ic_launcher_foreground_{theme_id}.png', size, size, area_resize(rows, S, S, size, size))
-    print(f'✓ {theme_id}: 15 个图标')
+        write_png_rgb(f'{out}/mipmap-{d}/ic_launcher_foreground_{theme_id}.png', size, size, area_resize(fg_rows, S, S, size, size))
+    print(f'✓ {theme_id}: 15 个图标（legacy 全出血 + fg 居中构图）')
 
 # ===== 自适应图标 XML（每主题一份，引用独立前景与底色）=====
 os.makedirs('native-resources/adaptive', exist_ok=True)
