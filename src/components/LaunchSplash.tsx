@@ -61,8 +61,8 @@ export const LaunchSplash: React.FC<{ theme: ThemeConfig }> = ({ theme }) => {
         style={{
           opacity: 0,
           animation: 'splash-aurora-in 800ms ease-out 1500ms both',
-          background: `linear-gradient(115deg, transparent 12%, ${mc.aur1}38 36%, ${mc.aur2}30 56%, transparent 80%)`,
-          filter: 'blur(30px)',
+          background: `repeating-linear-gradient(97deg, transparent 0 14px, ${mc.aur2}22 14px 22px, transparent 22px 40px), linear-gradient(180deg, transparent 8%, ${mc.aur1}30 45%, transparent 85%)`,
+          filter: 'blur(14px)',
         }}
       />
 

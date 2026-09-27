@@ -8,7 +8,7 @@
     </linearGradient>
   </defs>
   <rect width="512" height="512" rx="112" fill="url(#bg)"/>
-  <path d="M-40 120 C 120 40, 320 90, 552 220 L 552 300 C 330 180, 130 150, -40 210 Z" fill="#2d529e" opacity="0.45"/>
+
   <circle cx="92" cy="74" r="3" fill="#fff" opacity="0.85"/>
   <circle cx="300" cy="36" r="2.5" fill="#fff" opacity="0.8"/>
   <circle cx="408" cy="66" r="2.5" fill="#fff" opacity="0.75"/>

@@ -61,7 +61,7 @@ def crescent(x, y):
     d2 = math.sqrt((x - C2X) ** 2 + (y - C2Y) ** 2)
     return d1 <= R1 and d2 > R2
 
-# ===== 极光帘幕：弯曲带 + 垂直光柱纹理（青绿→紫，饱和）=====
+# ===== 极光帘幕（当前停用：图标小画布上呈雾状圆斑，仅开屏动画使用）=====
 # 带：沿从左下到右上的弧线，高斯横截面，两层（核心亮 + 外围晕）
 AUR_P0 = (-60, 470)          # 弧线起点
 AUR_D = (1.0, -0.62)         # 弧线方向（右上）
@@ -101,9 +101,6 @@ for y in range(S):
     base_r = lerp(TOP[0], BOT[0], ty); base_g = lerp(TOP[1], BOT[1], ty); base_b = lerp(TOP[2], BOT[2], ty)
     for x in range(S):
         r, g, b = base_r, base_g, base_b
-        # 极光帘幕（在月牙后方，先绘制）
-        a_core, a_glow, (ar, ag, ab) = aurora_alpha(x, y)
-        r = lerp(r, ar, min(1, a_core + a_glow)); g = lerp(g, ag, min(1, a_core + a_glow)); b = lerp(b, ab, min(1, a_core + a_glow))
         # 弯刀月牙
         if crescent(x, y):
             # 纯位置渐变（无光照模型）：左下亮青 → 右上深蓝，与参考图一致的干净渐变
