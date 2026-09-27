@@ -46,10 +46,10 @@ export const MoonDisc: React.FC<MoonDiscProps> = ({
     >
       <defs>
         <clipPath id={`${uid}lit`}>
-          <rect x={litSideX} y="0" width="40" height="80" />
+          <rect x={litSideX - 0.5} y="0" width="41" height="80" />
         </clipPath>
         <clipPath id={`${uid}dark`}>
-          <rect x={darkSideX} y="0" width="40" height="80" />
+          <rect x={darkSideX - 0.5} y="0" width="41" height="80" />
         </clipPath>
       </defs>
       {/* 暗底 */}
