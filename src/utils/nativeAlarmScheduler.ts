@@ -12,6 +12,15 @@ interface CapacitorLocalNotificationsPlugin {
   schedule: (options: { notifications: any[] }) => Promise<any>;
   cancel: (options: { notifications: { id: number }[] }) => Promise<any>;
   getPending: () => Promise<{ notifications: any[] }>;
+  createChannel: (channel: {
+    id: string;
+    name: string;
+    description?: string;
+    importance?: number;
+    sound?: string;
+    vibration?: boolean;
+    visibility?: number;
+  }) => Promise<any>;
 }
 
 function getCapacitor(): any {
@@ -69,6 +78,22 @@ export async function syncAlarmsToNative(alarms: CustomAlarmSetting[]): Promise<
   }
 
   try {
+    // 专用闹钟通知通道：IMPORTANCE_HIGH（息屏会响铃/震动）+ 30 秒渐弱钟声（res/raw/gentle_chime.wav）。
+    // Android 8+ 的声音属于通道而非通知，必须先建好通道再调度。
+    try {
+      await plugin.createChannel({
+        id: 'somnacare-alarm',
+        name: '极光睡眠闹钟',
+        description: '定时睡眠唤醒（重要级，熄屏可响）',
+        importance: 5,
+        sound: 'gentle_chime.wav',
+        vibration: true,
+        visibility: 1,
+      });
+    } catch {
+      // 通道已存在或创建失败不阻断调度
+    }
+
     // 1. 取消已挂起的历史通知，防止重复堆叠
     const pending = await plugin.getPending();
     if (pending?.notifications?.length > 0) {
@@ -105,6 +130,7 @@ export async function syncAlarmsToNative(alarms: CustomAlarmSetting[]): Promise<
             at: targetDate,
             allowWhileIdle: true,
           },
+          channelId: 'somnacare-alarm',
           extra: { alarmId: alarm.id },
         });
       } else {
@@ -124,6 +150,7 @@ export async function syncAlarmsToNative(alarms: CustomAlarmSetting[]): Promise<
               },
               allowWhileIdle: true,
             },
+            channelId: 'somnacare-alarm',
             extra: { alarmId: alarm.id, isoDay },
           });
         });

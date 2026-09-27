@@ -242,6 +242,9 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
             <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap">
               杀进程与息屏均不影响响铃
             </span>
+            <span className="text-[10px] text-amber-300/90 font-medium whitespace-nowrap">
+              若息屏未响：请允许自启动、省电设为“无限制”、调高通知音量
+            </span>
           </div>
         )}
         {permissionHint && (

@@ -99,6 +99,10 @@ jobs:
           # MediaPipe 要求 minSdk ≥ 24（Capacitor 模板默认 23）
           sed -i 's/minSdkVersion = 23/minSdkVersion = 24/' android/variables.gradle
 
+          # 注入闹钟铃声资源（30 秒渐弱钟声，通知通道用；息屏响铃依赖它）
+          mkdir -p android/app/src/main/res/raw
+          cp -r native-resources/res/raw/* android/app/src/main/res/raw/
+
           echo "android.useAndroidX=true" >> android/gradle.properties
           echo "android.enableJetifier=true" >> android/gradle.properties
 
