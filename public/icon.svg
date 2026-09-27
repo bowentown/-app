@@ -6,12 +6,9 @@
     <linearGradient id="m" x1="0" y1="1" x2="0.7" y2="0">
       <stop offset="0%" stop-color="#a8e6ff"/><stop offset="55%" stop-color="#60bef5"/><stop offset="100%" stop-color="#2563eb"/>
     </linearGradient>
-    <linearGradient id="aur" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#2d529e" stop-opacity="0.9"/><stop offset="100%" stop-color="#9db4ff" stop-opacity="0.5"/>
-    </linearGradient>
   </defs>
   <rect width="512" height="512" rx="112" fill="url(#bg)"/>
-  <path d="M-40 120 C 120 40, 320 90, 552 220 L 552 300 C 330 180, 130 150, -40 210 Z" fill="url(#aur)" opacity="0.5"/>
+  <path d="M-40 120 C 120 40, 320 90, 552 220 L 552 300 C 330 180, 130 150, -40 210 Z" fill="#2d529e" opacity="0.45"/>
   <circle cx="92" cy="74" r="3" fill="#fff" opacity="0.85"/>
   <circle cx="300" cy="36" r="2.5" fill="#fff" opacity="0.8"/>
   <circle cx="408" cy="66" r="2.5" fill="#fff" opacity="0.75"/>
@@ -19,13 +16,13 @@
   <circle cx="252" cy="72" r="1.8" fill="#fff" opacity="0.5"/>
   <circle cx="235" cy="218" r="155" fill="url(#m)"/>
   <circle cx="345" cy="168" r="142" fill="#060b1a"/>
-  <g fill="#8fd0f8">
-    <ellipse cx="209" cy="402" rx="150" ry="5" opacity="0.55"/>
-    <ellipse cx="209" cy="416" rx="118" ry="4.4" opacity="0.48"/>
-    <ellipse cx="221" cy="429" rx="132" ry="4" opacity="0.42"/>
-    <ellipse cx="203" cy="441" rx="92" ry="3.6" opacity="0.36"/>
-    <ellipse cx="217" cy="453" rx="108" ry="3.2" opacity="0.30"/>
-    <ellipse cx="205" cy="464" rx="66" ry="2.8" opacity="0.24"/>
-    <ellipse cx="219" cy="475" rx="84" ry="2.6" opacity="0.18"/>
+  <g stroke="#8fd0f8">
+    <line x1="60" y1="402" x2="360" y2="402" stroke-width="3" opacity="0.55"/>
+    <line x1="92" y1="414" x2="326" y2="414" stroke-width="2.6" opacity="0.48"/>
+    <line x1="88" y1="426" x2="354" y2="426" stroke-width="2.2" opacity="0.42"/>
+    <line x1="140" y1="438" x2="296" y2="438" stroke-width="1.8" opacity="0.36"/>
+    <line x1="112" y1="450" x2="326" y2="450" stroke-width="1.6" opacity="0.30"/>
+    <line x1="172" y1="462" x2="272" y2="462" stroke-width="1.3" opacity="0.24"/>
+    <line x1="158" y1="473" x2="304" y2="473" stroke-width="1.1" opacity="0.18"/>
   </g>
 </svg>
