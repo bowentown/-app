@@ -156,8 +156,15 @@ export const App: React.FC = () => {
 
   return (
     <div
-      className={`min-h-screen w-full ${currentTheme.pageBg} ${currentTheme.textPrimary} selection:bg-indigo-500/30 relative flex flex-col transition-colors duration-300`}
+      className={`min-h-screen w-full theme-${currentTheme.id} ${currentTheme.pageBg} ${currentTheme.textPrimary} selection:bg-indigo-500/30 relative flex flex-col transition-colors duration-300`}
     >
+      {/* 夜间护眼：暖色滤镜 + 减光（强度在偏好区调节） */}
+      {userProfile.warmthFilter && (
+        <div className="fixed inset-0 z-[70] pointer-events-none" style={{ background: 'rgba(255,147,41,0.10)', mixBlendMode: 'multiply' }} />
+      )}
+      {userProfile.brightnessLevel < 100 && (
+        <div className="fixed inset-0 z-[70] pointer-events-none" style={{ background: `rgba(0,0,0,${((100 - userProfile.brightnessLevel) / 100) * 0.55})` }} />
+      )}
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[90] px-5 py-3 rounded-2xl bg-indigo-600 text-white text-xs font-black shadow-2xl flex items-center gap-2.5 animate-bounce border border-indigo-400">

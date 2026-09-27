@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Moon, Clock, Sparkles, Check } from 'lucide-react';
+import { X, Moon, Clock, Sparkles, Check, Smartphone, Coffee, Bath, Flower2, BookOpen, Dumbbell, Wine, Utensils } from 'lucide-react';
 import { SleepRecord, WakingMood } from '../types/sleep';
 import { calculateSleepScore, generateSleepStages } from '../utils/sleepScore';
 import { ThemeConfig } from '../utils/themeStyles';
@@ -13,14 +13,14 @@ interface ManualLogModalProps {
 }
 
 const HABIT_OPTIONS = [
-  { id: 'screen_time', label: '睡前玩手机', emoji: '📱' },
-  { id: 'caffeine', label: '下午喝咖啡/茶', emoji: '☕' },
-  { id: 'hot_bath', label: '睡前温水澡', emoji: '🛁' },
-  { id: 'meditation', label: '冥想/腹式呼吸', emoji: '🧘' },
-  { id: 'reading', label: '纸质书阅读', emoji: '📖' },
-  { id: 'workout', label: '晚间运动', emoji: '🏃' },
-  { id: 'alcohol', label: '睡前饮酒', emoji: '🍷' },
-  { id: 'heavy_meal', label: '夜宵饱腹', emoji: '🍜' },
+  { id: 'screen_time', label: '睡前玩手机', icon: Smartphone },
+  { id: 'caffeine', label: '下午喝咖啡/茶', icon: Coffee },
+  { id: 'hot_bath', label: '睡前温水澡', icon: Bath },
+  { id: 'meditation', label: '冥想/腹式呼吸', icon: Flower2 },
+  { id: 'reading', label: '纸质书阅读', icon: BookOpen },
+  { id: 'workout', label: '晚间运动', icon: Dumbbell },
+  { id: 'alcohol', label: '睡前饮酒', icon: Wine },
+  { id: 'heavy_meal', label: '夜宵饱腹', icon: Utensils },
 ];
 
 export const ManualLogModal: React.FC<ManualLogModalProps> = ({
@@ -255,7 +255,7 @@ export const ManualLogModal: React.FC<ManualLogModalProps> = ({
                         : `${innerBg} text-slate-200 border ${innerBorder} hover:border-slate-400`
                     }`}
                   >
-                    <span>{h.emoji}</span>
+                    <h.icon className="w-3.5 h-3.5" />
                     <span>{h.label}</span>
                   </button>
                 );

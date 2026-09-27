@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Moon,
   Plus,
@@ -33,6 +33,24 @@ export const TodayTab: React.FC<TodayTabProps> = ({
   theme,
 }) => {
   const latestRecord = records[0] || null;
+
+  // 得分环 + 数字 count-up（进入页面时 0 → 目标值，800ms 缓出）
+  const [displayScore, setDisplayScore] = useState(0);
+  useEffect(() => {
+    if (!latestRecord) return;
+    const target = Math.min(99, Math.max(25, latestRecord.sleepScore));
+    const start = performance.now();
+    const dur = 800;
+    let raf = 0;
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - start) / dur);
+      const eased = 1 - Math.pow(1 - t, 3);
+      setDisplayScore(Math.round(target * eased));
+      if (t < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [latestRecord?.sleepScore, latestRecord?.id]);
 
   const getScoreColor = (score: number) => {
     if (score >= 88) return { text: 'text-indigo-400', stroke: '#818cf8', label: '优' };
@@ -70,7 +88,7 @@ export const TodayTab: React.FC<TodayTabProps> = ({
                   r="40"
                   stroke={scoreInfo.stroke}
                   strokeWidth="8"
-                  strokeDasharray={`${(latestRecord.sleepScore / 100) * 251.2} 251.2`}
+                  strokeDasharray={`${(displayScore / 100) * 251.2} 251.2`}
                   strokeLinecap="round"
                   fill="none"
                   className="transition-all duration-700 ease-out"
@@ -78,7 +96,7 @@ export const TodayTab: React.FC<TodayTabProps> = ({
               </svg>
               <div className="absolute flex flex-col items-center justify-center">
                 <span className="text-2xl font-black font-mono text-white tabular-nums leading-none">
-                  {latestRecord.sleepScore}
+                  {displayScore}
                 </span>
                 <span className={`text-[11px] font-black mt-1 ${scoreInfo.text}`}>
                   {scoreInfo.label}
@@ -141,7 +159,7 @@ export const TodayTab: React.FC<TodayTabProps> = ({
           <div className={`w-12 h-12 rounded-2xl ${theme.cardInnerBg} border ${theme.cardBorder} flex items-center justify-center mx-auto shadow-inner`}>
             <Moon className={`w-6 h-6 ${theme.accentText}`} />
           </div>
-          <h4 className="text-sm font-black text-white pt-1">暂无睡眠记录</h4>
+          <h4 className="text-sm font-bold text-white pt-1">暂无睡眠记录</h4>
           <p className={`text-xs ${theme.textMuted}`}>点击上方开始就寝，或通过下方快速补录真实作息</p>
         </div>
       )}
@@ -166,7 +184,7 @@ export const TodayTab: React.FC<TodayTabProps> = ({
             </div>
             <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-white transition-colors" />
           </div>
-          <span className="text-sm font-black text-white block">晨起手动补录</span>
+          <span className="text-sm font-bold text-white block">晨起手动补录</span>
           <span className={`text-xs ${theme.textMuted} mt-0.5 block font-medium`}>按昨夜真实起居补记</span>
         </button>
 
@@ -181,7 +199,7 @@ export const TodayTab: React.FC<TodayTabProps> = ({
             </div>
             <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-white transition-colors" />
           </div>
-          <span className="text-sm font-black text-white block">床头夜钟伴眠</span>
+          <span className="text-sm font-bold text-white block">床头夜钟伴眠</span>
           <span className={`text-xs ${theme.textMuted} mt-0.5 block font-medium`}>极简暗屏 · 助眠白噪</span>
         </button>
       </div>

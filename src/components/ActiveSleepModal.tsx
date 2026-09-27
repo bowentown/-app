@@ -1,5 +1,7 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { Moon, Bell, Volume2, Sparkles, X, ChevronRight, Check } from 'lucide-react';
+import { Bell, Volume2, Sparkles, X, ChevronRight, Check, CloudRain, Waves, Flower2, Sunrise, CloudSun, Coffee, CloudFog } from 'lucide-react';
+import MoonDisc from './MoonDisc';
+import { getMoonInfo } from '../utils/moonPhase';
 import { sleepAudio } from '../utils/audioSynth';
 import { calculateSleepScore, generateSleepStages } from '../utils/sleepScore';
 import { SleepRecord, WakingMood } from '../types/sleep';
@@ -42,6 +44,16 @@ export const ActiveSleepModal: React.FC<ActiveSleepModalProps> = ({
   const audioContextRef = useRef<AudioContext | null>(null);
   const rafRef = useRef<number | null>(null);
   const splSmoothRef = useRef<number | null>(null);
+
+  // 声级历史（每 500ms 采样一次，保留最近 90 个点供迷你曲线）
+  const splHistoryRef = useRef<number[]>([]);
+  const lastSampleRef = useRef(0);
+  const [splHistory, setSplHistory] = useState<number[]>([]);
+  // 夜空色调：晚间 19-23 点带一层更深的蓝调渐变（随真实时间演化）
+  const eveningTint = useMemo(() => {
+    const h = new Date().getHours();
+    return Math.max(0, 1 - Math.abs(h - 21) / 4);
+  }, [isOpen]);
 
   // 星点背景：确定性伪随机分布（渲染稳定不闪烁），集中在上半区，随主题强调色着色
   const stars = useMemo(
@@ -172,6 +184,12 @@ export const ActiveSleepModal: React.FC<ActiveSleepModalProps> = ({
         splSmoothRef.current =
           splSmoothRef.current === null ? spl : Math.round(splSmoothRef.current * 0.8 + spl * 0.2);
         setDecibels(splSmoothRef.current);
+        const now = Date.now();
+        if (now - lastSampleRef.current > 500) {
+          lastSampleRef.current = now;
+          splHistoryRef.current = [...splHistoryRef.current.slice(-89), splSmoothRef.current];
+          setSplHistory(splHistoryRef.current);
+        }
         analyser.getByteFrequencyData(freq);
         const bars: number[] = [];
         const bucket = Math.floor(freq.length / 10);
@@ -321,18 +339,25 @@ export const ActiveSleepModal: React.FC<ActiveSleepModalProps> = ({
       {/* Main Night Mode Screen or Morning Review Screen */}
       {!isWakingUp ? (
         <div className="relative z-10 flex-1 flex flex-col items-center justify-center my-6 text-center">
-          {/* Breathing moon */}
-          <div className="relative w-28 h-28 mb-4 flex items-center justify-center">
+          {/* Breathing moon：真实月相圆盘 */}
+          <div className="relative w-28 h-28 mb-3 flex items-center justify-center">
             <div className="absolute inset-0 rounded-full animate-ping opacity-20" style={{ backgroundColor: `${theme.accentHex}1a` }} />
             <div
               className={`w-24 h-24 rounded-full ${theme.cardInnerBg} border ${theme.cardInnerBorder} flex items-center justify-center shadow-2xl animate-moon-breathe`}
               style={{ boxShadow: `0 18px 50px -12px ${theme.accentHex}40` }}
             >
-              <Moon className={`w-10 h-10 ${theme.accentText}`} />
+              <MoonDisc
+                size={76}
+                litColor={theme.accentHex}
+                darkColor={theme.pageBg.includes('amber') ? '#1c130b' : '#0a1120'}
+                strokeColor={theme.accentHex}
+              />
             </div>
           </div>
 
-          <div className={`text-xs ${theme.accentText} font-medium tracking-wide mb-1`}>{currentDate}</div>
+          <div className={`text-xs ${theme.accentText} font-medium tracking-wide mb-1`}>
+            {currentDate} · {getMoonInfo().phaseName}（月龄 {getMoonInfo().age.toFixed(1)} 天）
+          </div>
           <div className="text-5xl font-mono font-bold tracking-tight text-white mb-2 tabular-nums">
             {currentTime || '23:45:00'}
           </div>
@@ -373,6 +398,23 @@ export const ActiveSleepModal: React.FC<ActiveSleepModalProps> = ({
                 />
               ))}
             </div>
+            {/* 声级历史迷你曲线（最近 45 秒） */}
+            <svg viewBox="0 0 100 24" preserveAspectRatio="none" className="w-full h-6 mt-1">
+              <polyline
+                fill="none"
+                stroke={theme.accentHex}
+                strokeWidth="1.5"
+                strokeLinejoin="round"
+                opacity="0.8"
+                points={splHistory
+                  .map((v, i) => {
+                    const x = (i / Math.max(1, splHistory.length - 1)) * 100;
+                    const y = 24 - ((Math.min(110, Math.max(25, v)) - 25) / 85) * 22 - 1;
+                    return `${x.toFixed(1)},${y.toFixed(1)}`;
+                  })
+                  .join(' ')}
+              />
+            </svg>
             <div className={`text-[11px] ${theme.textMuted} mt-2 text-left space-y-0.5`}>
               <p className={`${theme.textSecondary} font-medium`}>
                 {micStatus === 'active'
@@ -407,24 +449,29 @@ export const ActiveSleepModal: React.FC<ActiveSleepModalProps> = ({
             <div className="grid grid-cols-3 gap-2">
               {(
                 [
-                  { type: 'rain' as const, icon: '🌧️ 雨声', desc: '窗畔细雨' },
-                  { type: 'ocean' as const, icon: '🌊 海浪', desc: '深海潮汐' },
-                  { type: 'bowl' as const, icon: '🧘 颂钵', desc: '冥想音景' },
+                  { type: 'rain' as const, icon: CloudRain, label: '雨声', desc: '窗畔细雨' },
+                  { type: 'ocean' as const, icon: Waves, label: '海浪', desc: '深海潮汐' },
+                  { type: 'bowl' as const, icon: Flower2, label: '颂钵', desc: '冥想音景' },
                 ]
-              ).map((s) => (
-                <button
-                  key={s.type}
-                  onClick={() => toggleSound(s.type)}
-                  className={`py-2 px-2.5 rounded-xl border text-xs flex flex-col items-center gap-1 transition-all ${
-                    isAudioPlaying && activeSound === s.type
-                      ? `${theme.navActiveBg} border ${theme.cardInnerBorder} ${theme.accentText}`
-                      : `${theme.cardInnerBg} border ${theme.cardInnerBorder} ${theme.textSecondary} hover:opacity-80`
-                  }`}
-                >
-                  <span>{s.icon}</span>
-                  <span className={`text-[10px] ${theme.textMuted}`}>{s.desc}</span>
-                </button>
-              ))}
+              ).map((s) => {
+                const Icon = s.icon;
+                const active = isAudioPlaying && activeSound === s.type;
+                return (
+                  <button
+                    key={s.type}
+                    onClick={() => toggleSound(s.type)}
+                    className={`py-2 px-2.5 rounded-xl border text-xs flex flex-col items-center gap-1 transition-all ${
+                      active
+                        ? `${theme.navActiveBg} border ${theme.cardInnerBorder} ${theme.accentText}`
+                        : `${theme.cardInnerBg} border ${theme.cardInnerBorder} ${theme.textSecondary} hover:opacity-80`
+                    }`}
+                  >
+                    <Icon className={`w-4 h-4 ${active ? theme.accentText : theme.textMuted}`} />
+                    <span>{s.label}</span>
+                    <span className={`text-[10px] ${theme.textMuted}`}>{s.desc}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -445,10 +492,10 @@ export const ActiveSleepModal: React.FC<ActiveSleepModalProps> = ({
             <div className="grid grid-cols-4 gap-2">
               {(
                 [
-                  { key: 'refreshed', emoji: '✨', label: '精力充沛' },
-                  { key: 'neutral', emoji: '😌', label: '平稳自然' },
-                  { key: 'tired', emoji: '🥱', label: '略带倦意' },
-                  { key: 'groggy', emoji: '😵', label: '昏睡困滞' },
+                  { key: 'refreshed', icon: Sunrise, label: '精力充沛' },
+                  { key: 'neutral', icon: CloudSun, label: '平稳自然' },
+                  { key: 'tired', icon: Coffee, label: '略带倦意' },
+                  { key: 'groggy', icon: CloudFog, label: '昏睡困滞' },
                 ] as const
               ).map((item) => (
                 <button
@@ -460,7 +507,10 @@ export const ActiveSleepModal: React.FC<ActiveSleepModalProps> = ({
                       : `${theme.cardInnerBg} border ${theme.cardInnerBorder} ${theme.textMuted} hover:opacity-80`
                   }`}
                 >
-                  <span className="text-xl">{item.emoji}</span>
+                  {(() => {
+                    const Icon = item.icon;
+                    return <Icon className={`w-5 h-5 ${selectedMood === item.key ? theme.accentText : theme.textMuted}`} />;
+                  })()}
                   <span className="text-[11px]">{item.label}</span>
                 </button>
               ))}

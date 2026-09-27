@@ -85,7 +85,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               <Palette className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-sm font-black text-white tracking-wide">界面主题</h3>
+              <h3 className="text-sm font-bold text-white tracking-wide">界面主题</h3>
             </div>
           </div>
           <span className="text-[11px] font-bold text-slate-400">
@@ -128,6 +128,46 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         </div>
       </div>
 
+      {/* 1.5 夜间护眼：暖色滤镜 + 减光（此前为死配置，现接入真实渲染） */}
+      <div className={`${theme.cardBg} rounded-3xl p-5 border ${theme.cardBorder} shadow-xl space-y-3`}>
+        <div className="flex items-center gap-2.5 pb-3 border-b border-slate-700/60">
+          <div className="w-8 h-8 rounded-xl bg-orange-500/20 text-orange-300 flex items-center justify-center border border-orange-400">
+            <Eye className="w-4 h-4" />
+          </div>
+          <h3 className="text-sm font-bold text-white">夜间护眼</h3>
+        </div>
+
+        <div className={`${theme.cardInnerBg} border ${theme.cardInnerBorder} rounded-2xl p-3.5 flex items-center justify-between`}>
+          <div>
+            <span className="text-xs font-bold text-slate-200 block">暖色滤镜</span>
+            <span className="text-[10px] text-slate-500">琥珀色减蓝光，睡前更温和</span>
+          </div>
+          <input
+            type="checkbox"
+            checked={!!userProfile.warmthFilter}
+            onChange={(e) => onUpdateProfile({ warmthFilter: e.target.checked })}
+            className="accent-amber-500 w-5 h-5 rounded cursor-pointer"
+          />
+        </div>
+
+        <div className={`${theme.cardInnerBg} border ${theme.cardInnerBorder} rounded-2xl p-3.5 space-y-2`}>
+          <div className="flex justify-between text-xs font-bold">
+            <span className="text-slate-200">屏幕减光</span>
+            <span className="text-indigo-400 font-mono text-sm">{userProfile.brightnessLevel}%</span>
+          </div>
+          <input
+            type="range"
+            min={40}
+            max={100}
+            step={5}
+            value={userProfile.brightnessLevel}
+            onChange={(e) => onUpdateProfile({ brightnessLevel: Number(e.target.value) })}
+            className="w-full accent-indigo-500 cursor-pointer h-2 bg-slate-700 rounded-lg"
+          />
+          <p className="text-[10px] text-slate-500">100 为正常亮度；熄屏前建议调至 55–70，全 App 变暗</p>
+        </div>
+      </div>
+
       {/* 2. Custom Alarm Clocks (Hardware Web Audio) */}
       <div className={`${theme.cardBg} rounded-3xl p-5 border ${theme.cardBorder} shadow-xl`}>
         <AlarmManager
@@ -145,7 +185,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               <Sliders className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-sm font-black text-white">AI 顾问</h3>
+              <h3 className="text-sm font-bold text-white">AI 顾问</h3>
               <p className="text-xs text-slate-300">
                 当前运行：
                 <span className="text-indigo-300 font-bold ml-1">
@@ -182,7 +222,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             <Clock className="w-4 h-4" />
           </div>
           <div>
-            <h3 className="text-sm font-black text-white">作息目标</h3>
+            <h3 className="text-sm font-bold text-white">作息目标</h3>
           </div>
         </div>
 
@@ -267,7 +307,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         <div className="flex items-center justify-between pb-2 border-b border-slate-700/60">
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span className="text-sm font-black text-white">数据备份</span>
+            <span className="text-sm font-bold text-white">数据备份</span>
           </div>
           <span className={`text-[10px] ${theme.textMuted} font-mono`}>共 {records.length} 条记录</span>
         </div>

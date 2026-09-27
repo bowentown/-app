@@ -1,8 +1,36 @@
 @import "tailwindcss";
+@import "@fontsource/space-grotesk/400.css";
+@import "@fontsource/space-grotesk/500.css";
+@import "@fontsource/space-grotesk/700.css";
 
 /* 页面本身即为暗色主题：禁用 WebView Force Dark 的二次压暗（Android/国产 ROM 深色模式） */
 :root {
   color-scheme: dark;
+  /* Design Tokens：间距/圆角/动效收敛（新样式一律引用，存量渐进迁移） */
+  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px; --sp-6: 24px;
+  --r-md: 12px; --r-lg: 16px; --r-xl: 24px;
+  --dur-fast: 150ms; --dur-base: 300ms; --dur-slow: 800ms;
+  /* 显示字体：仅用于时间与大数字（拉丁几何字体子集，CJK 回落系统字体） */
+  --font-display: 'Space Grotesk', ui-rounded, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+html {
+  background: #070a12; /* 冷启动与 WebView 首帧同色，消灭白屏闪现 */
+}
+
+/* 显示字体工具类：数字自动等宽 */
+.font-display {
+  font-family: var(--font-display);
+  font-feature-settings: 'tnum';
+  letter-spacing: -0.01em;
+}
+
+/* OLED 纯黑主题：阴影在纯黑上发灰，改由描边分层 */
+.theme-pure_dark .shadow-xl,
+.theme-pure_dark .shadow-lg,
+.theme-pure_dark .shadow-md,
+.theme-pure_dark .shadow-sm {
+  box-shadow: none !important;
 }
 
 @layer utilities {
@@ -26,7 +54,7 @@
   animation: moon-breathe 4s ease-in-out infinite;
 }
 
-/* 监测页：星点闪烁（配 transform: translate 定位使用） */
+/* 监测页：星点闪烁 */
 @keyframes star-twinkle {
   0%, 100% { opacity: 0.15; }
   50% { opacity: 0.85; }
@@ -44,8 +72,48 @@
   animation: tab-fade-in 180ms ease-out;
 }
 
-body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+/* 极光渐变描边：品牌元素，缓慢流转、低透明度、夜间友好 */
+@property --aurora-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+.aurora-ring {
+  position: relative;
+}
+.aurora-ring::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: conic-gradient(
+    from var(--aurora-angle),
+    transparent 0deg,
+    var(--aurora, #818cf8) 35deg,
+    transparent 80deg,
+    transparent 180deg,
+    var(--aurora, #818cf8) 225deg,
+    transparent 270deg
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  animation: aurora-rotate 12s linear infinite;
+  opacity: 0.55;
+  pointer-events: none;
+}
+@keyframes aurora-rotate {
+  to { --aurora-angle: 360deg; }
+}
+
+/* 无障碍：系统开启减弱动效时全部静止 */
+@media (prefers-reduced-motion: reduce) {
+  .animate-moon-breathe,
+  .animate-star-twinkle,
+  .animate-tab-fade-in,
+  .aurora-ring::before {
+    animation: none;
+  }
 }

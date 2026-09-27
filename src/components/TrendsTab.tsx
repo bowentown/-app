@@ -148,8 +148,8 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
               <svg className="w-full h-24 overflow-visible my-auto" viewBox="0 0 280 80">
                 <defs>
                   <linearGradient id="scoreGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#818cf8" stopOpacity="0.35" />
-                    <stop offset="100%" stopColor="#818cf8" stopOpacity="0.0" />
+                    <stop offset="0%" stopColor={theme.accentHex} stopOpacity="0.35" />
+                    <stop offset="100%" stopColor={theme.accentHex} stopOpacity="0.0" />
                   </linearGradient>
                 </defs>
 

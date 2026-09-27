@@ -211,7 +211,7 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
             <Bell className="w-4 h-4 text-indigo-400 shrink-0" />
-            <span className="text-sm font-black text-white whitespace-nowrap">定时唤醒</span>
+            <span className="text-sm font-bold text-white whitespace-nowrap">定时唤醒</span>
           </div>
 
           <button
