@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import MoonDisc from './MoonDisc';
+import moonGlowUrl from '../../native-resources/moon-glow.png';
 
 const KEY = 'somnacare_splash_shown';
 
@@ -64,10 +64,14 @@ export const LaunchSplash: React.FC = () => {
           />
         </svg>
 
-        {/* 月相盘（真实月相）呼吸 */}
-        <div className="animate-moon-breathe" style={{ animationDuration: '3.2s' }}>
-          <MoonDisc size={104} litColor="#fcd34d" darkColor="#0a1120" strokeColor="#334155" />
-        </div>
+        {/* 发光月亮（品牌渲染资产）呼吸 */}
+        <img
+          src={moonGlowUrl}
+          alt=""
+          className="animate-moon-breathe select-none"
+          style={{ width: 168, animationDuration: '3.2s' }}
+          draggable={false}
+        />
       </div>
 
       <h1
