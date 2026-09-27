@@ -116,7 +116,12 @@ jobs:
           mkdir -p android/app/src/main/res/mipmap-anydpi-v26
           cp native-resources/adaptive/ic_launcher.xml android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
           cp native-resources/adaptive/ic_launcher_round.xml android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
-          sed -i 's/#FFFFFF/#0B1026/' android/app/src/main/res/values/colors.xml
+          # 自适应图标底色：模板若无 colors.xml 则创建（Capacitor 7 模板可能不含该文件）
+          if [ -f android/app/src/main/res/values/colors.xml ]; then
+            sed -i 's/#FFFFFF/#0B1026/' android/app/src/main/res/values/colors.xml
+          else
+            printf '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <color name="ic_launcher_background">#0B1026</color>\n</resources>\n' > android/app/src/main/res/values/colors.xml
+          fi
           mkdir -p android/app/src/main/res/drawable-night
           cp native-resources/splash.png android/app/src/main/res/drawable-night/splash.png
 
