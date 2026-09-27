@@ -86,8 +86,8 @@ def aurora_alpha(x, y):
     # 垂直光柱纹理（极光特色）：沿带方向的条纹调制
     ray = 0.72 + 0.28 * math.sin(t * AUR_LEN * 0.045 + math.sin(t * 3.1) * 2.0)
     env = smooth(-0.02, 0.12, t) * smooth(1.02, 0.88, t)     # 两端渐隐
-    a_core = core * 0.42 * ray * env
-    a_glow = glow * 0.20 * env
+    a_core = core * 0.26 * ray * env
+    a_glow = glow * 0.12 * env
     # 颜色：青绿 → 紫 沿带渐变
     ct = clamp(t * 1.2, 0, 1)
     cr = lerp(52, 167, ct); cg = lerp(224, 121, ct); cb = lerp(198, 246, ct)
@@ -129,7 +129,7 @@ for y in range(S):
 # ===== 水面镜像倒影：细波浪线（镜像月牙，随深度变碎变淡）=====
 WATERLINE = sc(396, CCY)
 RIPPLE_LINES = tuple(
-    dict(y=sc(y, CCY), comp=1.5 + i * 0.55, wave=(2.0 + i * 0.8) * SC, fade=(0.85 - i * 0.11) * 0.9)
+    dict(y=sc(y, CCY), comp=1.5 + i * 0.55, wave=(2.0 + i * 0.8) * SC, fade=(0.95 - i * 0.09))
     for i, y in enumerate((402, 413, 425, 438, 452, 466, 480))
 )
 for ln in RIPPLE_LINES:
@@ -140,8 +140,12 @@ for ln in RIPPLE_LINES:
     for x in range(S):
         xw = x + math.sin(x * 0.045 + yi * 0.21) * wave
         if crescent(xw, src_y):
-            px = rows[yi][x]
-            rows[yi][x] = (lerp(px[0], 168, fade), lerp(px[1], 230, fade), lerp(px[2], 255, fade))
+            for dyi, wv in ((0, 1.0), (-1, 0.55), (1, 0.55)):
+                yy = yi + dyi
+                if not (0 <= yy < S):
+                    continue
+                px = rows[yy][x]
+                rows[yy][x] = (lerp(px[0], 190, fade * wv), lerp(px[1], 240, fade * wv), lerp(px[2], 255, fade * wv))
 
 # ===== 繁星：追随月牙开口弧线，1 主星芒 + 2 点缀 =====
 def add_sparkle(cx, cy, size, amp):
