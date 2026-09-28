@@ -136,6 +136,7 @@ export const App: React.FC = () => {
   useEffect(() => {
     const check = () => {
       if (bedtimeReminder || isNativePlatform()) return; // 原生端由悬浮窗提醒（跨应用）
+      if (!userProfile.bedtimeReminderEnabled) return;
       try {
         if (localStorage.getItem('somnacare_bedtime_start')) return;
         const today = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`;
@@ -155,9 +156,9 @@ export const App: React.FC = () => {
     check();
     const t = setInterval(check, 20_000);
     return () => clearInterval(t);
-  }, [userProfile.targetBedtime, bedtimeReminder]);
+  }, [userProfile.targetBedtime, userProfile.bedtimeReminderEnabled, bedtimeReminder]);
 
-  // 原生：目标变化即重排精确闹钟；悬浮提醒"好的"经冷启动标记或事件接续
+  // 原生：开启提醒时按目标重排精确闹钟；关闭即取消。悬浮"好的"经冷启动标记或事件接续
   const runGoodPath = () => {
     try {
       if (localStorage.getItem('somnacare_bedtime_start')) return;
@@ -174,7 +175,11 @@ export const App: React.FC = () => {
     if (!isNativePlatform()) return;
     try {
       const cap = (window as any).Capacitor;
-      cap.Plugins?.GemmaLLM?.bedtimeReminderSchedule?.({ time: userProfile.targetBedtime });
+      if (userProfile.bedtimeReminderEnabled) {
+        cap.Plugins?.GemmaLLM?.bedtimeReminderSchedule?.({ time: userProfile.targetBedtime });
+      } else {
+        cap.Plugins?.GemmaLLM?.bedtimeReminderCancel?.();
+      }
       cap.Plugins?.GemmaLLM?.bedtimeAutoStartConsume?.().then((res: any) => {
         if (res?.consume) runGoodPath();
       });
@@ -183,7 +188,7 @@ export const App: React.FC = () => {
       // ignore
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userProfile.targetBedtime]);
+  }, [userProfile.targetBedtime, userProfile.bedtimeReminderEnabled]);
 
   // 护眼滤镜：打开 App 时按配置/定时窗口自动启停，之后每 30 秒轮询一次
   const eyeCareCfg = userProfile.eyeCare ?? DEFAULT_EYE_CARE;

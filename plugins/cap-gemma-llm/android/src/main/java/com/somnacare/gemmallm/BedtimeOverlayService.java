@@ -1,5 +1,6 @@
 package com.somnacare.gemmallm;
 
+import android.animation.ObjectAnimator;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -7,8 +8,14 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.LinearGradient;
+import android.graphics.Paint;
 import android.graphics.PixelFormat;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffXfermode;
+import android.graphics.Shader;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
@@ -18,24 +25,73 @@ import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
 import android.view.WindowManager;
+import android.view.animation.AccelerateInterpolator;
 import android.widget.Button;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
 /**
- * 作息目标到点的全局悬浮提醒服务（用户在其他应用或桌面时也能弹出）。
- * 视觉：深空渐变底 + 月亮 + "夜深喽，该睡了"（应要求不含品牌标语），
- * 入场淡入 + 缩放动画。
- * "好的" → 关闭提醒、启动应用并携带自动开始监测标记（JS 侧经
- * bedtimeAutoStartConsume / bedtimeGood 事件接续）；
- * "无视" → 仅关闭提醒，不做任何变化。
+ * 作息目标到点的全局悬浮提醒服务（其他应用/桌面均会弹出）。
+ * 视觉与 Web 开屏动画同源：水滴落下→涟漪→月亮顺时针渲染（渐变+咬合弯刀）→
+ * 极光浮现 + "夜深喽，该睡了"（应要求不含品牌标语、无 emoji）。
+ * "好的" → "晚安"，拉起应用并携带自动开始监测标记；
+ * "无视" → 仅关闭提醒。
  */
 public class BedtimeOverlayService extends Service {
 
     private static final String CHANNEL_ID = "somnacare-bedtime";
     private static final int NOTIFICATION_ID = 20260929;
+    private static final int MOON_COLOR_LIT = 0xFFA8E6FF;
+    private static final int MOON_COLOR_DEEP = 0xFF2563EB;
+
     private static View overlay;
     private static WindowManager wmRef;
+
+    @Override
+    public IBinder onBind(Intent intent) {
+        return null;
+    }
+
+    /** 弯刀月亮：渐变圆按顺时针扇形逐步显现，再经咬合圆 CLEAR 抠出弯刀。 */
+    private static final class MoonView extends View {
+        float progress = 0f;
+        private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint bite = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+        MoonView(Context c) {
+            super(c);
+        }
+
+        void setProgress(float p) {
+            progress = p;
+            invalidate();
+        }
+
+        @Override
+        protected void onDraw(Canvas c) {
+            float cx = getWidth() / 2f;
+            float cy = getHeight() / 2f;
+            float r = Math.min(getWidth(), getHeight()) * 0.31f;
+            int sc = c.saveLayer(0, 0, getWidth(), getHeight(), null);
+            android.graphics.Path sector = new android.graphics.Path();
+            sector.moveTo(cx, cy);
+            sector.arcTo(new android.graphics.RectF(cx - r, cy - r, cx + r, cy + r), -90, 360f * progress);
+            sector.close();
+            c.clipPath(sector);
+            fill.setShader(new LinearGradient(cx - r * 0.4f, cy + r, cx + r * 0.5f, cy - r,
+                    MOON_COLOR_LIT, MOON_COLOR_DEEP, Shader.TileMode.CLAMP));
+            c.drawCircle(cx, cy, r, fill);
+            bite.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.CLEAR));
+            c.drawCircle(cx + r * 0.56f, cy - r * 0.42f, r * 0.84f, bite);
+            bite.setXfermode(null);
+            c.restoreToCount(sc);
+        }
+    }
+
+    private int dp(float v) {
+        return Math.round(v * getResources().getDisplayMetrics().density);
+    }
 
     @Override
     public IBinder onBind(Intent intent) {
@@ -52,10 +108,6 @@ public class BedtimeOverlayService extends Service {
         return START_NOT_STICKY;
     }
 
-    private int dp(float v) {
-        return Math.round(v * getResources().getDisplayMetrics().density);
-    }
-
     private void showOverlay() {
         if (!Settings.canDrawOverlays(this)) {
             fallbackNotification();
@@ -68,21 +120,63 @@ public class BedtimeOverlayService extends Service {
         if (wm == null) return;
         wmRef = wm;
 
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setGravity(Gravity.CENTER);
+        // 深空渐变根布局
+        FrameLayout root = new FrameLayout(this);
         GradientDrawable bg = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
                 new int[]{0xF2060B1A, 0xF203060F});
         root.setBackground(bg);
-        root.setPadding(dp(28), dp(28), dp(28), dp(28));
+        root.setAlpha(0f);
 
-        TextView moon = new TextView(this);
-        moon.setText("🌙");
-        moon.setTextSize(TypedValue.COMPLEX_UNIT_SP, 76);
-        moon.setGravity(Gravity.CENTER);
-        moon.setScaleX(0.5f);
-        moon.setScaleY(0.5f);
-        root.addView(moon);
+        // 极光条带（月亮后方，第 3 幕浮现）
+        View aurora = new View(this);
+        aurora.setBackground(new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
+                new int[]{0x002D529E, 0x402DD4BF, 0x408B5CF6, 0x002D529E}));
+        FrameLayout.LayoutParams auroraLp = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, dp(150), Gravity.CENTER);
+        auroraLp.topMargin = -dp(30);
+        aurora.setAlpha(0f);
+        root.addView(aurora, auroraLp);
+
+        // 内容列：月亮 / 水线涟漪 / 文案 / 按钮
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setGravity(Gravity.CENTER_HORIZONTAL);
+        FrameLayout.LayoutParams contentLp = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.CENTER);
+        root.addView(content, contentLp);
+
+        // 月亮
+        MoonView moon = new MoonView(this);
+        LinearLayout.LayoutParams moonLp = new LinearLayout.LayoutParams(dp(170), dp(170));
+        moonLp.setMargins(0, dp(10), 0, dp(6));
+        content.addView(moon, moonLp);
+
+        // 水线：水滴 + 两道涟漪线
+        FrameLayout water = new FrameLayout(this);
+        LinearLayout.LayoutParams waterLp = new LinearLayout.LayoutParams(dp(230), dp(18));
+        waterLp.setMargins(0, 0, 0, dp(6));
+        content.addView(water, waterLp);
+
+        // 水滴：绘制的光珠（不用 emoji）
+        View drop = new View(this);
+        GradientDrawable dropBg = new GradientDrawable();
+        dropBg.setShape(GradientDrawable.OVAL);
+        dropBg.setColor(MOON_COLOR_LIT);
+        drop.setBackground(dropBg);
+        drop.setTranslationY(-dp(280));
+        water.addView(drop, new FrameLayout.LayoutParams(dp(11), dp(11), Gravity.CENTER));
+
+        for (int i = 0; i < 2; i++) {
+            View line = new View(this);
+            GradientDrawable lg = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
+                    new int[]{0x00A8E6FF, 0xFFA8E6FF, 0x00A8E6FF});
+            line.setBackground(lg);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(150 - i * 40), dp(1));
+            water.addView(line, lp);
+            line.setAlpha(0f);
+            line.animate().alpha(i == 0 ? 0.9f : 0.55f).setStartDelay(560 + i * 150).setDuration(400).start();
+        }
 
         TextView msg = new TextView(this);
         msg.setText("夜深喽，该睡了");
@@ -90,13 +184,18 @@ public class BedtimeOverlayService extends Service {
         msg.setTextSize(TypedValue.COMPLEX_UNIT_SP, 24);
         msg.setTypeface(Typeface.DEFAULT_BOLD);
         msg.setGravity(Gravity.CENTER);
-        msg.setPadding(0, dp(30), 0, 0);
-        root.addView(msg);
+        msg.setPadding(0, dp(16), 0, 0);
+        msg.setAlpha(0f);
+        msg.setTranslationY(dp(14));
+        content.addView(msg);
 
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER);
-        row.setPadding(0, dp(40), 0, 0);
+        row.setPadding(0, dp(34), 0, 0);
+        row.setAlpha(0f);
+        row.setTranslationY(dp(14));
+        content.addView(row);
 
         Button ok = new Button(this);
         ok.setText("好的");
@@ -105,10 +204,10 @@ public class BedtimeOverlayService extends Service {
         ok.setTypeface(Typeface.DEFAULT_BOLD);
         ok.setAllCaps(false);
         GradientDrawable okBg = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
-                new int[]{0xFF38BDF8, 0xFF3B82F6});
+                new int[]{0xFFA8E6FF, 0xFF3B82F6});
         okBg.setCornerRadius(dp(18));
         ok.setBackground(okBg);
-        ok.setPadding(dp(36), dp(12), dp(36), dp(12));
+        ok.setPadding(dp(38), dp(12), dp(38), dp(12));
         LinearLayout.LayoutParams okLp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         okLp.setMargins(dp(8), 0, dp(8), 0);
@@ -126,16 +225,14 @@ public class BedtimeOverlayService extends Service {
         igBg.setCornerRadius(dp(18));
         igBg.setStroke(dp(1), 0x26FFFFFF);
         ignore.setBackground(igBg);
-        ignore.setPadding(dp(36), dp(12), dp(36), dp(12));
+        ignore.setPadding(dp(38), dp(12), dp(38), dp(12));
         LinearLayout.LayoutParams igLp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         igLp.setMargins(dp(8), 0, dp(8), 0);
         ignore.setLayoutParams(igLp);
         row.addView(ignore);
 
-        root.addView(row);
-        root.setAlpha(0f);
-
+        // 悬浮窗参数：按钮可点、全屏
         WindowManager.LayoutParams lp = new WindowManager.LayoutParams(
                 WindowManager.LayoutParams.MATCH_PARENT,
                 WindowManager.LayoutParams.MATCH_PARENT,
@@ -148,8 +245,6 @@ public class BedtimeOverlayService extends Service {
         try {
             wm.addView(root, lp);
             overlay = root;
-            root.animate().alpha(1f).setDuration(360).start();
-            moon.animate().scaleX(1f).scaleY(1f).setDuration(600).setStartDelay(120).start();
         } catch (Exception e) {
             overlay = null;
             fallbackNotification();
@@ -157,9 +252,26 @@ public class BedtimeOverlayService extends Service {
             return;
         }
 
+        // 时间线：底色淡入 → 水滴落下 → 涟漪 → 月亮顺时针渲染 → 极光/文案/按钮
+        root.animate().alpha(1f).setDuration(280).start();
+        drop.animate().translationY(0f).setDuration(430).setInterpolator(new AccelerateInterpolator())
+                .setStartDelay(120).start();
+        moon.postDelayed(() -> {
+            drop.setAlpha(0f);
+            ObjectAnimator.ofFloat(moon, "progress", 0f, 1f).setDuration(820).start();
+        }, 560);
+        msg.postDelayed(() -> {
+            msg.animate().alpha(1f).translationY(0f).setDuration(420).start();
+            row.animate().alpha(1f).translationY(0f).setDuration(420).start();
+            aurora.animate().alpha(1f).setDuration(700).start();
+        }, 1420);
+
         ok.setOnClickListener(v -> {
             try {
-                // 记录标记（冷启动路径）+ 拉起应用（热启动路径：经 onNewIntent → bedtimeGood 事件）
+                msg.setText("晚安");
+                row.setVisibility(View.GONE);
+                moon.animate().scaleX(1.06f).scaleY(1.06f).setDuration(500).start();
+                // 记录标记（冷启动路径）+ 拉起应用（热启动路径：onNewIntent → bedtimeGood 事件）
                 getSharedPreferences("somnacare_prefs", Context.MODE_PRIVATE)
                         .edit().putBoolean("auto_start_sleep", true).apply();
                 Intent launch = getPackageManager().getLaunchIntentForPackage(getPackageName());
@@ -170,32 +282,40 @@ public class BedtimeOverlayService extends Service {
                 }
             } catch (Exception ignored) {
             }
-            dismiss();
+            dismiss(900);
         });
-        ignore.setOnClickListener(v -> dismiss());
+        ignore.setOnClickListener(v -> {
+            try {
+                msg.setText("随便你");
+                row.setVisibility(View.GONE);
+            } catch (Exception ignored) {
+            }
+            dismiss(800);
+        });
     }
 
-    private void dismiss() {
-        try {
-            if (overlay != null && wmRef != null) {
-                overlay.animate().alpha(0f).setDuration(220).start();
-                View v = overlay;
-                // 动画结束后移除
-                new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
-                    try {
-                        wmRef.removeView(v);
-                    } catch (Exception ignored) {
-                    }
-                    overlay = null;
-                    stopForeground(STOP_FOREGROUND_REMOVE);
-                    stopSelf();
-                }, 240);
-                return;
+    private void dismiss(long delay) {
+        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+            try {
+                if (overlay != null && wmRef != null) {
+                    View v = overlay;
+                    v.animate().alpha(0f).setDuration(240).start();
+                    new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                        try {
+                            wmRef.removeView(v);
+                        } catch (Exception ignored) {
+                        }
+                        overlay = null;
+                        stopForeground(STOP_FOREGROUND_REMOVE);
+                        stopSelf();
+                    }, 260);
+                    return;
+                }
+                stopForeground(STOP_FOREGROUND_REMOVE);
+                stopSelf();
+            } catch (Exception ignored) {
             }
-            stopForeground(STOP_FOREGROUND_REMOVE);
-            stopSelf();
-        } catch (Exception ignored) {
-        }
+        }, delay);
     }
 
     /** 无悬浮窗权限时的兜底：普通高优先级通知（点击拉起应用）。 */

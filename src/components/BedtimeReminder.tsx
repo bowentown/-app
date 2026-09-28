@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { Moon } from 'lucide-react';
 
 export type BedtimeReminderPhase = 'ask' | 'good' | 'ignore';
 
@@ -11,15 +10,16 @@ interface BedtimeReminderProps {
   onDone: (finalPhase: BedtimeReminderPhase) => void;
 }
 
+const CIRC = 2 * Math.PI * 62;
+
 /**
- * 作息目标到点的全屏提醒（品牌开屏同款视觉：月亮 + 极光 + 水波，
- * 应要求不显示"懂睡眠，更懂你"标语）：
- * - "好的" → 显示"晚安💤"，收尾时由父级自动开始夜间监测
- * - "无视" → 显示"随便你🙄"，不做任何变化
- * 仅在应用处于前台时可触发（跨应用的全屏唤醒需要原生 FULL_SCREEN_INTENT，属后续原生功能）。
+ * 作息目标到点的全屏提醒（Web/PWA 端）：视觉与 LaunchSplash 开屏动画同源
+ * （水滴→涟漪→月亮顺时针渲染→极光），仅文案与排版不同、无品牌标语。
+ * "好的" → "晚安"，收尾时由父级自动开始夜间监测；"无视" → "随便你"。
  */
 export const BedtimeReminder: React.FC<BedtimeReminderProps> = ({ phase, onGood, onIgnore, onDone }) => {
   const [leaving, setLeaving] = useState(false);
+  const answered = phase !== 'ask';
 
   useEffect(() => {
     if (phase === 'ask') return;
@@ -34,57 +34,106 @@ export const BedtimeReminder: React.FC<BedtimeReminderProps> = ({ phase, onGood,
 
   return (
     <div
-      className={`fixed inset-0 z-[300] flex flex-col items-center justify-center overflow-hidden transition-opacity duration-300 ${
-        leaving ? 'opacity-0' : 'opacity-100'
-      }`}
+      className={`fixed inset-0 z-[300] overflow-hidden transition-opacity duration-300 ${leaving ? 'opacity-0' : 'opacity-100'}`}
       style={{ background: 'linear-gradient(180deg, #060b1a 0%, #03060f 100%)' }}
       role="dialog"
       aria-label="就寝时间提醒"
     >
-      {/* 极光带 */}
-      <div aria-hidden className="absolute top-[16%] left-1/2 -translate-x-1/2 w-[130%] h-40 blur-3xl opacity-40"
-        style={{ background: 'linear-gradient(100deg, transparent 15%, #2dd4bf55 38%, transparent 52%, #8b5cf644 66%, transparent 84%)' }}
+      {/* 极光条带（开屏第三步同款） */}
+      <div
+        className="absolute inset-0"
+        style={{
+          opacity: 0,
+          animation: 'splash-aurora-in 800ms ease-out 1300ms both',
+          background:
+            'repeating-linear-gradient(97deg, transparent 0 14px, #9db4ff22 14px 22px, transparent 22px 40px), linear-gradient(180deg, transparent 8%, #2d529e30 45%, transparent 85%)',
+          filter: 'blur(14px)',
+        }}
       />
-      {/* 星点 */}
-      <div aria-hidden className="absolute top-[22%] left-[24%] w-1.5 h-1.5 rounded-full bg-white/70 animate-star-twinkle" />
-      <div aria-hidden className="absolute top-[28%] right-[27%] w-1 h-1 rounded-full bg-white/50 animate-star-twinkle" style={{ animationDelay: '0.8s' }} />
 
-      {/* 月亮（品牌弯刀新月） */}
-      <div className="relative animate-moon-breathe">
-        <svg width="132" height="132" viewBox="0 0 132 132" aria-hidden>
+      {/* 水滴 + 涟漪 */}
+      <div
+        className="absolute left-1/2 top-[30%] rounded-full"
+        style={{
+          width: 12,
+          height: 12,
+          marginLeft: -6,
+          marginTop: -6,
+          background: '#a8e6ff',
+          boxShadow: '0 0 16px #a8e6ff',
+          animation: 'splash-drop 560ms cubic-bezier(0.55,0,1,0.45) both',
+        }}
+      />
+      {[0, 1, 2].map((i) => (
+        <div
+          key={i}
+          className="absolute left-1/2 top-[30%] rounded-full"
+          style={{
+            width: 130,
+            height: 130,
+            marginLeft: -65,
+            marginTop: -65,
+            border: '1.5px solid #a8e6ff',
+            animation: `splash-ripple 900ms ease-out ${380 + i * 160}ms both`,
+          }}
+        />
+      ))}
+
+      {/* 月亮：顺时针渲染 + 渐变填充（开屏第二步同款） */}
+      <div
+        className="absolute left-1/2 top-[30%]"
+        style={{ transform: 'translate(-50%,-50%)', animation: 'splash-zoom 1300ms ease-out 420ms both' }}
+      >
+        <svg width="200" height="200" viewBox="0 0 200 200">
           <defs>
-            <linearGradient id="br-moon" x1="0" y1="1" x2="1" y2="0">
+            <linearGradient id="brMoonGrad" x1="0" y1="1" x2="0.55" y2="0">
               <stop offset="0%" stopColor="#a8e6ff" />
               <stop offset="100%" stopColor="#2563eb" />
             </linearGradient>
-            <mask id="br-bite">
-              <rect width="132" height="132" fill="#fff" />
-              <circle cx="88" cy="42" r="40" fill="#000" />
+            <mask id="brBiteMask">
+              <rect width="200" height="200" fill="white" />
+              <circle cx="139" cy="76" r="56" fill="black" />
             </mask>
           </defs>
-          <circle cx="60" cy="68" r="46" fill="url(#br-moon)" mask="url(#br-bite)" />
+          <circle
+            cx="100"
+            cy="100"
+            r="62"
+            fill="none"
+            stroke="#a8e6ff"
+            strokeWidth="2.5"
+            strokeDasharray={CIRC}
+            strokeDashoffset={CIRC}
+            transform="rotate(-90 100 100)"
+            opacity="0.85"
+            style={{ animation: 'splash-draw 800ms ease-in-out 480ms both' }}
+          />
+          <g mask="url(#brBiteMask)">
+            <circle
+              cx="100"
+              cy="100"
+              r="62"
+              fill="url(#brMoonGrad)"
+              opacity="0"
+              style={{ animation: 'splash-fill 460ms ease-out 1150ms both' }}
+            />
+          </g>
         </svg>
-        <div className="absolute inset-0 rounded-full blur-2xl opacity-30"
-          style={{ background: 'radial-gradient(circle, #67b7ff55, transparent 70%)' }}
-        />
       </div>
 
-      {/* 水波 */}
-      <div aria-hidden className="mt-5 space-y-2 w-40 opacity-60">
-        <div className="h-px bg-gradient-to-r from-transparent via-sky-200/70 to-transparent" />
-        <div className="h-px w-4/5 mx-auto bg-gradient-to-r from-transparent via-sky-200/40 to-transparent" />
-        <div className="h-px w-3/5 mx-auto bg-gradient-to-r from-transparent via-sky-200/25 to-transparent" />
-      </div>
-
-      {/* 文案与按钮 */}
+      {/* 文案 + 选项（月亮下方；无品牌标语） */}
       {phase === 'ask' && (
-        <div className="mt-10 flex flex-col items-center gap-8 animate-[splash-rise_0.6s_ease-out]">
+        <div
+          className="absolute left-0 right-0 bottom-[13%] flex flex-col items-center gap-7"
+          style={{ animation: 'splash-rise 520ms ease-out 1600ms both' }}
+        >
           <h2 className="text-2xl font-black text-white tracking-wide">夜深喽，该睡了</h2>
           <div className="flex items-center gap-4">
             <button
               type="button"
               onClick={onGood}
-              className="px-10 py-3 rounded-2xl bg-gradient-to-r from-sky-400 to-blue-500 text-slate-950 text-sm font-black cursor-pointer active:scale-95 transition-transform shadow-lg"
+              className="px-10 py-3 rounded-2xl text-slate-950 text-sm font-black cursor-pointer active:scale-95 transition-transform shadow-lg"
+              style={{ background: 'linear-gradient(90deg, #a8e6ff, #3b82f6)' }}
             >
               好的
             </button>
@@ -99,20 +148,22 @@ export const BedtimeReminder: React.FC<BedtimeReminderProps> = ({ phase, onGood,
         </div>
       )}
       {phase === 'good' && (
-        <div className="mt-10 flex flex-col items-center gap-3 animate-[splash-rise_0.5s_ease-out]">
-          <span className="text-5xl">💤</span>
-          <h2 className="text-2xl font-black text-white tracking-widest">晚安</h2>
+        <div
+          className="absolute left-0 right-0 bottom-[15%] flex flex-col items-center gap-2"
+          style={{ animation: 'splash-rise 480ms ease-out both' }}
+        >
+          <h2 className="text-3xl font-black text-white tracking-[0.4em] indent-[0.4em]">晚安</h2>
+          <span className="text-[11px] text-sky-200/70 font-mono tracking-widest">开始记录今晚的睡眠</span>
         </div>
       )}
       {phase === 'ignore' && (
-        <div className="mt-10 flex flex-col items-center gap-3 animate-[splash-rise_0.5s_ease-out]">
-          <span className="text-5xl">🙄</span>
-          <h2 className="text-2xl font-black text-white tracking-widest">随便你</h2>
+        <div
+          className="absolute left-0 right-0 bottom-[15%] flex flex-col items-center"
+          style={{ animation: 'splash-rise 480ms ease-out both' }}
+        >
+          <h2 className="text-2xl font-black text-white tracking-[0.3em] indent-[0.3em]">随便你</h2>
         </div>
       )}
-
-      {/* 无障碍/兜底：图标语义 */}
-      <span className="sr-only"><Moon />就寝提醒</span>
     </div>
   );
 };

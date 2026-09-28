@@ -260,6 +260,25 @@ public class GemmaLLMPlugin extends Plugin {
         }
     }
 
+    /** 取消到点提醒闹钟（用户关闭"到点提醒我"时调用）。 */
+    @PluginMethod
+    public void bedtimeReminderCancel(PluginCall call) {
+        try {
+            android.app.AlarmManager am = (android.app.AlarmManager) getContext().getSystemService(Context.ALARM_SERVICE);
+            if (am != null) {
+                android.app.PendingIntent pi = android.app.PendingIntent.getBroadcast(getContext(), 3001,
+                        new Intent(getContext(), BedtimeAlarmReceiver.class),
+                        android.app.PendingIntent.FLAG_UPDATE_CURRENT | android.app.PendingIntent.FLAG_IMMUTABLE);
+                am.cancel(pi);
+            }
+            JSObject ret = new JSObject();
+            ret.put("ok", true);
+            call.resolve(ret);
+        } catch (Exception e) {
+            call.reject("取消失败: " + e.getMessage());
+        }
+    }
+
     /** 消费冷启动自动开始监测标记（悬浮提醒"好的"后冷启动应用时为 true）。 */
     @PluginMethod
     public void bedtimeAutoStartConsume(PluginCall call) {

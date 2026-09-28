@@ -125,6 +125,7 @@ export interface UserProfile {
   brightnessLevel: number; // 0 - 100% app display brightness / dimming
   warmthFilter: boolean; // eye protection amber warm tint
   eyeCare?: EyeCareConfig;
+  bedtimeReminderEnabled?: boolean; // 到点提醒我（默认关闭；开启后按作息目标弹出提醒动画）
   alarms?: CustomAlarmSetting[];
   aiConfig?: CustomAIConfig;
 }
