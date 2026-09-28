@@ -46,13 +46,34 @@ public class GemmaLLMPlugin extends Plugin {
 
     // ==== 能力探测与内存门控 ====
 
+    // ==== 主题联动桌面图标（activity-alias） ====
+
+    private static final String PREFS = "somnacare_prefs";
+    private static final String KEY_PENDING_ICON = "pending_launcher_icon";
+    private volatile String pendingIconTheme;
+
     /**
-     * 主题联动桌面图标：通过 activity-alias 启停切换启动器图标。
-     * 别名须在 Manifest 中预声明（CI 注入），目标先启用、其他后停用。
+     * 主题色切换时请求换图标。注意：绝不能在前台立即改 activity-alias——
+     * 禁用"正在运行的 Activity 所属的 alias"会让部分 ROM 强杀进程（每次切主题必闪退）。
+     * 这里只记录待应用主题，真正切换延迟到 App 退后台（handleOnPause）时执行，
+     * 用户回到桌面时图标已是新主题，即使系统杀进程也发生在后台、无感知。
      */
     @PluginMethod
     public void setLauncherIcon(PluginCall call) {
         String theme = call.getString("theme", "midnight");
+        try {
+            getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                    .edit().putString(KEY_PENDING_ICON, theme).apply();
+        } catch (Exception ignored) {
+        }
+        pendingIconTheme = theme;
+        JSObject ret = new JSObject();
+        ret.put("ok", true);
+        ret.put("deferred", true);
+        call.resolve(ret);
+    }
+
+    private void applyLauncherIconNow(String theme) {
         String pkg = getContext().getPackageName();
         PackageManager pm = getContext().getPackageManager();
         String[] themes = {"midnight", "pure_dark", "warm_amber", "serene_blue"};
@@ -82,12 +103,28 @@ public class GemmaLLMPlugin extends Plugin {
                         PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
                         PackageManager.DONT_KILL_APP);
             }
-            JSObject ret = new JSObject();
-            ret.put("ok", true);
-            ret.put("theme", theme);
-            call.resolve(ret);
-        } catch (Exception e) {
-            call.reject("切换图标失败: " + e.getMessage());
+        } catch (Exception ignored) {
+            // 别名缺失等场景静默跳过，绝不影响前台体验
+        }
+    }
+
+    /** App 退到后台：此时切换 alias 最安全（即使 ROM 杀进程，用户已在桌面，无感） */
+    @Override
+    protected void handleOnPause() {
+        super.handleOnPause();
+        try {
+            String t = pendingIconTheme;
+            if (t == null) {
+                t = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                        .getString(KEY_PENDING_ICON, null);
+            }
+            if (t != null) {
+                applyLauncherIconNow(t);
+                pendingIconTheme = null;
+                getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                        .edit().remove(KEY_PENDING_ICON).apply();
+            }
+        } catch (Exception ignored) {
         }
     }
 
