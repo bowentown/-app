@@ -93,12 +93,7 @@ public class BedtimeOverlayService extends Service {
         return Math.round(v * getResources().getDisplayMetrics().density);
     }
 
-    @Override
-    public IBinder onBind(Intent intent) {
-        return null;
-    }
-
-    @Override
+        @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         try {
             startForegroundCompat();
