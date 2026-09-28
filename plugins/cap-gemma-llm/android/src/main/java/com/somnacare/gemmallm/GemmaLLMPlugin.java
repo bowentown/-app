@@ -131,8 +131,8 @@ public class GemmaLLMPlugin extends Plugin {
     @PluginMethod
     public void eyeCareStart(PluginCall call) {
         String warmColor = call.getString("warmColor", "#FFB26B");
-        float warmAlpha = (float) call.getDouble("warmAlpha", 0.2);
-        float dimAlpha = (float) call.getDouble("dimAlpha", 0.0);
+        float warmAlpha = (float) (double) call.getDouble("warmAlpha", 0.2);
+        float dimAlpha = (float) (double) call.getDouble("dimAlpha", 0.0);
         if (!android.provider.Settings.canDrawOverlays(getContext())) {
             call.reject("OVERLAY_PERMISSION_REQUIRED");
             return;
