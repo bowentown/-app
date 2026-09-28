@@ -47,6 +47,7 @@ interface SettingsTabProps {
   onUpdateProfile: (updated: Partial<UserProfile>) => void;
   onResetDemoData: () => void;
   onImportRecords?: (imported: SleepRecord[]) => void;
+  onNavigateEyeCare?: () => void;
   theme: ThemeConfig;
 }
 
@@ -56,6 +57,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   onUpdateProfile,
   onResetDemoData,
   onImportRecords,
+  onNavigateEyeCare,
   theme,
 }) => {
   const [isAIConfigOpen, setIsAIConfigOpen] = useState(false);
@@ -143,43 +145,28 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         </div>
       </div>
 
-      {/* 1.5 夜间护眼：暖色滤镜 + 减光（此前为死配置，现接入真实渲染） */}
-      <div className={`${theme.cardBg} rounded-3xl p-5 border ${theme.cardBorder} shadow-xl space-y-3`}>
-        <div className="flex items-center gap-2.5 pb-3 border-b border-slate-700/60">
-          <div className="w-8 h-8 rounded-xl bg-orange-500/20 text-orange-300 flex items-center justify-center border border-orange-400">
-            <Eye className="w-4 h-4" />
+      {/* 1.5 夜间护眼：功能已升级为独立"护眼"分区（全局悬浮窗滤镜），此处保留入口 */}
+      <div className={`${theme.cardBg} rounded-3xl p-5 border ${theme.cardBorder} shadow-xl`}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-orange-500/20 text-orange-300 flex items-center justify-center border border-orange-400">
+              <Eye className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-white">夜间护眼</h3>
+              <p className="text-[11px] text-slate-400 mt-0.5">全局滤镜 · 色温 · 定时开关</p>
+            </div>
           </div>
-          <h3 className="text-sm font-bold text-white">夜间护眼</h3>
-        </div>
-
-        <div className={`${theme.cardInnerBg} border ${theme.cardInnerBorder} rounded-2xl p-3.5 flex items-center justify-between`}>
-          <div>
-            <span className="text-xs font-bold text-slate-200 block">暖色滤镜</span>
-            <span className="text-[10px] text-slate-500">琥珀色减蓝光，睡前更温和</span>
-          </div>
-          <input
-            type="checkbox"
-            checked={!!userProfile.warmthFilter}
-            onChange={(e) => onUpdateProfile({ warmthFilter: e.target.checked })}
-            className="accent-amber-500 w-5 h-5 rounded cursor-pointer"
-          />
-        </div>
-
-        <div className={`${theme.cardInnerBg} border ${theme.cardInnerBorder} rounded-2xl p-3.5 space-y-2`}>
-          <div className="flex justify-between text-xs font-bold">
-            <span className="text-slate-200">屏幕减光</span>
-            <span className="text-indigo-400 font-mono text-sm">{userProfile.brightnessLevel}%</span>
-          </div>
-          <input
-            type="range"
-            min={40}
-            max={100}
-            step={5}
-            value={userProfile.brightnessLevel}
-            onChange={(e) => onUpdateProfile({ brightnessLevel: Number(e.target.value) })}
-            className="w-full accent-indigo-500 cursor-pointer h-2 bg-slate-700 rounded-lg"
-          />
-          <p className="text-[10px] text-slate-500">100 为正常亮度；熄屏前建议调至 55–70，全 App 变暗</p>
+          {onNavigateEyeCare && (
+            <button
+              type="button"
+              onClick={onNavigateEyeCare}
+              className="px-3.5 py-2 rounded-xl bg-orange-500/15 border border-orange-400 text-orange-200 text-xs font-bold flex items-center gap-1 cursor-pointer active:scale-95 transition-transform"
+            >
+              前往护眼
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
       </div>
 

@@ -3,17 +3,19 @@ import {
   Moon,
   CheckCircle2,
 } from 'lucide-react';
-import { SleepRecord, UserProfile } from './types/sleep';
+import { SleepRecord, UserProfile, DEFAULT_EYE_CARE } from './types/sleep';
 import { getInitialSleepLogs } from './utils/sleepScore';
 import { TodayTab } from './components/TodayTab';
 import { TrendsTab } from './components/TrendsTab';
 import { AIAdvicePanel } from './components/AIAdvicePanel';
 import { SettingsTab } from './components/SettingsTab';
+import { EyeCareTab } from './components/EyeCareTab';
 import { BottomNavBar, NavTab } from './components/BottomNavBar';
 import { ActiveSleepModal } from './components/ActiveSleepModal';
 import { ManualLogModal } from './components/ManualLogModal';
 import { APP_THEMES } from './utils/themeStyles';
 import { isNativePlatform, syncAlarmsToNative } from './utils/nativeAlarmScheduler';
+import { applyEyeCare, eyeCareInAppStyles, isInEyeCareWindow } from './utils/eyeCare';
 import { LaunchSplash } from './components/LaunchSplash';
 
 export const App: React.FC = () => {
@@ -50,6 +52,10 @@ export const App: React.FC = () => {
           parsedProfile.alarms = parsedProfile.alarms.map((a) =>
             a.label === '工作日温和唤醒' ? { ...a, label: '周内温和唤醒' } : a
           );
+        }
+        // 老配置补齐护眼分区默认值
+        if (!parsedProfile.eyeCare) {
+          parsedProfile.eyeCare = DEFAULT_EYE_CARE;
         }
         return parsedProfile;
       } catch (e) {
@@ -116,6 +122,14 @@ export const App: React.FC = () => {
     }
   }, []);
 
+  // 护眼滤镜：打开 App 时按配置/定时窗口自动启停，之后每 30 秒轮询一次
+  const eyeCareCfg = userProfile.eyeCare ?? DEFAULT_EYE_CARE;
+  useEffect(() => {
+    void applyEyeCare(eyeCareCfg);
+    const t = setInterval(() => void applyEyeCare(eyeCareCfg), 30_000);
+    return () => clearInterval(t);
+  }, [eyeCareCfg]);
+
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3200);
@@ -160,13 +174,30 @@ export const App: React.FC = () => {
       className={`min-h-screen w-full theme-${currentTheme.id} ${currentTheme.pageBg} ${currentTheme.textPrimary} selection:bg-indigo-500/30 relative flex flex-col transition-colors duration-300`}
     >
       <LaunchSplash theme={currentTheme} />
-      {/* 夜间护眼：暖色滤镜 + 减光（强度在偏好区调节） */}
-      {userProfile.warmthFilter && (
-        <div className="fixed inset-0 z-[70] pointer-events-none" style={{ background: 'rgba(255,147,41,0.10)', mixBlendMode: 'multiply' }} />
-      )}
-      {userProfile.brightnessLevel < 100 && (
-        <div className="fixed inset-0 z-[70] pointer-events-none" style={{ background: `rgba(0,0,0,${((100 - userProfile.brightnessLevel) / 100) * 0.55})` }} />
-      )}
+      {/* 夜间护眼：原生端由系统悬浮窗全局生效，应用内不再叠加（避免双重滤镜）；
+          Web/PWA 端回退为应用内滤镜层 */}
+      {!isNativePlatform() && (eyeCareCfg.enabled
+        ? (() => {
+            const inWindow = isInEyeCareWindow(eyeCareCfg);
+            if (!inWindow) return null;
+            const { warm, dim } = eyeCareInAppStyles(eyeCareCfg);
+            return (
+              <>
+                <div className="fixed inset-0 z-[70] pointer-events-none" style={{ background: warm, mixBlendMode: 'multiply' }} />
+                <div className="fixed inset-0 z-[70] pointer-events-none" style={{ background: dim }} />
+              </>
+            );
+          })()
+        : (
+          <>
+            {userProfile.warmthFilter && (
+              <div className="fixed inset-0 z-[70] pointer-events-none" style={{ background: 'rgba(255,147,41,0.10)', mixBlendMode: 'multiply' }} />
+            )}
+            {userProfile.brightnessLevel < 100 && (
+              <div className="fixed inset-0 z-[70] pointer-events-none" style={{ background: `rgba(0,0,0,${((100 - userProfile.brightnessLevel) / 100) * 0.55})` }} />
+            )}
+          </>
+        ))}
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[90] px-5 py-3 rounded-2xl bg-indigo-600 text-white text-xs font-black shadow-2xl flex items-center gap-2.5 animate-bounce border border-indigo-400">
@@ -221,6 +252,15 @@ export const App: React.FC = () => {
             <AIAdvicePanel records={records} userProfile={userProfile} theme={currentTheme} />
           )}
 
+          {activeTab === 'eyecare' && (
+            <EyeCareTab
+              userProfile={userProfile}
+              onUpdateProfile={(updated) => setUserProfile((prev) => ({ ...prev, ...updated }))}
+              onToast={showToast}
+              theme={currentTheme}
+            />
+          )}
+
           {activeTab === 'settings' && (
             <SettingsTab
               records={records}
@@ -231,6 +271,7 @@ export const App: React.FC = () => {
                 setRecords(imported);
                 showToast(`已成功导入 ${imported.length} 条睡眠记录`);
               }}
+              onNavigateEyeCare={() => setActiveTab('eyecare')}
               theme={currentTheme}
             />
           )}

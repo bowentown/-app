@@ -91,6 +91,88 @@ public class GemmaLLMPlugin extends Plugin {
         }
     }
 
+    // ==== 护眼滤镜（全局悬浮窗，需"显示在其他应用上层"权限） ====
+
+    /** 查询悬浮窗权限是否已授予。 */
+    @PluginMethod
+    public void eyeCarePermission(PluginCall call) {
+        JSObject ret = new JSObject();
+        ret.put("granted", android.provider.Settings.canDrawOverlays(getContext()));
+        ret.put("sdkInt", android.os.Build.VERSION.SDK_INT);
+        call.resolve(ret);
+    }
+
+    /** 跳转系统"显示在其他应用上层"授权页（直接定位到本应用）。 */
+    @PluginMethod
+    public void eyeCareOpenPermission(PluginCall call) {
+        try {
+            android.content.Intent intent = new android.content.Intent(
+                    android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    android.net.Uri.parse("package:" + getContext().getPackageName()));
+            intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(intent);
+            call.resolve();
+        } catch (Exception e) {
+            // 个别 ROM 不支持带 package Uri 的授权页，回退到通用设置页
+            try {
+                android.content.Intent fallback = new android.content.Intent(
+                        android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        android.net.Uri.parse("package:" + getContext().getPackageName()));
+                fallback.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+                getContext().startActivity(fallback);
+                call.resolve();
+            } catch (Exception e2) {
+                call.reject("无法打开授权页: " + e2.getMessage());
+            }
+        }
+    }
+
+    /** 启动/更新护眼滤镜（幂等：服务已运行则按新参数重应用）。 */
+    @PluginMethod
+    public void eyeCareStart(PluginCall call) {
+        String warmColor = call.getString("warmColor", "#FFB26B");
+        float warmAlpha = (float) call.getDouble("warmAlpha", 0.2);
+        float dimAlpha = (float) call.getDouble("dimAlpha", 0.0);
+        if (!android.provider.Settings.canDrawOverlays(getContext())) {
+            call.reject("OVERLAY_PERMISSION_REQUIRED");
+            return;
+        }
+        try {
+            android.content.Intent intent = new android.content.Intent(getContext(), EyeCareService.class)
+                    .setAction(EyeCareService.ACTION_APPLY)
+                    .putExtra(EyeCareService.EXTRA_WARM_COLOR, warmColor)
+                    .putExtra(EyeCareService.EXTRA_WARM_ALPHA, warmAlpha)
+                    .putExtra(EyeCareService.EXTRA_DIM_ALPHA, dimAlpha);
+            if (android.os.Build.VERSION.SDK_INT >= 26) {
+                getContext().startForegroundService(intent);
+            } else {
+                getContext().startService(intent);
+            }
+            JSObject ret = new JSObject();
+            ret.put("ok", true);
+            call.resolve(ret);
+        } catch (Exception e) {
+            call.reject("启动护眼滤镜失败: " + e.getMessage());
+        }
+    }
+
+    /** 停止护眼滤镜（移除悬浮层 + 停止前台服务）。 */
+    @PluginMethod
+    public void eyeCareStop(PluginCall call) {
+        try {
+            android.content.Intent intent = new android.content.Intent(getContext(), EyeCareService.class)
+                    .setAction(EyeCareService.ACTION_STOP);
+            getContext().startService(intent);
+            JSObject ret = new JSObject();
+            ret.put("ok", true);
+            call.resolve(ret);
+        } catch (Exception e) {
+            // 服务未运行等场景直接清理兜底
+            try { EyeCareService.removeOverlay(getContext()); } catch (Exception ignored) {}
+            call.resolve();
+        }
+    }
+
     @PluginMethod
     public void isSupported(PluginCall call) {
         JSObject ret = new JSObject();

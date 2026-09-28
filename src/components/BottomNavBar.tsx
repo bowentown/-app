@@ -1,8 +1,8 @@
 import React from 'react';
-import { Moon, BarChart2, Sparkles, Sliders } from 'lucide-react';
+import { Moon, BarChart2, Sparkles, Sliders, Eye } from 'lucide-react';
 import { ThemeConfig } from '../utils/themeStyles';
 
-export type NavTab = 'today' | 'trends' | 'coach' | 'settings';
+export type NavTab = 'today' | 'trends' | 'coach' | 'eyecare' | 'settings';
 
 interface BottomNavBarProps {
   activeTab: NavTab;
@@ -15,6 +15,7 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({ activeTab, onChangeT
     { key: 'today', label: '睡眠', icon: Moon },
     { key: 'trends', label: '趋势', icon: BarChart2 },
     { key: 'coach', label: 'AI顾问', icon: Sparkles },
+    { key: 'eyecare', label: '护眼', icon: Eye },
     { key: 'settings', label: '偏好', icon: Sliders },
   ];
 
@@ -22,9 +23,9 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({ activeTab, onChangeT
     <nav
       role="navigation"
       aria-label="主标签栏"
-      className={`fixed bottom-0 left-0 right-0 z-50 w-full select-none ${theme.navBg} border-t ${theme.navBorder} px-4 py-2 pb-safe shadow-[0_-10px_30px_rgba(0,0,0,0.7)] transition-colors`}
+      className={`fixed bottom-0 left-0 right-0 z-50 w-full select-none ${theme.navBg} border-t ${theme.navBorder} px-3 py-2 pb-safe shadow-[0_-10px_30px_rgba(0,0,0,0.7)] transition-colors`}
     >
-      <div className="grid grid-cols-4 items-center max-w-lg mx-auto">
+      <div className="grid grid-cols-5 items-center max-w-lg mx-auto">
         {tabs.map((t) => {
           const Icon = t.icon;
           const isActive = activeTab === t.key;

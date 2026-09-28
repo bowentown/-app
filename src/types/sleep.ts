@@ -90,6 +90,28 @@ export interface CustomAIConfig {
   localModelVariant?: 'qwen_0_6b' | 'gemma_1b';
 }
 
+export interface EyeCareConfig {
+  enabled: boolean; // 总开关（原生端为全局悬浮窗滤镜；Web 端回退为应用内滤镜）
+  preset: 'soft' | 'amber' | 'maple' | 'custom'; // 柔和暖黄 / 月夜琥珀 / 深夜枫红
+  warmColor: string; // '#RRGGBB' 滤镜色
+  warmStrength: number; // 0-100 滤镜强度
+  dimStrength: number; // 0-100 屏幕减光强度
+  scheduleEnabled: boolean; // 定时开关（支持跨午夜时段）
+  start: string; // 'HH:MM'
+  end: string; // 'HH:MM'
+}
+
+export const DEFAULT_EYE_CARE: EyeCareConfig = {
+  enabled: false,
+  preset: 'amber',
+  warmColor: '#FFB26B',
+  warmStrength: 45,
+  dimStrength: 15,
+  scheduleEnabled: true,
+  start: '22:00',
+  end: '07:00',
+};
+
 export interface UserProfile {
   name: string;
   age: number;
@@ -102,6 +124,7 @@ export interface UserProfile {
   themeColor?: 'midnight' | 'pure_dark' | 'warm_amber' | 'serene_blue' | 'light_clean';
   brightnessLevel: number; // 0 - 100% app display brightness / dimming
   warmthFilter: boolean; // eye protection amber warm tint
+  eyeCare?: EyeCareConfig;
   alarms?: CustomAlarmSetting[];
   aiConfig?: CustomAIConfig;
 }
