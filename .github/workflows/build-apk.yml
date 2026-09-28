@@ -3,7 +3,11 @@ name: Build Standalone Offline Android APK
 on:
   push:
     branches: [ main, master ]
+    tags: [ 'v*' ]
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build-apk:
@@ -164,3 +168,48 @@ jobs:
           name: SomnaCare-Offline-Local-APK
           path: android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
+
+  # 打 v* 标签时：把构建产物发布到公开的 GitHub Release（无需登录即可下载）
+  release-apk:
+    name: Publish Release APK
+    needs: build-apk
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download built APK
+        uses: actions/download-artifact@v4
+        with:
+          name: SomnaCare-Offline-Local-APK
+          path: apk/
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          APK_FILE=$(find apk -name "*.apk" | head -n 1)
+          RELEASE_NAME="SomnaCare-${TAG}.apk"
+          cp "$APK_FILE" "$RELEASE_NAME"
+          cat > release_notes.md <<'EOF'
+          ## 极光睡眠 SomnaCare
+
+          **懂睡眠，更懂你。** 100% 离线优先的 Android 睡眠记录与分析应用。
+
+          ### 📱 安装
+          1. 下载下方 Assets 中的 `.apk` 文件
+          2. 手机上直接点开安装（需允许"安装未知来源应用"）
+          3. 从旧版本升级：请先卸载再安装（桌面会缓存旧图标）
+
+          ### ✨ 功能
+          - 🌙 睡眠记录 + 床头实时声级监测（纯本地计算）
+          - 📊 趋势图表与 90 分钟睡眠周期推演（模型估算值，非医疗诊断）
+          - ✨ AI 睡眠顾问（DeepSeek / 端侧 Gemma / 纯离线规则引擎）
+          - 👁 全局护眼滤镜（暖色减蓝 + 减光，四场景 + 自定义色，定时开关）
+          - ⚙️ 四套主题（桌面图标联动换色）+ 原生精确闹钟 + 数据备份
+
+          ### 🔒 隐私
+          所有睡眠数据仅存本机；AI 云端功能需自备 API Key。详情见项目 README。
+          EOF
+          gh release create "$TAG" "$RELEASE_NAME" \
+            --title "极光睡眠 SomnaCare $TAG" \
+            --notes-file release_notes.md
