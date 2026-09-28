@@ -21,6 +21,8 @@ interface TodayTabProps {
   onNavigateToTrends?: () => void;
   onSaveRecord?: (record: SleepRecord) => void;
   onUpdateProfile: (updated: Partial<UserProfile>) => void;
+  /** 到点提醒'好的'后的开始监测信号（时间戳 ms） */
+  startSignal?: number;
   theme: ThemeConfig;
 }
 
@@ -42,6 +44,7 @@ export const TodayTab: React.FC<TodayTabProps> = ({
   onNavigateToTrends,
   onSaveRecord,
   onUpdateProfile,
+  startSignal,
   theme,
 }) => {
   const latestRecord = records[0] || null;
@@ -77,7 +80,7 @@ export const TodayTab: React.FC<TodayTabProps> = ({
   return (
     <div className={`space-y-4 pb-28 ${theme.textPrimary}`}>
       {/* 1. Primary One-Tap Sleep Tracker */}
-      {onSaveRecord && <OneTapSleepTracker onSaveRecord={onSaveRecord} theme={theme} targetDurationHours={userProfile.targetDurationHours} />}
+      {onSaveRecord && <OneTapSleepTracker onSaveRecord={onSaveRecord} startSignal={startSignal} theme={theme} targetDurationHours={userProfile.targetDurationHours} />}
 
       {/* 2. Last Sleep Overview Card with Unified Theme Colors */}
       {latestRecord ? (

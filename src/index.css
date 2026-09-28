@@ -147,6 +147,8 @@ html {
   .animate-moon-breathe,
   .animate-star-twinkle,
   .animate-tab-fade-in,
+  .animate-tab-from-right,
+  .animate-tab-from-left,
   .animate-cta-breathe,
   .aurora-ring::before {
     animation: none;
@@ -173,3 +175,15 @@ html {
 .animate-cta-breathe {
   animation: cta-breathe 3.4s ease-in-out infinite;
 }
+
+/* ===== 左右滑动切换分区的方向感过渡 ===== */
+@keyframes tab-slide-from-right {
+  from { opacity: 0; transform: translateX(32px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes tab-slide-from-left {
+  from { opacity: 0; transform: translateX(-32px); }
+  to { opacity: 1; transform: none; }
+}
+.animate-tab-from-right { animation: tab-slide-from-right 220ms ease-out; }
+.animate-tab-from-left { animation: tab-slide-from-left 220ms ease-out; }

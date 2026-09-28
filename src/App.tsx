@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Moon,
   CheckCircle2,
@@ -17,12 +17,18 @@ import { APP_THEMES } from './utils/themeStyles';
 import { isNativePlatform, syncAlarmsToNative } from './utils/nativeAlarmScheduler';
 import { applyEyeCare, eyeCareInAppStyles, isInEyeCareWindow } from './utils/eyeCare';
 import { LaunchSplash } from './components/LaunchSplash';
+import { BedtimeReminder, BedtimeReminderPhase } from './components/BedtimeReminder';
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<NavTab>('today');
   const [isActiveSleepOpen, setIsActiveSleepOpen] = useState(false);
   const [isManualLogOpen, setIsManualLogOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [swipeDir, setSwipeDir] = useState<'left' | 'right' | null>(null);
+  const [bedtimeReminder, setBedtimeReminder] = useState<BedtimeReminderPhase | null>(null);
+  const [sleepStartSignal, setSleepStartSignal] = useState(0);
+  const swipeRef = useRef<{ x: number; y: number; skip: boolean } | null>(null);
+  const TAB_ORDER: NavTab[] = ['today', 'trends', 'coach', 'eyecare', 'settings'];
 
   // Persistence for user logs: Empty by default for new users, prevents overwriting corrupt data
   const [records, setRecords] = useState<SleepRecord[]>(() => {
@@ -122,6 +128,31 @@ export const App: React.FC = () => {
     }
   }, []);
 
+  // 作息目标到点提醒：目标就寝时刻起 15 分钟内、当日未提醒、且未在监测中 → 全屏提醒
+  useEffect(() => {
+    const check = () => {
+      if (bedtimeReminder) return;
+      try {
+        if (localStorage.getItem('somnacare_bedtime_start')) return;
+        const today = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`;
+        if (localStorage.getItem('somnacare_reminder_fired') === today) return;
+        const [th, tm] = (userProfile.targetBedtime || '23:30').split(':').map(Number);
+        const now = new Date();
+        const nowMin = now.getHours() * 60 + now.getMinutes();
+        const targetMin = th * 60 + tm;
+        if (nowMin >= targetMin && nowMin <= targetMin + 15) {
+          localStorage.setItem('somnacare_reminder_fired', today);
+          setBedtimeReminder('ask');
+        }
+      } catch {
+        // ignore
+      }
+    };
+    check();
+    const t = setInterval(check, 20_000);
+    return () => clearInterval(t);
+  }, [userProfile.targetBedtime, bedtimeReminder]);
+
   // 护眼滤镜：打开 App 时按配置/定时窗口自动启停，之后每 30 秒轮询一次
   const eyeCareCfg = userProfile.eyeCare ?? DEFAULT_EYE_CARE;
   useEffect(() => {
@@ -129,6 +160,28 @@ export const App: React.FC = () => {
     const t = setInterval(() => void applyEyeCare(eyeCareCfg), 30_000);
     return () => clearInterval(t);
   }, [eyeCareCfg]);
+
+  // 左右滑动切换分区（横移显著大于纵移才触发，不干扰纵向滚动与滑杆）
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const t = e.touches[0];
+    const el = e.target as HTMLElement;
+    swipeRef.current = { x: t.clientX, y: t.clientY, skip: !!el.closest('input, [data-no-swipe]') };
+  };
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    const st = swipeRef.current;
+    swipeRef.current = null;
+    if (!st || st.skip) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - st.x;
+    const dy = t.clientY - st.y;
+    if (Math.abs(dx) < 64 || Math.abs(dx) < Math.abs(dy) * 1.6) return;
+    const idx = TAB_ORDER.indexOf(activeTab);
+    const next = dx < 0 ? idx + 1 : idx - 1;
+    if (next < 0 || next >= TAB_ORDER.length) return;
+    setSwipeDir(dx < 0 ? 'left' : 'right');
+    setActiveTab(TAB_ORDER[next]);
+    window.setTimeout(() => setSwipeDir(null), 260);
+  };
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -205,6 +258,25 @@ export const App: React.FC = () => {
             )}
           </>
         ))}
+      {/* 作息目标到点提醒（全屏，品牌开屏同款视觉，无标语） */}
+      {bedtimeReminder && (
+        <BedtimeReminder
+          phase={bedtimeReminder}
+          onGood={() => setBedtimeReminder('good')}
+          onIgnore={() => setBedtimeReminder('ignore')}
+          onDone={(finalPhase) => {
+            if (finalPhase === 'good') {
+              const now = Date.now();
+              localStorage.setItem('somnacare_bedtime_start', String(now));
+              setSleepStartSignal(now);
+              setActiveTab('today');
+              showToast('晚安💤');
+            }
+            setBedtimeReminder(null);
+          }}
+        />
+      )}
+
       {/* Toast Notification */}
       {toastMessage && (
         <div className={`fixed top-5 left-1/2 -translate-x-1/2 z-[90] px-5 py-3 rounded-2xl ${currentTheme.accentBg.split(' ')[0]} text-white text-xs font-black shadow-2xl flex items-center gap-2.5 animate-bounce border border-white/10`}>
@@ -237,7 +309,12 @@ export const App: React.FC = () => {
         </header>
 
         {/* Tab View Container（key 重挂载触发 180ms 淡入上浮动效） */}
-        <main key={activeTab} className="animate-tab-fade-in p-4 space-y-4 flex-1">
+        <main
+          key={activeTab}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+          className={`${swipeDir === 'left' ? 'animate-tab-from-right' : swipeDir === 'right' ? 'animate-tab-from-left' : 'animate-tab-fade-in'} p-4 space-y-4 flex-1`}
+        >
           {activeTab === 'today' && (
             <TodayTab
               records={records}
@@ -245,6 +322,7 @@ export const App: React.FC = () => {
               onOpenActiveSleep={() => setIsActiveSleepOpen(true)}
               onOpenManualLog={() => setIsManualLogOpen(true)}
               onUpdateProfile={(updated) => setUserProfile((prev) => ({ ...prev, ...updated }))}
+              startSignal={sleepStartSignal}
               onNavigateToTrends={() => setActiveTab('trends')}
               onSaveRecord={handleSaveManualRecord}
               theme={currentTheme}

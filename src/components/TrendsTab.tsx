@@ -41,14 +41,6 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
   const [isHistoryExpanded, setIsHistoryExpanded] = useState(false);
 
   const count = records.length;
-  const avgDuration = count > 0 ? Math.round(records.reduce((acc, r) => acc + r.durationMinutes, 0) / count) : 0;
-  const avgScore = count > 0 ? Math.round(records.reduce((acc, r) => acc + r.sleepScore, 0) / count) : 0;
-  const avgDeepRatio =
-    count > 0
-      ? Math.round(
-          (records.reduce((acc, r) => acc + (r.durationMinutes > 0 ? r.deepSleepMinutes / r.durationMinutes : 0), 0) / count) * 100
-        )
-      : 0;
 
   // Use up to last 7 days sorted chronologically
   const last7Records = records.slice(0, 7).reverse();
@@ -71,27 +63,7 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
 
   return (
     <div className={`space-y-3 pb-28 ${theme.textPrimary}`}>
-      {/* 1. Concise Overview Numbers */}
-      <div className="grid grid-cols-3 gap-2">
-        <div className={`${theme.cardBg} rounded-2xl p-3 border ${theme.cardBorder} text-center`}>
-          <span className={`text-[11px] font-medium ${theme.textMuted} block`}>近7日均分</span>
-          <span className={`text-xl font-black font-mono ${accentText} tabular-nums`}>{avgScore}</span>
-        </div>
-
-        <div className={`${theme.cardBg} rounded-2xl p-3 border ${theme.cardBorder} text-center`}>
-          <span className={`text-[11px] font-medium ${theme.textMuted} block`}>日均睡眠</span>
-          <span className="text-xl font-black font-mono text-white tabular-nums">
-            {(avgDuration / 60).toFixed(1)}h
-          </span>
-        </div>
-
-        <div className={`${theme.cardBg} rounded-2xl p-3 border ${theme.cardBorder} text-center`}>
-          <span className={`text-[11px] font-medium ${theme.textMuted} block`}>深睡占比</span>
-          <span className="text-xl font-black font-mono text-emerald-400 tabular-nums">{avgDeepRatio}%</span>
-        </div>
-      </div>
-
-      {/* 2. Visual Trends Container */}
+      {/* Visual Trends Container */}
       <div className={`${theme.cardBg} rounded-3xl p-4 border ${theme.cardBorder} space-y-3`}>
         {/* Toggle Switch */}
         <div className={`flex items-center justify-between pb-2 border-b ${innerBorder}`}>

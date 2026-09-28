@@ -5,12 +5,14 @@ import { calculateSleepScore, generateSleepStages, formatDurationChinese } from 
 import { ThemeConfig } from '../utils/themeStyles';
 
 interface OneTapSleepTrackerProps {
+  /** 到点提醒'好的'后的开始监测信号（时间戳 ms，变化即开始记录） */
+  startSignal?: number;
   onSaveRecord: (record: SleepRecord) => void;
   theme: ThemeConfig;
   targetDurationHours?: number;
 }
 
-export const OneTapSleepTracker: React.FC<OneTapSleepTrackerProps> = ({ onSaveRecord, theme, targetDurationHours }) => {
+export const OneTapSleepTracker: React.FC<OneTapSleepTrackerProps> = ({ onSaveRecord, startSignal, theme, targetDurationHours }) => {
   const [sleepStartTime, setSleepStartTime] = useState<number | null>(() => {
     const saved = localStorage.getItem('somnacare_bedtime_start');
     return saved ? Number(saved) : null;
@@ -35,6 +37,14 @@ export const OneTapSleepTracker: React.FC<OneTapSleepTrackerProps> = ({ onSaveRe
     const interval = window.setInterval(updateTime, 5000);
     return () => window.clearInterval(interval);
   }, [sleepStartTime]);
+
+  // 到点提醒'好的'触发：与手点 CTA 等效的开始记录
+  useEffect(() => {
+    if (!startSignal) return;
+    const now = Date.now();
+    setSleepStartTime(now);
+    localStorage.setItem('somnacare_bedtime_start', String(now));
+  }, [startSignal]);
 
   const handleStartSleep = () => {
     const now = Date.now();
