@@ -19,7 +19,8 @@ interface EyeCareTabProps {
   theme: ThemeConfig;
 }
 
-// ===== 场景预设：每个场景是一组（色温 + 滤镜强度 + 减光） =====
+// ===== 场景预设：每个场景是一组（主色调 + 滤镜强度 + 减光），色相彼此区分 =====
+// 夜间=暖黄（经典减蓝光）· 阅读=豆沙绿（护眼绿纸感）· 游戏=中性灰（色彩保真只压暗）· 助眠=深橙（最强减蓝+减光）
 const SCENES: {
   id: EyeCareConfig['preset'];
   name: string;
@@ -29,14 +30,14 @@ const SCENES: {
   strength: number;
   dim: number;
 }[] = [
-  { id: 'night', name: '夜间', desc: '护眼暖橙', icon: MoonStar, color: '#FF9D57', strength: 55, dim: 15 },
-  { id: 'reading', name: '阅读', desc: '纸感淡黄', icon: BookOpen, color: '#FFDCA8', strength: 30, dim: 0 },
-  { id: 'game', name: '游戏', desc: '轻减蓝光', icon: Gamepad2, color: '#FFE7C4', strength: 18, dim: 0 },
-  { id: 'sleep', name: '助眠', desc: '深暖低亮', icon: BedDouble, color: '#FF7A50', strength: 75, dim: 30 },
+  { id: 'night', name: '夜间', desc: '暖黄减蓝', icon: MoonStar, color: '#FFB35C', strength: 50, dim: 15 },
+  { id: 'reading', name: '阅读', desc: '豆沙绿纸感', icon: BookOpen, color: '#CDE8CE', strength: 30, dim: 0 },
+  { id: 'game', name: '游戏', desc: '中性灰保真', icon: Gamepad2, color: '#D6E0EA', strength: 15, dim: 10 },
+  { id: 'sleep', name: '助眠', desc: '深橙低亮', icon: BedDouble, color: '#FF7A50', strength: 75, dim: 30 },
 ];
 
-// 自定义调色盘精选色点（暖色为主 + 少量个性色）
-const PALETTE_DOTS = ['#FFE3B8', '#FFC178', '#FF9D57', '#FF7A50', '#FF6B6B', '#C9A0FF', '#9DB4FF', '#A8E6CF'];
+// 自定义调色盘精选色点（覆盖暖黄/橙/绿/灰蓝/紫/蓝，与场景色相呼应）
+const PALETTE_DOTS = ['#FFE8C2', '#FFC178', '#FF9D57', '#FF7A50', '#CDE8CE', '#D6E0EA', '#C9A0FF', '#9DB4FF'];
 
 // 旧版预设名迁移
 const LEGACY_PRESET_MAP: Record<string, EyeCareConfig['preset']> = { soft: 'reading', amber: 'night', maple: 'sleep' };

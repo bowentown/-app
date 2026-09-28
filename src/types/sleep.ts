@@ -104,8 +104,8 @@ export interface EyeCareConfig {
 export const DEFAULT_EYE_CARE: EyeCareConfig = {
   enabled: false,
   preset: 'night',
-  warmColor: '#FF9D57',
-  warmStrength: 55,
+  warmColor: '#FFB35C',
+  warmStrength: 50,
   dimStrength: 15,
   scheduleEnabled: false,
   start: '22:00',
