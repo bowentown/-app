@@ -127,12 +127,14 @@ public class GemmaLLMPlugin extends Plugin {
         }
     }
 
-    /** 启动/更新护眼滤镜（幂等：服务已运行则按新参数重应用）。 */
+    /** 启动/更新护眼滤镜（幂等：服务已运行则原地更新参数，不重建窗口）。 */
     @PluginMethod
     public void eyeCareStart(PluginCall call) {
         String warmColor = call.getString("warmColor", "#FFB26B");
-        float warmAlpha = (float) (double) call.getDouble("warmAlpha", 0.2);
-        float dimAlpha = (float) (double) call.getDouble("dimAlpha", 0.0);
+        double warmAlphaIn = call.getDouble("warmAlpha", 0.2);
+        double dimAlphaIn = call.getDouble("dimAlpha", 0.0);
+        float warmAlpha = (float) Math.min(1.0, Math.max(0.0, warmAlphaIn));
+        float dimAlpha = (float) Math.min(1.0, Math.max(0.0, dimAlphaIn));
         if (!android.provider.Settings.canDrawOverlays(getContext())) {
             call.reject("OVERLAY_PERMISSION_REQUIRED");
             return;
@@ -156,21 +158,22 @@ public class GemmaLLMPlugin extends Plugin {
         }
     }
 
-    /** 停止护眼滤镜（移除悬浮层 + 停止前台服务）。 */
+    /** 停止护眼滤镜：先无条件同步移除滤镜层（保险丝，即使服务路径失败也立刻清屏），再停服务。 */
     @PluginMethod
     public void eyeCareStop(PluginCall call) {
+        try {
+            EyeCareService.removeOverlay(getContext());
+        } catch (Exception ignored) {
+        }
         try {
             android.content.Intent intent = new android.content.Intent(getContext(), EyeCareService.class)
                     .setAction(EyeCareService.ACTION_STOP);
             getContext().startService(intent);
-            JSObject ret = new JSObject();
-            ret.put("ok", true);
-            call.resolve(ret);
-        } catch (Exception e) {
-            // 服务未运行等场景直接清理兜底
-            try { EyeCareService.removeOverlay(getContext()); } catch (Exception ignored) {}
-            call.resolve();
+        } catch (Exception ignored) {
         }
+        JSObject ret = new JSObject();
+        ret.put("ok", true);
+        call.resolve(ret);
     }
 
     @PluginMethod

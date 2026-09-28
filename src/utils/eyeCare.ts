@@ -92,14 +92,49 @@ function wasStarted(): boolean {
   }
 }
 
+// ---- 原生更新节流：滑杆拖动时避免高频 startForegroundService ----
+let lastAppliedSig = '';
+let lastApplyAt = 0;
+let pendingApply: ReturnType<typeof setTimeout> | null = null;
+const APPLY_MIN_INTERVAL_MS = 150;
+
+function scheduleNativeApply(cfg: EyeCareConfig) {
+  const run = () => {
+    pendingApply = null;
+    void applyEyeCare(cfg, true);
+  };
+  const elapsed = Date.now() - lastApplyAt;
+  if (pendingApply) clearTimeout(pendingApply);
+  if (elapsed >= APPLY_MIN_INTERVAL_MS) {
+    run();
+  } else {
+    pendingApply = setTimeout(run, APPLY_MIN_INTERVAL_MS - elapsed);
+  }
+}
+
 /**
  * 按配置自动应用滤镜（App 打开时与定时轮询调用）。
+ * 连续调用（拖动滑杆）会自动节流合并；force=true 用于节流的尾随执行。
  * 返回当前是否实际处于生效状态。
  */
-export async function applyEyeCare(cfg: EyeCareConfig | undefined): Promise<boolean> {
+export async function applyEyeCare(cfg: EyeCareConfig | undefined, force = false): Promise<boolean> {
   const g = gemma();
   if (!g || !cfg) return false;
+
+  // 非强制调用走节流（尾随保证最终状态一定应用）
+  if (!force) {
+    scheduleNativeApply(cfg);
+    // 无原生层时直接返回目标状态，等待尾随执行
+    return cfg.enabled && isInEyeCareWindow(cfg);
+  }
+
+  const { warmColor, warmAlpha, dimAlpha } = eyeCareOverlayParams(cfg);
   const shouldRun = cfg.enabled && isInEyeCareWindow(cfg);
+  const sig = shouldRun ? `on|${warmColor}|${warmAlpha.toFixed(3)}|${dimAlpha.toFixed(3)}` : 'off';
+  if (sig === lastAppliedSig && Date.now() - lastApplyAt < 800) return shouldRun;
+  lastApplyAt = Date.now();
+  lastAppliedSig = sig;
+
   if (!shouldRun) {
     if (wasStarted()) {
       try { await g.eyeCareStop(); } catch { /* ignore */ }
@@ -107,9 +142,8 @@ export async function applyEyeCare(cfg: EyeCareConfig | undefined): Promise<bool
     }
     return false;
   }
-  const params = eyeCareOverlayParams(cfg);
   try {
-    await g.eyeCareStart(params);
+    await g.eyeCareStart({ warmColor, warmAlpha, dimAlpha });
     markStarted(true);
     return true;
   } catch {

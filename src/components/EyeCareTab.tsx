@@ -25,6 +25,29 @@ const PRESETS: { id: EyeCareConfig['preset']; name: string; desc: string; color:
   { id: 'maple', name: '深夜枫红', desc: '深度夜间', color: '#FF8A65' },
 ];
 
+// 自定义色调：色相滑杆 → 滤镜色（夜用滤镜取中等饱和度/亮度，暖而不闷）
+const hslToHex = (h: number, s: number, l: number): string => {
+  const f = (n: number) => {
+    const k = (n + h / 30) % 12;
+    const c = l - s * Math.min(l, 1 - l) * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+    return Math.round(c * 255).toString(16).padStart(2, '0');
+  };
+  return `#${f(0)}${f(8)}${f(4)}`.toUpperCase();
+};
+const hexToHue = (hex: string): number => {
+  const r = parseInt(hex.slice(1, 3), 16) / 255;
+  const g = parseInt(hex.slice(3, 5), 16) / 255;
+  const b = parseInt(hex.slice(5, 7), 16) / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  if (max === min) return 30;
+  const d = max - min;
+  let h = 0;
+  if (max === r) h = ((g - b) / d) % 6;
+  else if (max === g) h = (b - r) / d + 2;
+  else h = (r - g) / d + 4;
+  return ((h * 60) % 360 + 360) % 360;
+};
+
 const cfgOf = (p: UserProfile): EyeCareConfig => p.eyeCare ?? DEFAULT_EYE_CARE;
 
 export const EyeCareTab: React.FC<EyeCareTabProps> = ({ userProfile, onUpdateProfile, onToast, theme }) => {
@@ -32,6 +55,7 @@ export const EyeCareTab: React.FC<EyeCareTabProps> = ({ userProfile, onUpdatePro
   const native = isEyeCareNative();
   const [granted, setGranted] = useState<boolean>(true);
   const [now, setNow] = useState<Date>(new Date());
+  const hue = hexToHue(cfg.warmColor);
 
   const patch = (p: Partial<EyeCareConfig>) => onUpdateProfile({ eyeCare: { ...cfg, ...p } });
 
@@ -173,6 +197,37 @@ export const EyeCareTab: React.FC<EyeCareTabProps> = ({ userProfile, onUpdatePro
               </button>
             );
           })}
+        </div>
+
+        {/* 自定义色调 */}
+        <div className={`${theme.cardInnerBg} border ${theme.cardInnerBorder} rounded-2xl p-3.5 space-y-2`}>
+          <div className="flex justify-between items-center text-xs font-bold">
+            <span className={cfg.preset === 'custom' ? 'text-orange-300' : 'text-slate-200'}>自定义色调</span>
+            <div className="flex items-center gap-2">
+              <span className="text-slate-500 font-mono">{Math.round(hue)}°</span>
+              <div
+                className="w-8 h-4 rounded border border-white/10"
+                style={{ background: cfg.warmColor }}
+              />
+            </div>
+          </div>
+          <input
+            type="range"
+            min={0}
+            max={359}
+            step={1}
+            value={Math.round(hue)}
+            onChange={(e) => {
+              const h = Number(e.target.value);
+              patch({ preset: 'custom', warmColor: hslToHex(h, 0.62, 0.58) });
+            }}
+            className="w-full cursor-pointer h-2 rounded-lg"
+            style={{
+              background:
+                'linear-gradient(90deg, #ff8080, #ffc780, #f5ff80, #96ff80, #80ffe0, #80b3ff, #c280ff, #ff80d5, #ff8080)',
+            }}
+          />
+          <p className="text-[10px] text-slate-500">拖动选择想要的滤镜色，强度由下方滑杆控制</p>
         </div>
 
         {/* 强度滑杆 */}
