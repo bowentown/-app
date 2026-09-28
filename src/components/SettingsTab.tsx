@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  Clock,
+  ChevronDown,
   RotateCcw,
   Sliders,
   Sun,
@@ -114,6 +114,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   onImportRecords,
   theme,
 }) => {
+  const [themeOpen, setThemeOpen] = useState(false);
   const [isAIConfigOpen, setIsAIConfigOpen] = useState(false);
 
   const handleExportJSON = () => {
@@ -157,9 +158,13 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
 
   return (
     <div className={`space-y-4 pb-28 ${theme.textPrimary}`}>
-      {/* 1. Theme Color Palette Section */}
+      {/* 1. Theme Color Palette Section（默认折叠，点头部展开） */}
       <div className={`${theme.cardBg} rounded-3xl p-5 border ${theme.cardBorder} shadow-xl space-y-3.5`}>
-        <div className="flex items-center justify-between pb-2.5 border-b border-slate-700/60">
+        <button
+          type="button"
+          onClick={() => setThemeOpen(!themeOpen)}
+          className="w-full flex items-center justify-between pb-2.5 border-b border-slate-700/60 cursor-pointer"
+        >
           <div className="flex items-center gap-2.5">
             <div className={`w-8 h-8 rounded-xl ${theme.cardInnerBg} ${theme.accentText} flex items-center justify-center border ${theme.cardBorder}`}>
               <Palette className="w-4 h-4" />
@@ -168,11 +173,13 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               <h3 className="text-sm font-bold text-white tracking-wide">界面主题</h3>
             </div>
           </div>
-          <span className="text-[11px] font-bold text-slate-400">
+          <span className="flex items-center gap-2 text-[11px] font-bold text-slate-400">
             {APP_THEMES[(userProfile.themeColor || 'midnight') as keyof typeof APP_THEMES]?.name}
+            <ChevronDown className={`w-4 h-4 transition-transform ${themeOpen ? 'rotate-180' : ''}`} />
           </span>
-        </div>
+        </button>
 
+        {themeOpen && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
           {Object.values(APP_THEMES).map((t) => {
             const isSelected = (userProfile.themeColor || 'midnight') === t.id;
@@ -209,6 +216,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             );
           })}
         </div>
+        )}
       </div>
 
       {/* 2. Custom Alarm Clocks (Hardware Web Audio) */}
@@ -258,92 +266,6 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         </p>
       </div>
 
-      {/* 4. Schedule Target — 三字段联动编辑器：改其一，其余自动推算 */}
-      <div className={`${theme.cardBg} rounded-3xl p-5 border ${theme.cardBorder} shadow-xl space-y-4`}>
-        <div className="flex items-center gap-2.5 pb-3 border-b border-slate-700/60">
-          <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-300 flex items-center justify-center border border-amber-400">
-            <Clock className="w-4 h-4" />
-          </div>
-          <div>
-            <h3 className="text-sm font-bold text-white">作息目标</h3>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <div className={`${theme.cardInnerBg} border ${theme.cardInnerBorder} rounded-2xl p-3.5 shadow-inner`}>
-            <span className="text-xs font-bold text-slate-200 block mb-1">目标就寝</span>
-            <input
-              type="time"
-              value={userProfile.targetBedtime}
-              onChange={(e) =>
-                onUpdateProfile({
-                  targetBedtime: e.target.value,
-                  targetWakeTime: toClock(toMin(e.target.value) + Math.round(userProfile.targetDurationHours * 60)),
-                })
-              }
-              className="w-full bg-transparent text-2xl font-black text-white font-mono focus:outline-none cursor-pointer"
-            />
-          </div>
-
-          <div className={`${theme.cardInnerBg} border ${theme.cardInnerBorder} rounded-2xl p-3.5 shadow-inner`}>
-            <span className="text-xs font-bold text-slate-200 block mb-1">目标醒来</span>
-            <input
-              type="time"
-              value={userProfile.targetWakeTime}
-              onChange={(e) => {
-                // 反推时长（跨午夜安全），对齐 0.5h 步进并夹在滑杆范围内
-                const durH = Math.min(12, Math.max(4, Math.round(((toMin(e.target.value) - toMin(userProfile.targetBedtime) + 1440) % 1440) / 30) * 0.5));
-                onUpdateProfile({ targetWakeTime: e.target.value, targetDurationHours: durH });
-              }}
-              className="w-full bg-transparent text-2xl font-black text-white font-mono focus:outline-none cursor-pointer"
-            />
-          </div>
-        </div>
-
-        <div className={`${theme.cardInnerBg} border ${theme.cardInnerBorder} rounded-2xl p-3.5 shadow-inner space-y-2`}>
-          <div className="flex justify-between text-xs font-bold">
-            <span className="text-slate-200">目标睡眠时长</span>
-            <span className={`${theme.accentText} font-mono text-sm`}>{userProfile.targetDurationHours} 小时</span>
-          </div>
-          <input
-            type="range"
-            min={4}
-            max={12}
-            step={0.5}
-            value={userProfile.targetDurationHours}
-            onChange={(e) => {
-              const h = Number(e.target.value);
-              onUpdateProfile({
-                targetDurationHours: h,
-                targetWakeTime: toClock(toMin(userProfile.targetBedtime) + Math.round(h * 60)),
-              });
-            }}
-            className={`w-full ${theme.accentBg.split(' ')[0].replace('bg-', 'accent-')} cursor-pointer h-2 bg-slate-700 rounded-lg`}
-          />
-        </div>
-
-        {/* 实时摘要 + 距离下一次目标就寝的提示 */}
-        <div className={`${theme.cardInnerBg} border ${theme.cardInnerBorder} rounded-2xl p-3.5 space-y-1.5`}>
-          <p className={`text-xs font-mono font-bold ${theme.accentText}`}>
-            {userProfile.targetBedtime} 入睡 · {userProfile.targetDurationHours} 小时 · {userProfile.targetWakeTime} 醒来
-          </p>
-          <p className="text-[11px] text-slate-400 leading-relaxed">
-            {(() => {
-              const now = new Date();
-              const nowMin = now.getHours() * 60 + now.getMinutes();
-              let untilBed = toMin(userProfile.targetBedtime) - nowMin;
-              if (untilBed < 0) untilBed += 1440;
-              if (untilBed <= 90) {
-                return untilBed <= 15
-                  ? `⏰ 距目标就寝仅剩约 ${untilBed} 分钟——该开始减速了`
-                  : `🌙 距目标就寝约 ${Math.floor(untilBed / 60)}小时${untilBed % 60}分——适合现在启动睡前流程`;
-              }
-              return `🕐 距今晚目标就寝约 ${Math.floor(untilBed / 60)} 小时${untilBed % 60} 分`;
-            })()}
-            。此目标将用于：睡眠评分基准、报告偏差分析与 AI 建议。
-          </p>
-        </div>
-      </div>
 
       {/* 5. Data Backup, Export & Reset Management */}
       <div className={`${theme.cardBg} rounded-3xl p-5 border ${theme.cardBorder} shadow-xl space-y-3`}>

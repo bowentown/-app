@@ -1,15 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import {
+  ChevronDown,
   ChevronRight,
+  Clock,
   Moon,
   Plus,
   Play,
   ArrowRight,
-  Clock,
-  Sparkles,
 } from 'lucide-react';
 import { SleepRecord, UserProfile } from '../types/sleep';
-import { SleepHypnogram } from './SleepHypnogram';
 import { formatDurationChinese } from '../utils/sleepScore';
 import { OneTapSleepTracker } from './OneTapSleepTracker';
 import { ThemeConfig } from '../utils/themeStyles';
@@ -19,23 +18,34 @@ interface TodayTabProps {
   userProfile: UserProfile;
   onOpenActiveSleep: () => void;
   onOpenManualLog: () => void;
-  onNavigateToCoach: () => void;
   onNavigateToTrends?: () => void;
   onSaveRecord?: (record: SleepRecord) => void;
+  onUpdateProfile: (updated: Partial<UserProfile>) => void;
   theme: ThemeConfig;
 }
+
+// 作息目标联动工具：HH:MM ↔ 当日分钟数（跨午夜安全）
+const toMin = (t: string): number => {
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + m;
+};
+const toClock = (min: number): string => {
+  const norm = ((min % 1440) + 1440) % 1440;
+  return `${String(Math.floor(norm / 60)).padStart(2, '0')}:${String(norm % 60).padStart(2, '0')}`;
+};
 
 export const TodayTab: React.FC<TodayTabProps> = ({
   records,
   userProfile,
   onOpenActiveSleep,
   onOpenManualLog,
-  onNavigateToCoach,
   onNavigateToTrends,
   onSaveRecord,
+  onUpdateProfile,
   theme,
 }) => {
   const latestRecord = records[0] || null;
+  const [goalOpen, setGoalOpen] = useState(false);
 
   // 得分环 + 数字 count-up（进入页面时 0 → 目标值，800ms 缓出）
   const [displayScore, setDisplayScore] = useState(0);
@@ -152,6 +162,31 @@ export const TodayTab: React.FC<TodayTabProps> = ({
               <div className="pt-1 text-[10px] text-slate-500">
                 模型估算 · 非医疗诊断
               </div>
+              {(() => {
+                const t = latestRecord.durationMinutes + latestRecord.awakeMinutes || 1;
+                const p = {
+                  deep: Math.round((latestRecord.deepSleepMinutes / t) * 100),
+                  light: Math.round((latestRecord.lightSleepMinutes / t) * 100),
+                  rem: Math.round((latestRecord.remSleepMinutes / t) * 100),
+                };
+                const awakeP = Math.max(0, 100 - p.deep - p.light - p.rem);
+                return (
+                  <div className="pt-1.5 space-y-1.5">
+                    <div className="flex h-2.5 rounded-full overflow-hidden gap-px">
+                      <div style={{ width: `${p.deep}%` }} className="bg-emerald-400" />
+                      <div style={{ width: `${p.light}%` }} className="bg-sky-400" />
+                      <div style={{ width: `${p.rem}%` }} className="bg-violet-400" />
+                      <div style={{ width: `${awakeP}%` }} className="bg-rose-400/70" />
+                    </div>
+                    <div className="flex justify-between text-[10px] text-slate-400 font-mono">
+                      <span className="text-emerald-400">深 {p.deep}%</span>
+                      <span className="text-sky-400">浅 {p.light}%</span>
+                      <span className="text-violet-400">REM {p.rem}%</span>
+                      <span className="text-rose-400/80">醒 {awakeP}%</span>
+                    </div>
+                  </div>
+                );
+              })()}
               {latestRecord.sleepScore < 75 && (
                 <div className="pt-1 text-[11px] text-amber-300/90 font-medium">
                   💡 提示：睡眠评分自然波动属正常现象，身体今夜会自动通过增加深睡代偿，无需担忧。
@@ -173,13 +208,6 @@ export const TodayTab: React.FC<TodayTabProps> = ({
           </div>
           <h4 className="text-sm font-bold text-white pt-1">暂无睡眠记录</h4>
           <p className={`text-xs ${theme.textMuted}`}>点击上方开始就寝，或通过下方快速补录真实作息</p>
-        </div>
-      )}
-
-      {/* 3. Hypnogram Chart (Tonight Stage Distribution) */}
-      {latestRecord && (
-        <div className={`${theme.cardBg} rounded-3xl p-5 border ${theme.cardBorder} shadow-xl transition-colors`}>
-          <SleepHypnogram record={latestRecord} theme={theme} />
         </div>
       )}
 
@@ -214,21 +242,102 @@ export const TodayTab: React.FC<TodayTabProps> = ({
         </button>
       </div>
 
-      {/* 5. Coach Card Prompt */}
-      <div
-        onClick={onNavigateToCoach}
-        className={`p-4 rounded-2xl ${theme.cardBg} border ${theme.cardBorder} flex items-center justify-between cursor-pointer hover:border-slate-500 transition-all shadow-md`}
-      >
-        <div className="flex items-center gap-3">
-          <div className={`w-9 h-9 rounded-xl ${theme.cardInnerBg} ${theme.accentText} flex items-center justify-center border ${theme.cardBorder}`}>
-            <Sparkles className="w-4 h-4" />
+      {/* 5. 作息目标（默认折叠；编辑器内详尽） */}
+      <div className={`${theme.cardBg} rounded-3xl p-5 border ${theme.cardBorder} shadow-xl space-y-4`}>
+        <button
+          type="button"
+          onClick={() => setGoalOpen(!goalOpen)}
+          className="w-full flex items-center justify-between cursor-pointer"
+        >
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-300 flex items-center justify-center border border-amber-400">
+              <Clock className="w-4 h-4" />
+            </div>
+            <h3 className="text-sm font-bold text-white">作息目标</h3>
           </div>
-          <div>
-            <h4 className="text-xs font-black text-white">AI 睡眠节律智能问诊</h4>
-            <p className={`text-[11px] ${theme.textMuted} font-medium`}>基于近期 7 天数据定制恢复方案</p>
+          <span className="flex items-center gap-2 text-[11px] font-mono text-slate-400 font-bold">
+            {!goalOpen && `${userProfile.targetBedtime} · ${userProfile.targetDurationHours}h · ${userProfile.targetWakeTime}`}
+            <ChevronDown className={`w-4 h-4 transition-transform ${goalOpen ? 'rotate-180' : ''}`} />
+          </span>
+        </button>
+
+        {goalOpen && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div className={`${theme.cardInnerBg} border ${theme.cardInnerBorder} rounded-2xl p-3.5 shadow-inner`}>
+              <span className="text-xs font-bold text-slate-200 block mb-1">目标就寝</span>
+              <input
+                type="time"
+                value={userProfile.targetBedtime}
+                onChange={(e) =>
+                  onUpdateProfile({
+                    targetBedtime: e.target.value,
+                    targetWakeTime: toClock(toMin(e.target.value) + Math.round(userProfile.targetDurationHours * 60)),
+                  })
+                }
+                className="w-full bg-transparent text-2xl font-black text-white font-mono focus:outline-none cursor-pointer"
+              />
+            </div>
+            <div className={`${theme.cardInnerBg} border ${theme.cardInnerBorder} rounded-2xl p-3.5 shadow-inner`}>
+              <span className="text-xs font-bold text-slate-200 block mb-1">目标醒来</span>
+              <input
+                type="time"
+                value={userProfile.targetWakeTime}
+                onChange={(e) => {
+                  const durH = Math.min(12, Math.max(4, Math.round(((toMin(e.target.value) - toMin(userProfile.targetBedtime) + 1440) % 1440) / 30) * 0.5));
+                  onUpdateProfile({ targetWakeTime: e.target.value, targetDurationHours: durH });
+                }}
+                className="w-full bg-transparent text-2xl font-black text-white font-mono focus:outline-none cursor-pointer"
+              />
+            </div>
+          </div>
+
+          <div className={`${theme.cardInnerBg} border ${theme.cardInnerBorder} rounded-2xl p-3.5 shadow-inner space-y-2`}>
+            <div className="flex justify-between text-xs font-bold">
+              <span className="text-slate-200">目标睡眠时长</span>
+              <span className={`${theme.accentText} font-mono text-sm`}>{userProfile.targetDurationHours} 小时</span>
+            </div>
+            <input
+              type="range"
+              min={4}
+              max={12}
+              step={0.5}
+              value={userProfile.targetDurationHours}
+              onChange={(e) => {
+                const h = Number(e.target.value);
+                onUpdateProfile({
+                  targetDurationHours: h,
+                  targetWakeTime: toClock(toMin(userProfile.targetBedtime) + Math.round(h * 60)),
+                });
+              }}
+              className={`w-full ${theme.accentBg.split(' ')[0].replace('bg-', 'accent-')} cursor-pointer h-2 bg-slate-700 rounded-lg`}
+            />
+          </div>
+
+          <div className={`${theme.cardInnerBg} border ${theme.cardInnerBorder} rounded-2xl p-3.5 space-y-1.5`}>
+            <p className={`text-xs font-mono font-bold ${theme.accentText}`}>
+              {userProfile.targetBedtime} 入睡 · {userProfile.targetDurationHours} 小时 · {userProfile.targetWakeTime} 醒来
+            </p>
+            <p className="text-[11px] text-slate-400 leading-relaxed">
+              {(() => {
+                const now = new Date();
+                const nowMin = now.getHours() * 60 + now.getMinutes();
+                let untilBed = toMin(userProfile.targetBedtime) - nowMin;
+                if (untilBed < 0) untilBed += 1440;
+                if (untilBed <= 90) {
+                  return untilBed <= 15
+                    ? `⏰ 距目标就寝仅剩约 ${untilBed} 分钟——该开始减速了`
+                    : `🌙 距目标就寝约 ${Math.floor(untilBed / 60)}小时${untilBed % 60}分——适合现在启动睡前流程`;
+                }
+                return `🕐 距今晚目标就寝约 ${Math.floor(untilBed / 60)} 小时${untilBed % 60} 分`;
+              })()}
+            </p>
+            <p className="text-[11px] text-slate-400 leading-relaxed">
+              此目标将用于：睡眠评分基准、报告偏差分析与 AI 建议。
+            </p>
           </div>
         </div>
-        <ArrowRight className="w-4 h-4 text-slate-400" />
+        )}
       </div>
     </div>
   );

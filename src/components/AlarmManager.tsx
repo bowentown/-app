@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
+  ChevronDown,
+  ChevronUp,
   Bell,
   Plus,
   Play,
@@ -39,6 +41,7 @@ const DEFAULT_DAYS = [
 
 export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlarms, theme }) => {
   const [isAdding, setIsAdding] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
   const [newTime, setNewTime] = useState('07:30');
   const [newLabel, setNewLabel] = useState('早晨唤醒');
   const [newDays, setNewDays] = useState<number[]>([1, 2, 3, 4, 5]);
@@ -214,6 +217,22 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
             <span className="text-sm font-bold text-white whitespace-nowrap">定时唤醒</span>
           </div>
 
+          <div className="flex items-center gap-2">
+            {!isOpen && (
+              <span className="text-[10px] font-mono text-slate-400 whitespace-nowrap">
+                {alarms.filter((a) => a.enabled).length}/{alarms.length} 已启用
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => setIsOpen(!isOpen)}
+              className={`p-1.5 rounded-lg ${theme?.cardInnerBg || 'bg-slate-800'} ${theme?.accentText} cursor-pointer`}
+              aria-label={isOpen ? '收起闹钟列表' : '展开闹钟列表'}
+            >
+              {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </button>
+          </div>
+
           <button
           type="button"
           onClick={() => {
@@ -252,6 +271,7 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
         )}
       </div>
 
+      {isOpen && (<>
       {/* Add New Alarm Form */}
       {isAdding && (
         <div className={`p-4 rounded-2xl ${innerBg} border-2 ${theme?.accentBorder} space-y-4 animate-in fade-in duration-200 shadow-xl`}>
@@ -504,6 +524,7 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
           })
         )}
       </div>
+      </>)}
     </div>
   );
 };

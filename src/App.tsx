@@ -244,7 +244,7 @@ export const App: React.FC = () => {
               userProfile={userProfile}
               onOpenActiveSleep={() => setIsActiveSleepOpen(true)}
               onOpenManualLog={() => setIsManualLogOpen(true)}
-              onNavigateToCoach={() => setActiveTab('coach')}
+              onUpdateProfile={(updated) => setUserProfile((prev) => ({ ...prev, ...updated }))}
               onNavigateToTrends={() => setActiveTab('trends')}
               onSaveRecord={handleSaveManualRecord}
               theme={currentTheme}
