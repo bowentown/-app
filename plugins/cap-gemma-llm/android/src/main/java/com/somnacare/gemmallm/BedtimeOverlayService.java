@@ -105,10 +105,11 @@ public class BedtimeOverlayService extends Service {
             float cy = getHeight() / 2f;
             float r = Math.min(getWidth(), getHeight()) * 0.31f;
             if (sweep > 0f) {
+                float density = getResources().getDisplayMetrics().density;
                 ring.reset();
                 ring.setColor(MOON_COLOR_LIT);
                 ring.setStyle(Paint.Style.STROKE);
-                ring.setStrokeWidth(dp(2.2f));
+                ring.setStrokeWidth(Math.round(2.2f * density));
                 ring.setAlpha(Math.round(255 * 0.85f));
                 c.drawArc(cx - r, cy - r, cx + r, cy + r, -90, 360f * sweep, false, ring);
             }
