@@ -170,13 +170,36 @@ export const SplashScene: React.FC<SplashSceneProps> = ({
         </svg>
       </div>
 
-      {/* 文字区：开屏=宣传词居中；到点提醒=主文案左→右映现于月亮右下侧 + 按钮组 */}
+      {/* 到点提醒操作按钮：屏幕下方居中（不贴最底） */}
+      {isBedtime && showActions && (
+        <div
+          className="absolute left-0 right-0 flex items-center justify-center gap-3.5"
+          style={{ bottom: '9%', opacity: 0, animation: 'splash-rise 520ms ease-out 2300ms both' }}
+        >
+          <button
+            type="button"
+            onClick={onGood}
+            className="px-10 py-3 rounded-2xl text-slate-950 text-sm font-black cursor-pointer active:scale-95 transition-transform shadow-lg"
+            style={{ background: `linear-gradient(90deg, ${mc.lit}, #3b82f6)` }}
+          >
+            好的
+          </button>
+          <button
+            type="button"
+            onClick={onIgnore}
+            className="px-10 py-3 rounded-2xl border border-white/15 text-slate-300 text-sm font-bold cursor-pointer active:scale-95 transition-transform hover:border-white/30"
+          >
+            无视
+          </button>
+        </div>
+      )}
+
+      {/* 文字区：开屏=宣传词居中；到点提醒=水波下方居中（主文案从左到右映现） */}
       {isBedtime ? (
         <div
-          className="absolute w-max max-w-[86vw]"
+          className="absolute left-0 right-0 flex flex-col items-center gap-4"
           style={{
-            left: 'calc(50% - 30px)',
-            top: 'calc(38% + 168px)',
+            top: 'calc(38% + 178px)',
             opacity: 0,
             animation: 'splash-rise 520ms ease-out 2050ms both',
           }}
@@ -189,30 +212,11 @@ export const SplashScene: React.FC<SplashSceneProps> = ({
           </h2>
           {subMessage && (
             <p
-              className="text-[11px] text-slate-400 mt-1.5 tracking-wider whitespace-nowrap"
-              style={{ ...RISE_LTR, animationDelay: '220ms' }}
+              className="text-[11px] text-slate-400 tracking-wider"
+              style={{ ...RISE_LTR, animationDelay: '240ms' }}
             >
               {subMessage}
             </p>
-          )}
-          {showActions && (
-            <div className="flex items-center gap-3.5 mt-5" style={RISE_LTR}>
-              <button
-                type="button"
-                onClick={onGood}
-                className="px-10 py-3 rounded-2xl text-slate-950 text-sm font-black cursor-pointer active:scale-95 transition-transform shadow-lg"
-                style={{ background: `linear-gradient(90deg, ${mc.lit}, #3b82f6)` }}
-              >
-                好的
-              </button>
-              <button
-                type="button"
-                onClick={onIgnore}
-                className="px-10 py-3 rounded-2xl border border-white/15 text-slate-300 text-sm font-bold cursor-pointer active:scale-95 transition-transform hover:border-white/30"
-              >
-                无视
-              </button>
-            </div>
           )}
         </div>
       ) : (
