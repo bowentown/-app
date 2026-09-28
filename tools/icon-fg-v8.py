@@ -79,7 +79,8 @@ for y in range(S):
         row[x] = (clamp(r, 0, 255), clamp(g, 0, 255), clamp(b, 0, 255))
     rows.append(row)
 
-# ===== 水面镜像倒影（同 icon-v7，坐标经 T 变换）=====
+# ===== 水面镜像倒影（同 icon-v7，坐标经 T 变换；线端在触到可见圆前渐隐）=====
+VIS_R = S * (66 / 108) / 2
 RIPPLE_LINES = tuple(
     dict(y=T(256, CCY + (yy - CCY) * SC)[1], comp=1.5 + i * 0.55, wave=(2.0 + i * 0.8) * SC * FSC, fade=(0.95 - i * 0.09))
     for i, yy in enumerate((402, 413, 425, 438, 452, 466, 480))
@@ -92,12 +93,16 @@ for ln in RIPPLE_LINES:
     for x in range(S):
         xw = x + math.sin(x * 0.045 + yi * 0.21) * wave
         if crescent(xw, src_y):
+            tip = 1.0 - smooth(VIS_R - 30, VIS_R - 8, math.sqrt((x - 256) ** 2 + (yi - 256) ** 2))
+            f = fade * tip
+            if f <= 0.01:
+                continue
             for dyi, wv in ((0, 1.0), (-1, 0.55), (1, 0.55)):
                 yy2 = yi + dyi
                 if not (0 <= yy2 < S):
                     continue
                 px = rows[yy2][x]
-                rows[yy2][x] = (lerp(px[0], 190, fade * wv), lerp(px[1], 240, fade * wv), lerp(px[2], 255, fade * wv))
+                rows[yy2][x] = (lerp(px[0], 190, f * wv), lerp(px[1], 240, f * wv), lerp(px[2], 255, f * wv))
 
 # ===== 繁星（同 icon-v7 三颗，坐标经 T 变换）=====
 def add_sparkle(cx, cy, size, amp):
@@ -113,10 +118,10 @@ def add_sparkle(cx, cy, size, amp):
                 f = math.exp(-(dx * dx + dy * dy) / (2 * 8 * 8)) * amp * 0.5
                 rows[y][x] = (clamp(px[0] + 255 * f, 0, 255), clamp(px[1] + 250 * f, 0, 255), clamp(px[2] + 230 * f, 0, 255))
 
-s1x, s1y = T(330, 120); s2x, s2y = T(160, 118); s3x, s3y = T(408, 214)
-add_sparkle(s1x, s1y, 24 * FSC, 1.0)
-add_sparkle(s2x, s2y, 12 * FSC, 0.55)
-add_sparkle(s3x, s3y, 11 * FSC, 0.45)
+s1x, s1y = T(322, 128); s2x, s2y = T(176, 136); s3x, s3y = T(400, 220)
+add_sparkle(s1x, s1y, 22 * FSC, 1.0)
+add_sparkle(s2x, s2y, 11 * FSC, 0.55)
+add_sparkle(s3x, s3y, 10 * FSC, 0.45)
 
 # ===== 输出：master + 全密度前景 =====
 write_png_rgb('native-resources/moon-fg-master.png', S, S, rows)

@@ -54,7 +54,7 @@ _p1 = T(sc(235, CCX), sc(218, CCY)); _p2 = T(sc(345, CCX), sc(168, CCY))
 FG_C1X, FG_C1Y, FG_R1 = _p1[0], _p1[1], 155 * SC * FSC
 FG_C2X, FG_C2Y, FG_R2 = _p2[0], _p2[1], 142 * SC * FSC
 FG_WL = T(256, sc(396, CCY))[1]
-_s1 = T(330, 120); _s2 = T(160, 118); _s3 = T(408, 214)
+_s1 = T(322, 128); _s2 = T(176, 136); _s3 = T(400, 220)
 FG_STARS = ((_s1[0], _s1[1], 3.0 * FSC, 0.95), (_s2[0], _s2[1], 2.0 * FSC, 0.6), (_s3[0], _s3[1], 1.8 * FSC, 0.5))
 
 # ===== 四主题月色调板 =====
@@ -144,8 +144,9 @@ def render_theme(P, fg=False):
             row[x] = (clamp(r, 0, 255), clamp(g, 0, 255), clamp(b, 0, 255))
         rows.append(row)
 
-    # fg 构图的离散波纹线（与默认 fg 同算法：镜像月牙采样，随深度变碎变淡）
+    # fg 构图的离散波纹线（与默认 fg 同算法：镜像月牙采样，随深度变碎变淡；线端触边前渐隐）
     if fg:
+        vis_r = S * (66 / 108) / 2
         for i, yy in enumerate((402, 413, 425, 438, 452, 466, 480)):
             yi = int(T(256, sc(yy, CCY))[1])
             comp = 1.5 + i * 0.55
@@ -157,15 +158,19 @@ def render_theme(P, fg=False):
             for x in range(S):
                 xw = x + math.sin(x * 0.045 + yi * 0.21) * wave
                 if in_crescent(xw, src_y):
+                    tip = 1.0 - smooth(vis_r - 30, vis_r - 8, math.sqrt((x - 256) ** 2 + (yi - 256) ** 2))
+                    fade_t = fade * tip
+                    if fade_t <= 0.01:
+                        continue
                     for dyi, wv in ((0, 1.0), (-1, 0.55), (1, 0.55)):
                         yy2 = yi + dyi
                         if not (0 <= yy2 < S):
                             continue
                         px = rows[yy2][x]
                         rows[yy2][x] = (
-                            lerp(px[0], P['refl'][0], fade * wv),
-                            lerp(px[1], P['refl'][1], fade * wv),
-                            lerp(px[2], P['refl'][2], fade * wv),
+                            lerp(px[0], P['refl'][0], fade_t * wv),
+                            lerp(px[1], P['refl'][1], fade_t * wv),
+                            lerp(px[2], P['refl'][2], fade_t * wv),
                         )
     return rows
 
