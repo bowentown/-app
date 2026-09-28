@@ -112,8 +112,6 @@ jobs:
           # 护眼滤镜前台服务 + 作息到点提醒（服务/接收器，specialUse 类型 API 34+ 需属性）
           sed -i 's|</application>|<service android:name="com.somnacare.gemmallm.EyeCareService" android:exported="false" android:foregroundServiceType="specialUse"><property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="eye_care_overlay_filter"/></service><service android:name="com.somnacare.gemmallm.BedtimeOverlayService" android:exported="false" android:foregroundServiceType="specialUse"><property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="bedtime_reminder_overlay"/></service><receiver android:name="com.somnacare.gemmallm.BedtimeAlarmReceiver" android:exported="false" /></application>|' android/app/src/main/AndroidManifest.xml
 
-          # 冷启动背景改纯深色：原生静止图不再出现，直接衔接 Web 三段式开屏动画
-          python3 tools/make-cold-start-splash.py
 
           # MediaPipe 要求 minSdk ≥ 24（Capacitor 模板默认 23）
           sed -i 's/minSdkVersion = 23/minSdkVersion = 24/' android/variables.gradle
@@ -141,6 +139,8 @@ jobs:
           rm -f android/app/src/main/res/values/colors.xml
           mkdir -p android/app/src/main/res/drawable-night
           cp native-resources/splash.png android/app/src/main/res/drawable-night/splash.png
+          # 冷启动背景改纯深色：原生静止图不再出现，直接衔接 Web 三段式开屏动画
+          python3 tools/make-cold-start-splash.py
           # 四主题启动图标（activity-alias 换图标机制）+ 各主题自适应图标 XML + 主题底色
           cp -r native-resources/themes/*/mipmap-* android/app/src/main/res/
           cp native-resources/adaptive/ic_launcher_*.xml android/app/src/main/res/mipmap-anydpi-v26/
