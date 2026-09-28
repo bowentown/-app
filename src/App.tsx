@@ -271,7 +271,6 @@ export const App: React.FC = () => {
                 setRecords(imported);
                 showToast(`已成功导入 ${imported.length} 条睡眠记录`);
               }}
-              onNavigateEyeCare={() => setActiveTab('eyecare')}
               theme={currentTheme}
             />
           )}

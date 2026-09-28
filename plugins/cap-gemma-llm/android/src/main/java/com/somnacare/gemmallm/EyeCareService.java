@@ -22,11 +22,15 @@ import android.view.WindowManager;
  *   2) 减光层：纯黑 + 透明度（软件减光）
  *
  * 性能与稳定性关键：
- * - 参数更新走"原地更新"（ setBackgroundColor 改预乘 ARGB ），绝不销毁重建窗口，
- *   拖动滑杆时无闪烁、无窗口抖动；
+ * - 参数更新走"原地更新"（改背景纯色 + lp.alpha + updateViewLayout），绝不销毁重建窗口；
+ * - 触摸穿透铁律：透明度必须走 WindowManager.LayoutParams.alpha（窗口级 alpha）。
+ *   Android 12+ 会拦截"穿透悬浮窗的触摸"（防 tapjacking），仅当同 UID 悬浮窗
+ *   组合透明度 ≤ 0.8 才豁免；若把透明度烘焙进背景色像素，窗口被视作全不透明，
+ *   用户将无法滑动/点击任何应用；
  * - 输入穿透：FLAG_NOT_TOUCHABLE | FLAG_NOT_FOCUSABLE（不用 FLAG_LAYOUT_NO_LIMITS，
  *   部分国产 ROM 上该 flag 会有系统手势/输入异常）；
- * - 前台通知三级降级 + 全量 try/catch，任何失败都不允许带崩进程。
+ * - 前台通知兜底 + 全量 try/catch：startForegroundService 启动后必须成功调用
+ *   startForeground，否则系统 5 秒后强杀进程。
  */
 public class EyeCareService extends Service {
 
@@ -41,6 +45,8 @@ public class EyeCareService extends Service {
 
     private static View warmLayer;
     private static View dimLayer;
+    private static WindowManager.LayoutParams warmLp;
+    private static WindowManager.LayoutParams dimLp;
     private static WindowManager windowManager;
 
     @Override
@@ -76,11 +82,6 @@ public class EyeCareService extends Service {
     }
 
     /** 颜色 + 透明度 → 预乘进 ARGB 的 int（避免 View.setAlpha 触发离屏合成） */
-    private static int argb(float alpha, int rgb) {
-        int a = Math.round(clamp01(alpha) * 255f);
-        return (a << 24) | (rgb & 0x00FFFFFF);
-    }
-
     private static int parseSafe(String hex, int fallbackRgb) {
         if (hex == null || hex.length() < 7 || !hex.startsWith("#")) return fallbackRgb;
         try {
@@ -98,52 +99,78 @@ public class EyeCareService extends Service {
             if (wm == null) return;
             windowManager = wm;
 
-            int warmArgb = argb(clamp01(warmAlpha), parseSafe(warmColorHex, 0xFFB26B));
-            int dimArgb = argb(clamp01(dimAlpha), 0x000000);
+            float w = clamp01(warmAlpha);
+            float d = clamp01(dimAlpha);
+            // Android 12+ 非信任触摸拦截：同 UID 悬浮窗"组合透明度"必须 ≤ 0.8 才豁免触摸穿透。
+            // 此处按加法保守钳制（拖满双滑杆时等比缩小，视觉上只是略淡一点，绝不拦触摸）。
+            if (w + d > 0.78f) {
+                float k = 0.78f / (w + d);
+                w *= k;
+                d *= k;
+            }
+
+            int warmSolid = 0xFF000000 | parseSafe(warmColorHex, 0xFFB26B);
 
             // 暖色层：存在则原地更新，缺失则创建，透明则移除（零窗口抖动）
-            if (warmAlpha > 0.005f) {
+            if (w > 0.005f) {
                 if (warmLayer != null) {
-                    warmLayer.setBackgroundColor(warmArgb);
+                    warmLayer.setBackgroundColor(warmSolid);
+                    warmLp.alpha = w;
+                    try { wm.updateViewLayout(warmLayer, warmLp); } catch (Exception ignored) {}
                 } else {
-                    warmLayer = buildLayer(context, wm, warmArgb);
-                    if (warmLayer == null && dimLayer == null) return;
+                    warmLp = buildLp(w);
+                    warmLayer = buildLayer(context, wm, warmSolid, warmLp);
                 }
             } else if (warmLayer != null) {
                 removeViewSafe(warmLayer);
                 warmLayer = null;
+                warmLp = null;
             }
 
             // 减光层
-            if (dimAlpha > 0.005f) {
+            if (d > 0.005f) {
                 if (dimLayer != null) {
-                    dimLayer.setBackgroundColor(dimArgb);
+                    dimLayer.setBackgroundColor(0xFF000000);
+                    dimLp.alpha = d;
+                    try { wm.updateViewLayout(dimLayer, dimLp); } catch (Exception ignored) {}
                 } else {
-                    dimLayer = buildLayer(context, wm, dimArgb);
+                    dimLp = buildLp(d);
+                    dimLayer = buildLayer(context, wm, 0xFF000000, dimLp);
                 }
             } else if (dimLayer != null) {
                 removeViewSafe(dimLayer);
                 dimLayer = null;
+                dimLp = null;
             }
         } catch (Exception ignored) {
             // 悬浮窗应用失败不抛出，保持进程存活
         }
     }
 
-    private static View buildLayer(Context context, WindowManager wm, int argbColor) {
+    /**
+     * 悬浮窗布局参数。透明度必须走 lp.alpha（窗口级 alpha）——
+     * Android 12+ 的触摸穿透豁免按窗口 alpha 属性计算组合透明度；
+     * 若把透明度烘焙进背景色像素，窗口被视为全不透明，触摸会被系统拦截。
+     */
+    private static WindowManager.LayoutParams buildLp(float alpha) {
+        WindowManager.LayoutParams lp = new WindowManager.LayoutParams(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                        | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                        | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+                        | WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
+                PixelFormat.TRANSLUCENT);
+        lp.gravity = Gravity.TOP | Gravity.START;
+        lp.alpha = alpha;
+        return lp;
+    }
+
+    private static View buildLayer(Context context, WindowManager wm, int solidColor, WindowManager.LayoutParams lp) {
         try {
             View v = new View(context);
-            v.setBackgroundColor(argbColor);
-            WindowManager.LayoutParams lp = new WindowManager.LayoutParams(
-                    WindowManager.LayoutParams.MATCH_PARENT,
-                    WindowManager.LayoutParams.MATCH_PARENT,
-                    WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-                            | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-                            | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
-                            | WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
-                    PixelFormat.TRANSLUCENT);
-            lp.gravity = Gravity.TOP | Gravity.START;
+            v.setBackgroundColor(solidColor);
             wm.addView(v, lp);
             return v;
         } catch (Exception e) {
@@ -169,10 +196,17 @@ public class EyeCareService extends Service {
         removeViewSafe(dimLayer);
         warmLayer = null;
         dimLayer = null;
+        warmLp = null;
+        dimLp = null;
     }
 
-    /** 前台通知：三级降级（specialUse 类型 → 普通前台 → 仅通知），确保不抛异常。 */
+    /**
+     * 前台通知：富通知构建失败则退回最小通知，startForeground 多级降级。
+     * 铁律：startForegroundService 启动的服务必须成功调用 startForeground，
+     * 否则系统 ~5 秒后 RemoteServiceException 强杀进程（此前"切主题后进护眼区闪退"的根因）。
+     */
     private void startForegroundCompat() {
+        Notification notif = null;
         try {
             NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
             if (nm != null && nm.getNotificationChannel(CHANNEL_ID) == null) {
@@ -190,30 +224,36 @@ public class EyeCareService extends Service {
             Notification.Builder builder = Build.VERSION.SDK_INT >= 26
                     ? new Notification.Builder(this, CHANNEL_ID)
                     : new Notification.Builder(this);
-            Notification notif = builder
-                    .setSmallIcon(android.R.drawable.ic_menu_close_clear_cancel)
+            notif = builder
+                    .setSmallIcon(getApplicationInfo().icon)
                     .setContentTitle("护眼滤镜运行中")
                     .setContentText("极光睡眠正在为屏幕减蓝光")
                     .addAction(new Notification.Action.Builder(
-                            null, "关闭护眼", stopPi).build())
+                            android.R.drawable.ic_menu_close_clear_cancel, "关闭护眼", stopPi).build())
                     .setOngoing(true)
                     .setOnlyAlertOnce(true)
                     .build();
-
-            if (Build.VERSION.SDK_INT >= 34) {
-                try {
-                    startForeground(NOTIFICATION_ID, notif,
-                            android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
-                    return;
-                } catch (Exception ignored) {
-                }
-            }
+        } catch (Exception ignored) {
+            notif = null;
+        }
+        if (notif == null) {
             try {
-                startForeground(NOTIFICATION_ID, notif);
+                notif = new Notification(); // 最小合法通知，绝不因构建失败而跳过 startForeground
+            } catch (Exception ignored) {
+                return;
+            }
+        }
+        if (Build.VERSION.SDK_INT >= 34) {
+            try {
+                startForeground(NOTIFICATION_ID, notif,
+                        android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
+                return;
             } catch (Exception ignored) {
             }
+        }
+        try {
+            startForeground(NOTIFICATION_ID, notif);
         } catch (Exception ignored) {
-            // 通知构建失败也不允许崩溃；滤镜层照常工作
         }
     }
 

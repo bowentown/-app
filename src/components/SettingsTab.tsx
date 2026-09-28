@@ -3,10 +3,8 @@ import {
   Clock,
   RotateCcw,
   Sliders,
-  ChevronRight,
   Sun,
   Moon,
-  Eye,
   ShieldCheck,
   Palette,
   CheckCircle2,
@@ -47,7 +45,6 @@ interface SettingsTabProps {
   onUpdateProfile: (updated: Partial<UserProfile>) => void;
   onResetDemoData: () => void;
   onImportRecords?: (imported: SleepRecord[]) => void;
-  onNavigateEyeCare?: () => void;
   theme: ThemeConfig;
 }
 
@@ -57,7 +54,6 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   onUpdateProfile,
   onResetDemoData,
   onImportRecords,
-  onNavigateEyeCare,
   theme,
 }) => {
   const [isAIConfigOpen, setIsAIConfigOpen] = useState(false);
@@ -142,31 +138,6 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               </button>
             );
           })}
-        </div>
-      </div>
-
-      {/* 1.5 夜间护眼：功能已升级为独立"护眼"分区（全局悬浮窗滤镜），此处保留入口 */}
-      <div className={`${theme.cardBg} rounded-3xl p-5 border ${theme.cardBorder} shadow-xl`}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-orange-500/20 text-orange-300 flex items-center justify-center border border-orange-400">
-              <Eye className="w-4 h-4" />
-            </div>
-            <div>
-              <h3 className="text-sm font-bold text-white">夜间护眼</h3>
-              <p className="text-[11px] text-slate-400 mt-0.5">全局滤镜 · 色温 · 定时开关</p>
-            </div>
-          </div>
-          {onNavigateEyeCare && (
-            <button
-              type="button"
-              onClick={onNavigateEyeCare}
-              className="px-3.5 py-2 rounded-xl bg-orange-500/15 border border-orange-400 text-orange-200 text-xs font-bold flex items-center gap-1 cursor-pointer active:scale-95 transition-transform"
-            >
-              前往护眼
-              <ChevronRight className="w-3.5 h-3.5" />
-            </button>
-          )}
         </div>
       </div>
 
