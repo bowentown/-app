@@ -8,6 +8,7 @@ import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.PixelFormat;
+import android.hardware.display.DisplayManager;
 import android.os.Build;
 import android.os.IBinder;
 import android.provider.Settings;
@@ -49,9 +50,43 @@ public class EyeCareService extends Service {
     private static WindowManager.LayoutParams dimLp;
     private static WindowManager windowManager;
 
+    // 最近一次应用的参数（旋转屏幕等显示变化时原地重放，保证全屏覆盖）
+    private static String lastColorHex = null;
+    private static float lastWarm = 0f;
+    private static float lastDim = 0f;
+
     @Override
     public IBinder onBind(Intent intent) {
         return null;
+    }
+
+    /** 屏幕旋转/分辨率变化时原地重放滤镜参数（显式定尺寸的窗口不会自动跟随旋转） */
+    private final DisplayManager.DisplayListener displayListener = new DisplayManager.DisplayListener() {
+        @Override
+        public void onDisplayAdded(int displayId) { }
+
+        @Override
+        public void onDisplayRemoved(int displayId) { }
+
+        @Override
+        public void onDisplayChanged(int displayId) {
+            if (displayId == android.view.Display.DEFAULT_DISPLAY && lastColorHex != null) {
+                try {
+                    applyOverlay(EyeCareService.this, lastColorHex, lastWarm, lastDim);
+                } catch (Exception ignored) {
+                }
+            }
+        }
+    };
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        try {
+            DisplayManager dm = (DisplayManager) getSystemService(DISPLAY_SERVICE);
+            if (dm != null) dm.registerDisplayListener(displayListener, null);
+        } catch (Exception ignored) {
+        }
     }
 
     @Override
@@ -99,6 +134,10 @@ public class EyeCareService extends Service {
             if (wm == null) return;
             windowManager = wm;
 
+            lastColorHex = warmColorHex;
+            lastWarm = warmAlpha;
+            lastDim = dimAlpha;
+
             float w = clamp01(warmAlpha);
             float d = clamp01(dimAlpha);
             // Android 12+ 非信任触摸拦截：同 UID 悬浮窗"组合透明度"必须 ≤ 0.8 才豁免触摸穿透。
@@ -109,6 +148,10 @@ public class EyeCareService extends Service {
                 d *= k;
             }
 
+            // 真实物理分辨率：MATCH_PARENT 只覆盖系统"应用可视帧"，会漏掉手势区/曲面边/刘海侧，
+            // 必须显式定尺寸到整块物理屏（含 NO_LIMITS 越界绘制），才能真正全屏覆盖。
+            int[] size = realDisplaySize(wm);
+
             int warmSolid = 0xFF000000 | parseSafe(warmColorHex, 0xFFB26B);
 
             // 暖色层：存在则原地更新，缺失则创建，透明则移除（零窗口抖动）
@@ -116,9 +159,10 @@ public class EyeCareService extends Service {
                 if (warmLayer != null) {
                     warmLayer.setBackgroundColor(warmSolid);
                     warmLp.alpha = w;
+                    applyLpSize(warmLp, size);
                     try { wm.updateViewLayout(warmLayer, warmLp); } catch (Exception ignored) {}
                 } else {
-                    warmLp = buildLp(w);
+                    warmLp = buildLp(w, size[0], size[1]);
                     warmLayer = buildLayer(context, wm, warmSolid, warmLp);
                 }
             } else if (warmLayer != null) {
@@ -132,9 +176,10 @@ public class EyeCareService extends Service {
                 if (dimLayer != null) {
                     dimLayer.setBackgroundColor(0xFF000000);
                     dimLp.alpha = d;
+                    applyLpSize(dimLp, size);
                     try { wm.updateViewLayout(dimLayer, dimLp); } catch (Exception ignored) {}
                 } else {
-                    dimLp = buildLp(d);
+                    dimLp = buildLp(d, size[0], size[1]);
                     dimLayer = buildLayer(context, wm, 0xFF000000, dimLp);
                 }
             } else if (dimLayer != null) {
@@ -147,23 +192,55 @@ public class EyeCareService extends Service {
         }
     }
 
+    /** 真实物理分辨率（含刘海/手势区/系统装饰区）。API 30+ 用最大窗口度量，旧机回退 getRealMetrics。 */
+    private static int[] realDisplaySize(WindowManager wm) {
+        try {
+            if (Build.VERSION.SDK_INT >= 30) {
+                android.graphics.Rect b = wm.getMaximumWindowMetrics().getBounds();
+                if (b.width() > 0 && b.height() > 0) return new int[]{b.width(), b.height()};
+            }
+        } catch (Exception ignored) {
+        }
+        try {
+            android.util.DisplayMetrics dm = new android.util.DisplayMetrics();
+            wm.getDefaultDisplay().getRealMetrics(dm);
+            if (dm.widthPixels > 0 && dm.heightPixels > 0) return new int[]{dm.widthPixels, dm.heightPixels};
+        } catch (Exception ignored) {
+        }
+        return new int[]{WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT};
+    }
+
+    private static void applyLpSize(WindowManager.LayoutParams lp, int[] size) {
+        lp.width = size[0];
+        lp.height = size[1];
+        lp.x = 0;
+        lp.y = 0;
+    }
+
     /**
      * 悬浮窗布局参数。透明度必须走 lp.alpha（窗口级 alpha）——
      * Android 12+ 的触摸穿透豁免按窗口 alpha 属性计算组合透明度；
-     * 若把透明度烘焙进背景色像素，窗口被视为全不透明，触摸会被系统拦截。
+     * 若把透明度烘焙进背景色像素，窗口被视作全不透明，触摸会被系统拦截。
+     * FLAG_LAYOUT_NO_LIMITS：允许绘制进手势区/曲面边缘/系统装饰区（触摸穿透由 alpha 豁免保证）。
      */
-    private static WindowManager.LayoutParams buildLp(float alpha) {
+    private static WindowManager.LayoutParams buildLp(float alpha, int width, int height) {
         WindowManager.LayoutParams lp = new WindowManager.LayoutParams(
-                WindowManager.LayoutParams.MATCH_PARENT,
-                WindowManager.LayoutParams.MATCH_PARENT,
+                width, height,
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
                 WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
                         | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
                         | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+                        | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
                         | WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
                 PixelFormat.TRANSLUCENT);
         lp.gravity = Gravity.TOP | Gravity.START;
+        lp.x = 0;
+        lp.y = 0;
         lp.alpha = alpha;
+        if (Build.VERSION.SDK_INT >= 28) {
+            // 覆盖刘海/挖孔区域
+            lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+        }
         return lp;
     }
 
@@ -260,6 +337,11 @@ public class EyeCareService extends Service {
     @Override
     public void onDestroy() {
         // 服务销毁时兜底移除滤镜，避免残留色层
+        try {
+            DisplayManager dm = (DisplayManager) getSystemService(DISPLAY_SERVICE);
+            if (dm != null) dm.unregisterDisplayListener(displayListener);
+        } catch (Exception ignored) {
+        }
         try {
             removeOverlayInternal();
         } catch (Exception ignored) {
