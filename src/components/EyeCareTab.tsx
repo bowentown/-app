@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Eye, Sun, Moon, Clock, ShieldCheck, Info, CheckCircle2 } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Eye, MoonStar, BookOpen, Gamepad2, BedDouble, Pipette, Clock, CheckCircle2 } from 'lucide-react';
 import { UserProfile, EyeCareConfig, DEFAULT_EYE_CARE } from '../types/sleep';
 import { ThemeConfig } from '../utils/themeStyles';
 import {
@@ -19,13 +19,28 @@ interface EyeCareTabProps {
   theme: ThemeConfig;
 }
 
-const PRESETS: { id: EyeCareConfig['preset']; name: string; desc: string; color: string }[] = [
-  { id: 'soft', name: '柔和暖黄', desc: '轻度减蓝光', color: '#FFD180' },
-  { id: 'amber', name: '月夜琥珀', desc: '睡前推荐', color: '#FFB26B' },
-  { id: 'maple', name: '深夜枫红', desc: '深度夜间', color: '#FF8A65' },
+// ===== 场景预设：每个场景是一组（色温 + 滤镜强度 + 减光） =====
+const SCENES: {
+  id: EyeCareConfig['preset'];
+  name: string;
+  desc: string;
+  icon: React.ElementType;
+  color: string;
+  strength: number;
+  dim: number;
+}[] = [
+  { id: 'night', name: '夜间', desc: '护眼暖橙', icon: MoonStar, color: '#FF9D57', strength: 55, dim: 15 },
+  { id: 'reading', name: '阅读', desc: '纸感淡黄', icon: BookOpen, color: '#FFDCA8', strength: 30, dim: 0 },
+  { id: 'game', name: '游戏', desc: '轻减蓝光', icon: Gamepad2, color: '#FFE7C4', strength: 18, dim: 0 },
+  { id: 'sleep', name: '助眠', desc: '深暖低亮', icon: BedDouble, color: '#FF7A50', strength: 75, dim: 30 },
 ];
 
-// 自定义色调：色相滑杆 → 滤镜色（夜用滤镜取中等饱和度/亮度，暖而不闷）
+// 自定义调色盘精选色点（暖色为主 + 少量个性色）
+const PALETTE_DOTS = ['#FFE3B8', '#FFC178', '#FF9D57', '#FF7A50', '#FF6B6B', '#C9A0FF', '#9DB4FF', '#A8E6CF'];
+
+// 旧版预设名迁移
+const LEGACY_PRESET_MAP: Record<string, EyeCareConfig['preset']> = { soft: 'reading', amber: 'night', maple: 'sleep' };
+
 const hslToHex = (h: number, s: number, l: number): string => {
   const f = (n: number) => {
     const k = (n + h / 30) % 12;
@@ -39,37 +54,78 @@ const hexToHue = (hex: string): number => {
   const g = parseInt(hex.slice(3, 5), 16) / 255;
   const b = parseInt(hex.slice(5, 7), 16) / 255;
   const max = Math.max(r, g, b), min = Math.min(r, g, b);
-  if (max === min) return 30;
+  if (max === min) return 28;
   const d = max - min;
-  let h = 0;
+  let h: number;
   if (max === r) h = ((g - b) / d) % 6;
   else if (max === g) h = (b - r) / d + 2;
   else h = (r - g) / d + 4;
   return ((h * 60) % 360 + 360) % 360;
 };
 
-const cfgOf = (p: UserProfile): EyeCareConfig => p.eyeCare ?? DEFAULT_EYE_CARE;
+/** 色相条：指针拖动取色（触屏友好） */
+const HueBar: React.FC<{ hue: number; onChange: (h: number) => void }> = ({ hue, onChange }) => {
+  const ref = useRef<HTMLDivElement>(null);
+  const dragging = useRef(false);
+  const pick = (clientX: number) => {
+    const el = ref.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const t = Math.min(1, Math.max(0, (clientX - r.left) / r.width));
+    onChange(Math.round(t * 359));
+  };
+  return (
+    <div
+      ref={ref}
+      role="slider"
+      aria-label="色相"
+      aria-valuenow={Math.round(hue)}
+      className="relative h-5 rounded-full cursor-pointer touch-none select-none"
+      style={{
+        background:
+          'linear-gradient(90deg,#ff8080,#ffc780,#f5ff80,#96ff80,#80ffe0,#80b3ff,#c280ff,#ff80d5,#ff8080)',
+      }}
+      onPointerDown={(e) => {
+        dragging.current = true;
+        (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+        pick(e.clientX);
+      }}
+      onPointerMove={(e) => {
+        if (dragging.current) pick(e.clientX);
+      }}
+      onPointerUp={() => { dragging.current = false; }}
+      onPointerCancel={() => { dragging.current = false; }}
+    >
+      <div
+        className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-6 h-6 rounded-full border-2 border-white shadow-md pointer-events-none"
+        style={{ left: `${(Math.min(359, Math.max(0, hue)) / 359) * 100}%`, background: hslToHex(hue, 0.68, 0.6) }}
+      />
+    </div>
+  );
+};
 
 export const EyeCareTab: React.FC<EyeCareTabProps> = ({ userProfile, onUpdateProfile, onToast, theme }) => {
-  const cfg = cfgOf(userProfile);
+  const rawCfg = userProfile.eyeCare ?? DEFAULT_EYE_CARE;
+  const cfg: EyeCareConfig = LEGACY_PRESET_MAP[rawCfg.preset]
+    ? { ...rawCfg, preset: LEGACY_PRESET_MAP[rawCfg.preset] }
+    : rawCfg;
   const native = isEyeCareNative();
   const [granted, setGranted] = useState<boolean>(true);
   const [now, setNow] = useState<Date>(new Date());
-  const hue = hexToHue(cfg.warmColor);
+  const [hue, setHue] = useState<number>(() => hexToHue(cfg.warmColor));
 
   const patch = (p: Partial<EyeCareConfig>) => onUpdateProfile({ eyeCare: { ...cfg, ...p } });
 
-  // 权限状态 + 每分钟刷新（驱动定时窗口状态显示与自动启停）
+  // 权限状态 + 每 30s 轮询（定时窗口自动启停）
   useEffect(() => {
     if (native) {
       eyeCarePermissionGranted().then(setGranted);
     }
-    const tick = () => {
-      setNow(new Date());
-      void applyEyeCare(cfgOf(userProfile));
-    };
     void applyEyeCare(cfg);
-    const t = setInterval(tick, 30_000);
+    const t = setInterval(() => {
+      setNow(new Date());
+      void applyEyeCare(cfg);
+    }, 30_000);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cfg.enabled, cfg.scheduleEnabled, cfg.start, cfg.end, cfg.warmColor, cfg.warmStrength, cfg.dimStrength]);
@@ -98,30 +154,31 @@ export const EyeCareTab: React.FC<EyeCareTabProps> = ({ userProfile, onUpdatePro
     }
   };
 
-  const handleGrant = async () => {
-    await eyeCareOpenPermissionSettings();
-    onToast('授权后返回本页，再次打开护眼开关即可');
-  };
-
-  const title = active ? '护眼滤镜生效中' : cfg.enabled ? '待定时窗口自动开启' : '护眼滤镜未开启';
+  const statusLine = active
+    ? '滤镜生效中'
+    : cfg.enabled
+      ? '等待定时窗口自动开启'
+      : '已关闭';
 
   return (
     <div className={`space-y-4 pb-28 ${theme.textPrimary}`}>
-      {/* 1. 状态总卡 */}
-      <div className={`${theme.cardBg} rounded-3xl p-5 border ${theme.cardBorder} shadow-xl space-y-4`}>
+      {/* 1. 总开关 + 状态 */}
+      <div className={`${theme.cardBg} rounded-3xl p-5 border ${theme.cardBorder} shadow-xl space-y-3`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-2xl bg-orange-500/20 text-orange-300 flex items-center justify-center border border-orange-400">
               <Eye className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-sm font-black text-white">夜间护眼</h3>
-              <p className="text-[10px] text-slate-400">
-                {native ? '全局悬浮窗滤镜 · 所有应用上方生效' : '网页预览：仅应用内生效，安装 APK 后全局生效'}
+              <h3 className="text-sm font-black text-white">护眼滤镜</h3>
+              <p className="text-[10px] text-slate-400 flex items-center gap-1" aria-live="polite">
+                {active ? <CheckCircle2 className="w-3 h-3 text-emerald-400" /> : null}
+                {statusLine}
+                {cfg.enabled && cfg.scheduleEnabled ? ` · 定时 ${cfg.start}–${cfg.end}` : ''}
               </p>
             </div>
           </div>
-          <label className="relative inline-flex items-center cursor-pointer">
+          <label className="relative inline-flex items-center cursor-pointer shrink-0">
             <input
               type="checkbox"
               checked={cfg.enabled}
@@ -132,106 +189,115 @@ export const EyeCareTab: React.FC<EyeCareTabProps> = ({ userProfile, onUpdatePro
           </label>
         </div>
 
+        {/* 滤镜色预览细条 */}
         <div
-          className={`${theme.cardInnerBg} border ${theme.cardInnerBorder} rounded-2xl px-4 py-3 flex items-center gap-3`}
-          aria-live="polite"
-        >
-          {active ? (
-            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-          ) : (
-            <Clock className="w-4 h-4 text-slate-400 shrink-0" />
-          )}
-          <div className="flex-1 min-w-0">
-            <span className="text-xs font-bold text-slate-100 block">{title}</span>
-            <span className="text-[10px] text-slate-400">
-              {cfg.enabled && cfg.scheduleEnabled
-                ? `定时 ${cfg.start} – ${cfg.end} · 当前${inWindow ? '窗口内' : '窗口外'}`
-                : '手动模式，随开关即时生效'}
-            </span>
-          </div>
-          {/* 滤镜效果预览条 */}
-          <div
-            className="w-14 h-7 rounded-lg border border-white/10 shrink-0"
-            style={{ background: `linear-gradient(90deg, #0b1026, ${styles.warm})` }}
-            title="滤镜色预览"
-          />
-        </div>
+          className="h-2 rounded-full border border-white/5"
+          style={{ background: `linear-gradient(90deg, #0b1026, ${styles.warm})` }}
+          aria-hidden
+        />
 
         {native && cfg.enabled && !granted && (
           <button
             type="button"
-            onClick={() => void handleGrant()}
+            onClick={() => {
+              void eyeCareOpenPermissionSettings();
+              onToast('授权后返回本页，再次打开护眼开关即可');
+            }}
             className="w-full py-2.5 rounded-xl bg-orange-500/20 border border-orange-400 text-orange-200 text-xs font-bold cursor-pointer active:scale-[0.98] transition-transform"
           >
             需要悬浮窗权限 · 前往系统设置授权
           </button>
         )}
+        {!native && (
+          <p className="text-[10px] text-slate-500">网页预览仅应用内生效；安装 APK 后全系统生效</p>
+        )}
       </div>
 
-      {/* 2. 色温档位 */}
-      <div className={`${theme.cardBg} rounded-3xl p-5 border ${theme.cardBorder} shadow-xl space-y-3`}>
-        <div className="flex items-center gap-2 pb-2 border-b border-slate-700/60">
-          <Sun className="w-4 h-4 text-amber-300" />
-          <h3 className="text-sm font-bold text-white">色温档位</h3>
-        </div>
-        <div className="grid grid-cols-3 gap-2">
-          {PRESETS.map((p) => {
-            const selected = cfg.preset === p.id;
+      {/* 2. 场景预设 */}
+      <div className={`${theme.cardBg} rounded-3xl p-5 border ${theme.cardBorder} shadow-xl`}>
+        <div className="grid grid-cols-4 gap-2.5">
+          {SCENES.map((s) => {
+            const Icon = s.icon;
+            const selected = cfg.preset === s.id;
             return (
               <button
-                key={p.id}
+                key={s.id}
                 type="button"
-                onClick={() => patch({ preset: p.id, warmColor: p.color })}
-                className={`rounded-2xl p-3 border text-left transition-all cursor-pointer active:scale-[0.97] ${
+                onClick={() => patch({ preset: s.id, warmColor: s.color, warmStrength: s.strength, dimStrength: s.dim })}
+                className={`flex flex-col items-center gap-1.5 rounded-2xl py-3 px-1 border transition-all cursor-pointer active:scale-[0.96] ${
                   selected
-                    ? 'border-orange-400 bg-orange-500/10'
-                    : `${theme.cardInnerBg} ${theme.cardInnerBorder} border-opacity-40`
+                    ? 'border-orange-400/80 bg-orange-500/10 shadow-lg shadow-orange-900/20'
+                    : `${theme.cardInnerBg} ${theme.cardInnerBorder} hover:border-white/20`
                 }`}
               >
                 <div
-                  className="w-full h-8 rounded-xl mb-2 border border-white/10"
-                  style={{ background: `linear-gradient(135deg, ${p.color}, ${p.color}55)` }}
-                />
-                <span className="text-[11px] font-bold text-white block">{p.name}</span>
-                <span className="text-[9px] text-slate-400">{p.desc}</span>
+                  className="w-10 h-10 rounded-2xl flex items-center justify-center border border-white/10"
+                  style={{ background: `linear-gradient(135deg, ${s.color}, ${s.color}55)` }}
+                >
+                  <Icon className="w-5 h-5 text-white/90" />
+                </div>
+                <span className={`text-xs font-bold ${selected ? 'text-orange-200' : 'text-white'}`}>{s.name}</span>
+                <span className="text-[9px] text-slate-400 leading-none">{s.desc}</span>
               </button>
             );
           })}
         </div>
+      </div>
 
-        {/* 自定义色调 */}
-        <div className={`${theme.cardInnerBg} border ${theme.cardInnerBorder} rounded-2xl p-3.5 space-y-2`}>
-          <div className="flex justify-between items-center text-xs font-bold">
-            <span className={cfg.preset === 'custom' ? 'text-orange-300' : 'text-slate-200'}>自定义色调</span>
-            <div className="flex items-center gap-2">
-              <span className="text-slate-500 font-mono">{Math.round(hue)}°</span>
-              <div
-                className="w-8 h-4 rounded border border-white/10"
-                style={{ background: cfg.warmColor }}
-              />
-            </div>
-          </div>
-          <input
-            type="range"
-            min={0}
-            max={359}
-            step={1}
-            value={Math.round(hue)}
-            onChange={(e) => {
-              const h = Number(e.target.value);
-              patch({ preset: 'custom', warmColor: hslToHex(h, 0.62, 0.58) });
-            }}
-            className="w-full cursor-pointer h-2 rounded-lg"
-            style={{
-              background:
-                'linear-gradient(90deg, #ff8080, #ffc780, #f5ff80, #96ff80, #80ffe0, #80b3ff, #c280ff, #ff80d5, #ff8080)',
-            }}
+      {/* 3. 自定义调色盘 */}
+      <div className={`${theme.cardBg} rounded-3xl p-5 border ${theme.cardBorder} shadow-xl space-y-3.5`}>
+        <div className="flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => patch({ preset: 'custom' })}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold cursor-pointer transition-all active:scale-95 ${
+              cfg.preset === 'custom'
+                ? 'border-orange-400/80 bg-orange-500/10 text-orange-200'
+                : `${theme.cardInnerBg} ${theme.cardInnerBorder} text-white`
+            }`}
+          >
+            <Pipette className="w-3.5 h-3.5" />
+            自定义颜色
+          </button>
+          <div
+            className="w-9 h-9 rounded-2xl border border-white/15 shadow-inner"
+            style={{ background: cfg.warmColor }}
+            aria-label={`当前颜色 ${cfg.warmColor}`}
           />
-          <p className="text-[10px] text-slate-500">拖动选择想要的滤镜色，强度由下方滑杆控制</p>
         </div>
 
-        {/* 强度滑杆 */}
-        <div className={`${theme.cardInnerBg} border ${theme.cardInnerBorder} rounded-2xl p-3.5 space-y-2`}>
+        {/* 精选色点 */}
+        <div className="flex items-center justify-between gap-2">
+          {PALETTE_DOTS.map((c) => (
+            <button
+              key={c}
+              type="button"
+              aria-label={`选择颜色 ${c}`}
+              onClick={() => {
+                setHue(hexToHue(c));
+                patch({ preset: 'custom', warmColor: c });
+              }}
+              className={`w-7 h-7 rounded-full cursor-pointer transition-transform active:scale-90 border ${
+                cfg.warmColor.toUpperCase() === c ? 'border-white scale-110 shadow-md' : 'border-white/10'
+              }`}
+              style={{ background: c }}
+            />
+          ))}
+        </div>
+
+        {/* 色相条 */}
+        <HueBar
+          hue={hue}
+          onChange={(h) => {
+            setHue(h);
+            patch({ preset: 'custom', warmColor: hslToHex(h, 0.68, 0.6) });
+          }}
+        />
+      </div>
+
+      {/* 4. 强度调节 */}
+      <div className={`${theme.cardBg} rounded-3xl p-5 border ${theme.cardBorder} shadow-xl space-y-3.5`}>
+        <div className="space-y-1.5">
           <div className="flex justify-between text-xs font-bold">
             <span className="text-slate-200">滤镜强度</span>
             <span className="text-orange-400 font-mono">{cfg.warmStrength}%</span>
@@ -244,10 +310,10 @@ export const EyeCareTab: React.FC<EyeCareTabProps> = ({ userProfile, onUpdatePro
             value={cfg.warmStrength}
             onChange={(e) => patch({ warmStrength: Number(e.target.value) })}
             className="w-full accent-orange-500 cursor-pointer h-2 bg-slate-700 rounded-lg"
+            aria-label="滤镜强度"
           />
         </div>
-
-        <div className={`${theme.cardInnerBg} border ${theme.cardInnerBorder} rounded-2xl p-3.5 space-y-2`}>
+        <div className="space-y-1.5">
           <div className="flex justify-between text-xs font-bold">
             <span className="text-slate-200">屏幕减光</span>
             <span className="text-indigo-400 font-mono">{cfg.dimStrength}%</span>
@@ -260,19 +326,19 @@ export const EyeCareTab: React.FC<EyeCareTabProps> = ({ userProfile, onUpdatePro
             value={cfg.dimStrength}
             onChange={(e) => patch({ dimStrength: Number(e.target.value) })}
             className="w-full accent-indigo-500 cursor-pointer h-2 bg-slate-700 rounded-lg"
+            aria-label="屏幕减光"
           />
-          <p className="text-[10px] text-slate-500">在全系统之上叠加柔和暗层，比手动调低亮度更温和</p>
         </div>
       </div>
 
-      {/* 3. 定时窗口 */}
+      {/* 5. 定时（默认关闭，按需开启） */}
       <div className={`${theme.cardBg} rounded-3xl p-5 border ${theme.cardBorder} shadow-xl space-y-3`}>
-        <div className="flex items-center justify-between pb-2 border-b border-slate-700/60">
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Moon className="w-4 h-4 text-indigo-300" />
-            <h3 className="text-sm font-bold text-white">定时开关</h3>
+            <Clock className="w-4 h-4 text-indigo-300" />
+            <h3 className="text-sm font-bold text-white">定时开启</h3>
           </div>
-          <label className="relative inline-flex items-center cursor-pointer">
+          <label className="relative inline-flex items-center cursor-pointer shrink-0">
             <input
               type="checkbox"
               checked={cfg.scheduleEnabled}
@@ -286,42 +352,32 @@ export const EyeCareTab: React.FC<EyeCareTabProps> = ({ userProfile, onUpdatePro
         {cfg.scheduleEnabled && (
           <div className="grid grid-cols-2 gap-2.5">
             <div className={`${theme.cardInnerBg} border ${theme.cardInnerBorder} rounded-2xl p-3`}>
-              <span className="text-[10px] text-slate-400 block mb-1">开启时间</span>
+              <span className="text-[10px] text-slate-400 block mb-1">开始</span>
               <input
                 type="time"
                 value={cfg.start}
                 onChange={(e) => patch({ start: e.target.value || '22:00' })}
                 className="w-full bg-transparent text-sm font-mono font-bold text-white focus:outline-none cursor-pointer"
+                aria-label="定时开始时间"
               />
             </div>
             <div className={`${theme.cardInnerBg} border ${theme.cardInnerBorder} rounded-2xl p-3`}>
-              <span className="text-[10px] text-slate-400 block mb-1">关闭时间</span>
+              <span className="text-[10px] text-slate-400 block mb-1">结束</span>
               <input
                 type="time"
                 value={cfg.end}
                 onChange={(e) => patch({ end: e.target.value || '07:00' })}
                 className="w-full bg-transparent text-sm font-mono font-bold text-white focus:outline-none cursor-pointer"
+                aria-label="定时结束时间"
               />
             </div>
           </div>
         )}
-        <p className="text-[10px] text-slate-500 flex items-center gap-1">
-          <Info className="w-3 h-3 shrink-0" />
-          支持跨午夜时段（如 22:00 – 07:00）；应用在后台时按窗口自动启停
+        <p className="text-[10px] text-slate-500">
+          {cfg.scheduleEnabled
+            ? '到点自动开、出窗自动关，支持跨午夜时段（如 22:00 – 07:00）'
+            : '开启后按设定时间段自动开关滤镜'}
         </p>
-      </div>
-
-      {/* 4. 护眼小知识 */}
-      <div className={`${theme.cardBg} rounded-3xl p-5 border ${theme.cardBorder} shadow-xl`}>
-        <div className="flex items-center gap-2 pb-2.5 border-b border-slate-700/60">
-          <ShieldCheck className="w-4 h-4 text-emerald-300" />
-          <h3 className="text-sm font-bold text-white">护眼小知识</h3>
-        </div>
-        <ul className="mt-2.5 space-y-1.5 text-[11px] text-slate-300 leading-relaxed list-none">
-          <li>· 暖色滤镜减少短波蓝光，降低夜间对褪黑素分泌的抑制</li>
-          <li>· 建议 20-20-20 法则：每 20 分钟看 20 英尺（6 米）外 20 秒</li>
-          <li>· 滤镜不能替代暗环境用眼保护，睡前 1 小时调暗屏幕更佳</li>
-        </ul>
       </div>
     </div>
   );
