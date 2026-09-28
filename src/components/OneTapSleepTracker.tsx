@@ -138,7 +138,7 @@ export const OneTapSleepTracker: React.FC<OneTapSleepTrackerProps> = ({ onSaveRe
                 </div>
                 <div>
                   <h3 className="text-base font-black tracking-wide text-white">今晚准备入睡</h3>
-                  <p className={`text-xs ${theme.textMuted} mt-0.5`}>枕边环境实时估算 · 记录真实作息起止点</p>
+                  <p className={`text-xs ${theme.textMuted} mt-0.5`}>记录真实作息起止点</p>
                 </div>
               </div>
             </div>
@@ -148,7 +148,7 @@ export const OneTapSleepTracker: React.FC<OneTapSleepTrackerProps> = ({ onSaveRe
               onClick={handleStartSleep}
               className={`w-full py-3.5 px-5 rounded-2xl ${theme.accentBg} text-white font-black text-xs tracking-wider flex items-center justify-center gap-2 active:scale-[0.99] transition-all cursor-pointer shadow-lg animate-cta-breathe`}
             >
-              <span>轻按开启今夜就寝监测</span>
+              <span>开始夜间监测</span>
               <span className="text-sm">→</span>
             </button>
           </div>

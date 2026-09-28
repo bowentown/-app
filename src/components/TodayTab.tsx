@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
+  ChevronRight,
   Moon,
   Plus,
   Play,
@@ -19,6 +20,7 @@ interface TodayTabProps {
   onOpenActiveSleep: () => void;
   onOpenManualLog: () => void;
   onNavigateToCoach: () => void;
+  onNavigateToTrends?: () => void;
   onSaveRecord?: (record: SleepRecord) => void;
   theme: ThemeConfig;
 }
@@ -29,6 +31,7 @@ export const TodayTab: React.FC<TodayTabProps> = ({
   onOpenActiveSleep,
   onOpenManualLog,
   onNavigateToCoach,
+  onNavigateToTrends,
   onSaveRecord,
   theme,
 }) => {
@@ -68,13 +71,19 @@ export const TodayTab: React.FC<TodayTabProps> = ({
 
       {/* 2. Last Sleep Overview Card with Unified Theme Colors */}
       {latestRecord ? (
-        <div className={`rounded-3xl p-5 ${theme.cardBg} border ${theme.cardBorder} shadow-xl transition-colors`}>
+        <div
+          onClick={() => onNavigateToTrends?.()}
+          className={`rounded-3xl p-5 ${theme.cardBg} border ${theme.cardBorder} shadow-xl transition-all cursor-pointer hover:border-white/20 active:scale-[0.99]`}
+        >
           <div className="flex items-center justify-between text-xs mb-3 font-medium">
             <span className="text-white font-black flex items-center gap-2">
               <span className={`w-2.5 h-2.5 rounded-full ${theme.dot}`}></span>
-              最近一次睡眠生理报告
+              昨晚睡眠
             </span>
-            <span className="font-mono text-slate-300 font-bold">{latestRecord.date}</span>
+            <span className="flex items-center gap-1.5">
+              <span className="font-mono text-slate-300 font-bold">{latestRecord.date}</span>
+              <ChevronRight className={`w-3.5 h-3.5 ${theme.accentText}`} />
+            </span>
           </div>
 
           <div className="flex items-center justify-between gap-5 my-1">
@@ -141,7 +150,7 @@ export const TodayTab: React.FC<TodayTabProps> = ({
                 );
               })()}
               <div className="pt-1 text-[10px] text-slate-500">
-                评分为按作息推演的模型估算值，非医疗诊断，仅作生活方式参考。
+                模型估算 · 非医疗诊断
               </div>
               {latestRecord.sleepScore < 75 && (
                 <div className="pt-1 text-[11px] text-amber-300/90 font-medium">
@@ -188,7 +197,6 @@ export const TodayTab: React.FC<TodayTabProps> = ({
             <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-white transition-colors" />
           </div>
           <span className="text-sm font-bold text-white block">晨起手动补录</span>
-          <span className={`text-xs ${theme.textMuted} mt-0.5 block font-medium`}>按昨夜真实起居补记</span>
         </button>
 
         <button
@@ -203,7 +211,6 @@ export const TodayTab: React.FC<TodayTabProps> = ({
             <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-white transition-colors" />
           </div>
           <span className="text-sm font-bold text-white block">床头夜钟伴眠</span>
-          <span className={`text-xs ${theme.textMuted} mt-0.5 block font-medium`}>极简暗屏 · 助眠白噪</span>
         </button>
       </div>
 

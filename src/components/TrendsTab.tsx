@@ -279,7 +279,7 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
                   </span>
                 </div>
                 <span className={`text-[9px] ${textMuted} font-sans`}>
-                  * 睡眠分期为基于作息起止点与超昼夜节律的模型估算值，非临床医疗设备检测
+                  * 分期为模型估算值，非临床检测
                 </span>
               </div>
             </div>
@@ -354,14 +354,14 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
           className="w-full flex items-center justify-between text-left cursor-pointer group"
         >
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-white">历史睡眠数据记录</span>
+            <span className="text-xs font-bold text-white">历史记录</span>
             <span className={`text-[10px] ${textMuted} font-mono ${innerBg} px-2 py-0.5 rounded-full border ${innerBorder}`}>
               共 {records.length} 条
             </span>
           </div>
 
           <div className={`flex items-center gap-1 text-xs ${accentText} font-medium`}>
-            <span>{isHistoryExpanded ? '收起列表' : '展开查看与管理'}</span>
+            <span>{isHistoryExpanded ? '收起' : '展开'}</span>
             {isHistoryExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </div>
         </button>
@@ -422,7 +422,10 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
         const avgDeepWk = Math.round(wk.reduce((a, r) => a + r.deepSleepMinutes, 0) / wk.length);
         const best = wk.reduce((a, r) => (r.sleepScore > a.sleepScore ? r : a), wk[0]);
         return (
-          <div className={`${theme.cardBg} rounded-3xl p-5 border ${theme.cardBorder} shadow-xl space-y-4`}>
+          <div
+            onClick={() => setIsHistoryExpanded(true)}
+            className={`${theme.cardBg} rounded-3xl p-5 border ${theme.cardBorder} shadow-xl space-y-4 cursor-pointer hover:border-white/20 active:scale-[0.99] transition-all`}
+          >
             <div className="flex items-center gap-2">
               <Sparkles className={`w-4 h-4 ${theme.accentText}`} />
               <h3 className="text-sm font-bold text-white">本周睡眠小结</h3>
@@ -448,12 +451,8 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
               </div>
             </div>
             <p className={`text-[11px] ${textMuted} leading-relaxed`}>
-              最佳一晚是 <span className="text-white font-bold">{best.date}</span>（{best.sleepScore} 分）。
-              {avgScoreWk >= 80
-                ? '整体节奏很稳，保持现在的作息。'
-                : avgScoreWk >= 70
-                  ? '状态尚可，试着把就寝时间再提前 20 分钟。'
-                  : '本周波动较大，建议先固定起床时间。'}
+              最佳 <span className="text-white font-bold">{best.date}</span> · {best.sleepScore} 分 ·{' '}
+              {avgScoreWk >= 80 ? '节奏很稳' : avgScoreWk >= 70 ? '就寝可再提前些' : '先固定起床时间'}
             </p>
           </div>
         );

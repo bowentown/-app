@@ -231,7 +231,7 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
 
         {!nativeStatus.isNative ? (
           <p className="text-[10px] text-amber-300/90 font-medium whitespace-nowrap">
-            （Web 端需保持页面打开 · APK 版可离线唤醒）
+            （APK 可离线唤醒）
           </p>
         ) : (
           <div className="flex items-center flex-wrap gap-x-2 gap-y-1">

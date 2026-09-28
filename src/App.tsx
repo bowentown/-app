@@ -245,6 +245,7 @@ export const App: React.FC = () => {
               onOpenActiveSleep={() => setIsActiveSleepOpen(true)}
               onOpenManualLog={() => setIsManualLogOpen(true)}
               onNavigateToCoach={() => setActiveTab('coach')}
+              onNavigateToTrends={() => setActiveTab('trends')}
               onSaveRecord={handleSaveManualRecord}
               theme={currentTheme}
             />

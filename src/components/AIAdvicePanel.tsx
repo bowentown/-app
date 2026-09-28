@@ -52,7 +52,7 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
       id: 'welcome',
       role: 'assistant',
       content:
-        '您好！我是您的睡眠顾问。根据您最近的作息记录与深睡比例，今晚有什么睡眠困扰需要我为您解答吗？',
+        '您好，我是您的睡眠顾问。今晚有什么睡眠困扰？',
       timestamp: '刚刚',
     },
   ]);
@@ -62,10 +62,10 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
   const localGenAbortRef = useRef<AbortController | null>(null);
 
   const QUICK_PROMPTS = [
-    '为什么我深睡眠比例偏低？怎么提升？',
-    '入睡困难，如何在20分钟内睡着？',
-    '半夜3-4点容易醒来，该如何应对？',
-    '下午喝茶对睡眠影响有多大？',
+    '深睡偏低怎么提升？',
+    '如何快速入睡？',
+    '半夜易醒怎么办？',
+    '下午喝茶影响睡眠吗？',
   ];
 
   const fetchAIAnalysis = async () => {
@@ -313,7 +313,7 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
       <div className={`${theme.cardBg} rounded-3xl p-4 border ${theme.cardBorder} flex items-center justify-between`}>
         <div>
           <h3 className="text-xs font-bold text-white">睡眠医学评估</h3>
-          <p className="text-[11px] text-slate-400 mt-0.5">模型：{activeProviderName} · 评分为模型估算，非医疗诊断</p>
+          <p className="text-[11px] text-slate-400 mt-0.5">模型：{activeProviderName} · 估算非诊断</p>
         </div>
 
         <button
