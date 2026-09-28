@@ -1,6 +1,5 @@
 package com.somnacare.gemmallm;
 
-import android.animation.ObjectAnimator;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -53,39 +52,72 @@ public class BedtimeOverlayService extends Service {
         return null;
     }
 
-    /** 弯刀月亮：渐变圆按顺时针扇形逐步显现，再经咬合圆 CLEAR 抠出弯刀。 */
+    /**
+     * 弯刀月亮：外圈细环按顺时针逐步描绘（呼应开屏第 2 步），随后弯刀形
+     * 渐变填充淡入。弯刀路径 = 外圆 Path.op DIFFERENCE 咬合圆（纯几何运算，
+     * 不依赖 clipPath/xfermode，硬件加速下 100% 可靠）。
+     */
     private static final class MoonView extends View {
-        float progress = 0f;
+        private float sweep = 0f;      // 0..1 外环顺时针描绘进度
+        private float fillAlpha = 0f;  // 0..1 弯刀填充淡入
+        private final Paint ring = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final Paint bite = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final android.graphics.Path crescent = new android.graphics.Path();
+        private boolean built = false;
 
         MoonView(Context c) {
             super(c);
         }
 
-        void setProgress(float p) {
-            progress = p;
+        void setSweep(float v) {
+            sweep = v;
+            invalidate();
+        }
+
+        void setFillAlpha(float v) {
+            fillAlpha = v;
             invalidate();
         }
 
         @Override
+        protected void onSizeChanged(int w, int h, int ow, int oh) {
+            super.onSizeChanged(w, h, ow, oh);
+            buildCrescent(w, h);
+        }
+
+        private void buildCrescent(int w, int h) {
+            float cx = w / 2f;
+            float cy = h / 2f;
+            float r = Math.min(w, h) * 0.31f;
+            android.graphics.Path outer = new android.graphics.Path();
+            outer.addCircle(cx, cy, r, android.graphics.Path.Direction.CW);
+            android.graphics.Path bite = new android.graphics.Path();
+            bite.addCircle(cx + r * 0.56f, cy - r * 0.42f, r * 0.84f, android.graphics.Path.Direction.CW);
+            crescent.set(outer);
+            crescent.op(bite, android.graphics.Path.Op.DIFFERENCE);
+            built = true;
+        }
+
+        @Override
         protected void onDraw(Canvas c) {
+            if (!built) buildCrescent(getWidth(), getHeight());
             float cx = getWidth() / 2f;
             float cy = getHeight() / 2f;
             float r = Math.min(getWidth(), getHeight()) * 0.31f;
-            int sc = c.saveLayer(0, 0, getWidth(), getHeight(), null);
-            android.graphics.Path sector = new android.graphics.Path();
-            sector.moveTo(cx, cy);
-            sector.arcTo(new android.graphics.RectF(cx - r, cy - r, cx + r, cy + r), -90, 360f * progress);
-            sector.close();
-            c.clipPath(sector);
-            fill.setShader(new LinearGradient(cx - r * 0.4f, cy + r, cx + r * 0.5f, cy - r,
-                    MOON_COLOR_LIT, MOON_COLOR_DEEP, Shader.TileMode.CLAMP));
-            c.drawCircle(cx, cy, r, fill);
-            bite.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.CLEAR));
-            c.drawCircle(cx + r * 0.56f, cy - r * 0.42f, r * 0.84f, bite);
-            bite.setXfermode(null);
-            c.restoreToCount(sc);
+            if (sweep > 0f) {
+                ring.reset();
+                ring.setColor(MOON_COLOR_LIT);
+                ring.setStyle(Paint.Style.STROKE);
+                ring.setStrokeWidth(dp(2.2f));
+                ring.setAlpha(Math.round(255 * 0.85f));
+                c.drawArc(cx - r, cy - r, cx + r, cy + r, -90, 360f * sweep, false, ring);
+            }
+            if (fillAlpha > 0f) {
+                fill.setShader(new LinearGradient(cx - r * 0.4f, cy + r, cx + r * 0.5f, cy - r,
+                        MOON_COLOR_LIT, MOON_COLOR_DEEP, Shader.TileMode.CLAMP));
+                fill.setAlpha(Math.round(255 * fillAlpha));
+                c.drawPath(crescent, fill);
+            }
         }
     }
 
@@ -253,7 +285,15 @@ public class BedtimeOverlayService extends Service {
                 .setStartDelay(120).start();
         moon.postDelayed(() -> {
             drop.setAlpha(0f);
-            ObjectAnimator.ofFloat(moon, "progress", 0f, 1f).setDuration(820).start();
+            android.animation.ValueAnimator ringAnim = android.animation.ValueAnimator.ofFloat(0f, 1f);
+            ringAnim.setDuration(760);
+            ringAnim.addUpdateListener(a -> moon.setSweep((float) a.getAnimatedValue()));
+            ringAnim.start();
+            android.animation.ValueAnimator fillAnim = android.animation.ValueAnimator.ofFloat(0f, 1f);
+            fillAnim.setDuration(460);
+            fillAnim.setStartDelay(700);
+            fillAnim.addUpdateListener(a -> moon.setFillAlpha((float) a.getAnimatedValue()));
+            fillAnim.start();
         }, 560);
         msg.postDelayed(() -> {
             msg.animate().alpha(1f).translationY(0f).setDuration(420).start();

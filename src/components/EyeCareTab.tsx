@@ -268,7 +268,7 @@ export const EyeCareTab: React.FC<EyeCareTabProps> = ({ userProfile, onUpdatePro
         </div>
 
         {/* 精选色点 */}
-        <div className="flex items-center justify-between gap-2">
+        <div data-no-swipe className="flex items-center justify-between gap-2">
           {PALETTE_DOTS.map((c) => (
             <button
               key={c}

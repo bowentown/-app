@@ -279,8 +279,8 @@ export const TodayTab: React.FC<TodayTabProps> = ({
           </div>
           <label
             htmlFor="bedtime-reminder-toggle"
-            className="relative inline-flex items-center cursor-pointer shrink-0"
             data-no-swipe
+            className="relative inline-flex items-center cursor-pointer shrink-0"
           >
             <input
               id="bedtime-reminder-toggle"

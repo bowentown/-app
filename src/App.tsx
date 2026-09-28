@@ -30,7 +30,7 @@ export const App: React.FC = () => {
   const trackRef = useRef<HTMLDivElement>(null);
   const idxRef = useRef(0);
   const dragRef = useRef<{
-    x0: number; y0: number; base: number; locked: 'h' | 'y' | null; skip: boolean;
+    x0: number; y0: number; base: number; locked: 'h' | 'y' | null; skip: boolean; aborted: boolean;
     w: number; lastX: number; lastT: number; v: number;
   } | null>(null);
 
@@ -215,7 +215,7 @@ export const App: React.FC = () => {
     dragRef.current = {
       x0: t.clientX, y0: t.clientY,
       base: -idxRef.current * paneW(),
-      locked: null, skip, w: paneW(),
+      locked: null, skip, aborted: false, w: paneW(),
       lastX: t.clientX, lastT: performance.now(), v: 0,
     };
     if (!skip && trackRef.current) trackRef.current.style.transition = 'none';
@@ -226,11 +226,20 @@ export const App: React.FC = () => {
     const t = e.touches[0];
     const dx = t.clientX - d.x0;
     const dy = t.clientY - d.y0;
+    if (d.locked === 'y' || d.aborted) return;
     if (!d.locked) {
-      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+      // 起拖阈值 14px：轻微抖动的点按绝不误判为拖拽（保证开关等点按可点）
+      if (Math.abs(dx) < 14 && Math.abs(dy) < 14) return;
       d.locked = Math.abs(dx) > Math.abs(dy) ? 'h' : 'y';
     }
-    if (d.locked !== 'h') return;
+    // 手指移入免滑区（滑杆/色相条等）→ 放弃本次拖拽，把触摸还给控件
+    const under = document.elementFromPoint(t.clientX, t.clientY) as HTMLElement | null;
+    if (under && under.closest('input, textarea, [data-no-swipe]')) {
+      d.aborted = true;
+      setTrackIdx(idxRef.current);
+      return;
+    }
+    if (Math.abs(dx) < 14) return;
     let offset = d.base + dx;
     const min = -(TAB_ORDER.length - 1) * d.w;
     if (offset > 0) offset = offset * 0.3;
@@ -251,8 +260,14 @@ export const App: React.FC = () => {
     if (!d || d.skip) return;
     const t = e.changedTouches[0];
     const dx = t.clientX - d.x0;
+    const dy = t.clientY - d.y0;
+    // 短距点按/被免滑区中止：不做任何切换（点按事件正常派发给控件）
+    if (d.aborted || d.locked !== 'h' || Math.abs(dx) < 24) {
+      setTrackIdx(idxRef.current);
+      return;
+    }
     let idx = idxRef.current;
-    if (d.locked === 'h' && (Math.abs(dx) > d.w * 0.22 || Math.abs(d.v) > 0.45)) {
+    if (Math.abs(dx) > d.w * 0.22 || Math.abs(d.v) > 0.45) {
       idx = Math.max(0, Math.min(TAB_ORDER.length - 1, idxRef.current + (dx < 0 ? 1 : -1)));
     }
     if (idx !== idxRef.current) {
