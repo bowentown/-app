@@ -24,11 +24,15 @@ export const App: React.FC = () => {
   const [isActiveSleepOpen, setIsActiveSleepOpen] = useState(false);
   const [isManualLogOpen, setIsManualLogOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [swipeDir, setSwipeDir] = useState<'left' | 'right' | null>(null);
   const [bedtimeReminder, setBedtimeReminder] = useState<BedtimeReminderPhase | null>(null);
   const [sleepStartSignal, setSleepStartSignal] = useState(0);
-  const swipeRef = useRef<{ x: number; y: number; skip: boolean } | null>(null);
   const TAB_ORDER: NavTab[] = ['today', 'trends', 'coach', 'eyecare', 'settings'];
+  const trackRef = useRef<HTMLDivElement>(null);
+  const idxRef = useRef(0);
+  const dragRef = useRef<{
+    x0: number; y0: number; base: number; locked: 'h' | 'y' | null; skip: boolean;
+    w: number; lastX: number; lastT: number; v: number;
+  } | null>(null);
 
   // Persistence for user logs: Empty by default for new users, prevents overwriting corrupt data
   const [records, setRecords] = useState<SleepRecord[]>(() => {
@@ -131,7 +135,7 @@ export const App: React.FC = () => {
   // 作息目标到点提醒：目标就寝时刻起 15 分钟内、当日未提醒、且未在监测中 → 全屏提醒
   useEffect(() => {
     const check = () => {
-      if (bedtimeReminder) return;
+      if (bedtimeReminder || isNativePlatform()) return; // 原生端由悬浮窗提醒（跨应用）
       try {
         if (localStorage.getItem('somnacare_bedtime_start')) return;
         const today = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`;
@@ -153,6 +157,34 @@ export const App: React.FC = () => {
     return () => clearInterval(t);
   }, [userProfile.targetBedtime, bedtimeReminder]);
 
+  // 原生：目标变化即重排精确闹钟；悬浮提醒"好的"经冷启动标记或事件接续
+  const runGoodPath = () => {
+    try {
+      if (localStorage.getItem('somnacare_bedtime_start')) return;
+      const now = Date.now();
+      localStorage.setItem('somnacare_bedtime_start', String(now));
+      setSleepStartSignal(now);
+      setActiveTab('today');
+      showToast('晚安💤');
+    } catch {
+      // ignore
+    }
+  };
+  useEffect(() => {
+    if (!isNativePlatform()) return;
+    try {
+      const cap = (window as any).Capacitor;
+      cap.Plugins?.GemmaLLM?.bedtimeReminderSchedule?.({ time: userProfile.targetBedtime });
+      cap.Plugins?.GemmaLLM?.bedtimeAutoStartConsume?.().then((res: any) => {
+        if (res?.consume) runGoodPath();
+      });
+      cap.Plugins?.GemmaLLM?.addListener?.('bedtimeGood', () => runGoodPath());
+    } catch {
+      // ignore
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userProfile.targetBedtime]);
+
   // 护眼滤镜：打开 App 时按配置/定时窗口自动启停，之后每 30 秒轮询一次
   const eyeCareCfg = userProfile.eyeCare ?? DEFAULT_EYE_CARE;
   useEffect(() => {
@@ -161,27 +193,79 @@ export const App: React.FC = () => {
     return () => clearInterval(t);
   }, [eyeCareCfg]);
 
-  // 左右滑动切换分区（横移显著大于纵移才触发，不干扰纵向滚动与滑杆）
+  // 分区滑动轨道：跟手拖拽 + 方向锁 + 边缘橡皮筋，松手按位移/速度吸附
+  const paneW = () => trackRef.current?.parentElement?.clientWidth || window.innerWidth;
+  const setTrack = (px: number, animate: boolean) => {
+    const el = trackRef.current;
+    if (!el) return;
+    el.style.transition = animate ? 'transform 300ms cubic-bezier(0.22,1,0.36,1)' : 'none';
+    el.style.transform = `translateX(${px}px)`;
+  };
+  const setTrackIdx = (idx: number) => setTrack(-idx * paneW(), true);
+
   const handleTouchStart = (e: React.TouchEvent) => {
     const t = e.touches[0];
     const el = e.target as HTMLElement;
-    swipeRef.current = { x: t.clientX, y: t.clientY, skip: !!el.closest('input, [data-no-swipe]') };
+    const skip = !!el.closest('input, textarea, [data-no-swipe]');
+    dragRef.current = {
+      x0: t.clientX, y0: t.clientY,
+      base: -idxRef.current * paneW(),
+      locked: null, skip, w: paneW(),
+      lastX: t.clientX, lastT: performance.now(), v: 0,
+    };
+    if (!skip && trackRef.current) trackRef.current.style.transition = 'none';
+  };
+  const handleTouchMove = (e: React.TouchEvent) => {
+    const d = dragRef.current;
+    if (!d || d.skip) return;
+    const t = e.touches[0];
+    const dx = t.clientX - d.x0;
+    const dy = t.clientY - d.y0;
+    if (!d.locked) {
+      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+      d.locked = Math.abs(dx) > Math.abs(dy) ? 'h' : 'y';
+    }
+    if (d.locked !== 'h') return;
+    let offset = d.base + dx;
+    const min = -(TAB_ORDER.length - 1) * d.w;
+    if (offset > 0) offset = offset * 0.3;
+    if (offset < min) offset = min + (offset - min) * 0.3;
+    const el = trackRef.current;
+    if (el) {
+      el.style.transition = 'none';
+      el.style.transform = `translateX(${offset}px)`;
+    }
+    const now = performance.now();
+    d.v = (t.clientX - d.lastX) / Math.max(1, now - d.lastT);
+    d.lastX = t.clientX;
+    d.lastT = now;
   };
   const handleTouchEnd = (e: React.TouchEvent) => {
-    const st = swipeRef.current;
-    swipeRef.current = null;
-    if (!st || st.skip) return;
+    const d = dragRef.current;
+    dragRef.current = null;
+    if (!d || d.skip) return;
     const t = e.changedTouches[0];
-    const dx = t.clientX - st.x;
-    const dy = t.clientY - st.y;
-    if (Math.abs(dx) < 64 || Math.abs(dx) < Math.abs(dy) * 1.6) return;
-    const idx = TAB_ORDER.indexOf(activeTab);
-    const next = dx < 0 ? idx + 1 : idx - 1;
-    if (next < 0 || next >= TAB_ORDER.length) return;
-    setSwipeDir(dx < 0 ? 'left' : 'right');
-    setActiveTab(TAB_ORDER[next]);
-    window.setTimeout(() => setSwipeDir(null), 260);
+    const dx = t.clientX - d.x0;
+    let idx = idxRef.current;
+    if (d.locked === 'h' && (Math.abs(dx) > d.w * 0.22 || Math.abs(d.v) > 0.45)) {
+      idx = Math.max(0, Math.min(TAB_ORDER.length - 1, idxRef.current + (dx < 0 ? 1 : -1)));
+    }
+    if (idx !== idxRef.current) {
+      setActiveTab(TAB_ORDER[idx]); // effect 吸附
+    } else {
+      setTrackIdx(idx); // 回弹
+    }
   };
+
+  // activeTab 变化（含底栏点击与滑动吸附）→ 轨道带缓动滑到目标页
+  useEffect(() => {
+    idxRef.current = TAB_ORDER.indexOf(activeTab);
+    const el = trackRef.current;
+    if (el) {
+      el.style.transition = 'transform 300ms cubic-bezier(0.22,1,0.36,1)';
+      el.style.transform = `translateX(${-idxRef.current * (100 / TAB_ORDER.length)}%)`;
+    }
+  }, [activeTab]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -224,7 +308,7 @@ export const App: React.FC = () => {
 
   return (
     <div
-      className={`min-h-screen w-full theme-${currentTheme.id} ${currentTheme.pageBg} ${currentTheme.textPrimary} ${currentTheme.selectionBg} relative flex flex-col transition-colors duration-300`}
+      className={`h-[100dvh] w-full theme-${currentTheme.id} ${currentTheme.pageBg} ${currentTheme.textPrimary} ${currentTheme.selectionBg} relative flex flex-col overflow-hidden transition-colors duration-300`}
     >
       {/* 品牌氛围：页首背后的主题色极光带（呼应开屏动画） */}
       <div aria-hidden className="pointer-events-none absolute top-0 left-0 right-0 h-44 overflow-hidden">
@@ -258,8 +342,8 @@ export const App: React.FC = () => {
             )}
           </>
         ))}
-      {/* 作息目标到点提醒（全屏，品牌开屏同款视觉，无标语） */}
-      {bedtimeReminder && (
+      {/* 作息目标到点提醒（Web/PWA 端；APK 端由原生悬浮窗跨应用弹出） */}
+      {!isNativePlatform() && bedtimeReminder && (
         <BedtimeReminder
           phase={bedtimeReminder}
           onGood={() => setBedtimeReminder('good')}
@@ -286,7 +370,7 @@ export const App: React.FC = () => {
       )}
 
       {/* Main Content Area: Natural Vertical Page Scroll (Header flows with content) */}
-      <div className="w-full flex-1 max-w-lg mx-auto flex flex-col">
+      <div className="w-full flex-1 max-w-lg mx-auto flex flex-col min-h-0">
         {/* Scrollable Mobile Header */}
         <header className={`px-5 pt-5 pb-3.5 flex items-center justify-between border-b ${currentTheme.cardBorder} shrink-0`}>
           <div className="flex items-center gap-2.5">
@@ -308,61 +392,76 @@ export const App: React.FC = () => {
           </div>
         </header>
 
-        {/* Tab View Container（key 重挂载触发 180ms 淡入上浮动效） */}
-        <main
-          key={activeTab}
-          onTouchStart={handleTouchStart}
-          onTouchEnd={handleTouchEnd}
-          className={`${swipeDir === 'left' ? 'animate-tab-from-right' : swipeDir === 'right' ? 'animate-tab-from-left' : 'animate-tab-fade-in'} p-4 space-y-4 flex-1`}
-        >
-          {activeTab === 'today' && (
-            <TodayTab
-              records={records}
-              userProfile={userProfile}
-              onOpenActiveSleep={() => setIsActiveSleepOpen(true)}
-              onOpenManualLog={() => setIsManualLogOpen(true)}
-              onUpdateProfile={(updated) => setUserProfile((prev) => ({ ...prev, ...updated }))}
-              startSignal={sleepStartSignal}
-              onNavigateToTrends={() => setActiveTab('trends')}
-              onSaveRecord={handleSaveManualRecord}
-              theme={currentTheme}
-            />
-          )}
+        {/* 分区滑动轨道：五分区常驻，跟手拖拽 + 吸附过渡（滑动丝滑的关键） */}
+        <main className="flex-1 min-h-0 overflow-hidden">
+          <div
+            ref={trackRef}
+            className="flex h-full"
+            style={{ width: `${TAB_ORDER.length * 100}%` }}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            onTouchCancel={handleTouchEnd}
+          >
+            {TAB_ORDER.map((id) => (
+              <div
+                key={id}
+                className="h-full overflow-y-auto no-scrollbar"
+                style={{ width: `${100 / TAB_ORDER.length}%` }}
+              >
+                <div className="p-4 space-y-4 pb-32">
+                  {id === 'today' && (
+                    <TodayTab
+                      records={records}
+                      userProfile={userProfile}
+                      onOpenActiveSleep={() => setIsActiveSleepOpen(true)}
+                      onOpenManualLog={() => setIsManualLogOpen(true)}
+                      onUpdateProfile={(updated) => setUserProfile((prev) => ({ ...prev, ...updated }))}
+                      startSignal={sleepStartSignal}
+                      onNavigateToTrends={() => setActiveTab('trends')}
+                      onSaveRecord={handleSaveManualRecord}
+                      theme={currentTheme}
+                    />
+                  )}
 
-          {activeTab === 'trends' && (
-            <TrendsTab
-              records={records}
-              onDeleteRecord={handleDeleteRecord}
-              theme={currentTheme}
-            />
-          )}
+                  {id === 'trends' && (
+                    <TrendsTab
+                      records={records}
+                      onDeleteRecord={handleDeleteRecord}
+                      theme={currentTheme}
+                    />
+                  )}
 
-          {activeTab === 'coach' && (
-            <AIAdvicePanel records={records} userProfile={userProfile} theme={currentTheme} />
-          )}
+                  {id === 'coach' && (
+                    <AIAdvicePanel records={records} userProfile={userProfile} theme={currentTheme} />
+                  )}
 
-          {activeTab === 'eyecare' && (
-            <EyeCareTab
-              userProfile={userProfile}
-              onUpdateProfile={(updated) => setUserProfile((prev) => ({ ...prev, ...updated }))}
-              onToast={showToast}
-              theme={currentTheme}
-            />
-          )}
+                  {id === 'eyecare' && (
+                    <EyeCareTab
+                      userProfile={userProfile}
+                      onUpdateProfile={(updated) => setUserProfile((prev) => ({ ...prev, ...updated }))}
+                      onToast={showToast}
+                      theme={currentTheme}
+                    />
+                  )}
 
-          {activeTab === 'settings' && (
-            <SettingsTab
-              records={records}
-              userProfile={userProfile}
-              onUpdateProfile={(updated) => setUserProfile((prev) => ({ ...prev, ...updated }))}
-              onResetDemoData={handleResetDemoData}
-              onImportRecords={(imported) => {
-                setRecords(imported);
-                showToast(`已成功导入 ${imported.length} 条睡眠记录`);
-              }}
-              theme={currentTheme}
-            />
-          )}
+                  {id === 'settings' && (
+                    <SettingsTab
+                      records={records}
+                      userProfile={userProfile}
+                      onUpdateProfile={(updated) => setUserProfile((prev) => ({ ...prev, ...updated }))}
+                      onResetDemoData={handleResetDemoData}
+                      onImportRecords={(imported) => {
+                        setRecords(imported);
+                        showToast(`已成功导入 ${imported.length} 条睡眠记录`);
+                      }}
+                      theme={currentTheme}
+                    />
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
         </main>
       </div>
 

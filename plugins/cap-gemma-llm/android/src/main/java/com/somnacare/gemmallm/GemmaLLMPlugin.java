@@ -3,7 +3,9 @@ package com.somnacare.gemmallm;
 import android.app.ActivityManager;
 import android.content.ComponentName;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.os.Build;
 
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
@@ -211,6 +213,78 @@ public class GemmaLLMPlugin extends Plugin {
         JSObject ret = new JSObject();
         ret.put("ok", true);
         call.resolve(ret);
+    }
+
+    // ==== 作息目标到点提醒（原生精确闹钟 + 全屏悬浮提醒） ====
+
+    /** 重排下一次目标就寝时刻的精确闹钟（触发时由 BedtimeAlarmReceiver 再排明天）。 */
+    public static void scheduleBedtimeAlarm(Context context) {
+        try {
+            android.app.AlarmManager am = (android.app.AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+            if (am == null) return;
+            android.content.SharedPreferences sp = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+            String[] hm = sp.getString("bedtime_target", "23:30").split(":");
+            java.util.Calendar cal = java.util.Calendar.getInstance();
+            cal.set(java.util.Calendar.HOUR_OF_DAY, Integer.parseInt(hm[0]));
+            cal.set(java.util.Calendar.MINUTE, hm.length > 1 ? Integer.parseInt(hm[1]) : 0);
+            cal.set(java.util.Calendar.SECOND, 0);
+            if (cal.getTimeInMillis() <= System.currentTimeMillis()) {
+                cal.add(java.util.Calendar.DAY_OF_YEAR, 1);
+            }
+            android.app.PendingIntent pi = android.app.PendingIntent.getBroadcast(context, 3001,
+                    new Intent(context, BedtimeAlarmReceiver.class),
+                    android.app.PendingIntent.FLAG_UPDATE_CURRENT | android.app.PendingIntent.FLAG_IMMUTABLE);
+            boolean exact = Build.VERSION.SDK_INT < 31 || am.canScheduleExactAlarms();
+            if (exact) {
+                am.setExactAndAllowWhileIdle(android.app.AlarmManager.RTC_WAKEUP, cal.getTimeInMillis(), pi);
+            } else {
+                am.setAndAllowWhileIdle(android.app.AlarmManager.RTC_WAKEUP, cal.getTimeInMillis(), pi);
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
+    /** 设定/更新提醒时间（'HH:MM'），并立即重排闹钟。 */
+    @PluginMethod
+    public void bedtimeReminderSchedule(PluginCall call) {
+        String time = call.getString("time", "23:30");
+        try {
+            getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                    .edit().putString("bedtime_target", time).apply();
+            scheduleBedtimeAlarm(getContext());
+            JSObject ret = new JSObject();
+            ret.put("ok", true);
+            call.resolve(ret);
+        } catch (Exception e) {
+            call.reject("排程失败: " + e.getMessage());
+        }
+    }
+
+    /** 消费冷启动自动开始监测标记（悬浮提醒"好的"后冷启动应用时为 true）。 */
+    @PluginMethod
+    public void bedtimeAutoStartConsume(PluginCall call) {
+        android.content.SharedPreferences sp = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        boolean v = sp.getBoolean("auto_start_sleep", false);
+        if (v) {
+            sp.edit().putBoolean("auto_start_sleep", false).apply();
+        }
+        JSObject ret = new JSObject();
+        ret.put("consume", v);
+        call.resolve(ret);
+    }
+
+    /** 热启动路径：悬浮提醒"好的"拉起应用时经 onNewIntent 广播给 JS。 */
+    @Override
+    protected void handleOnNewIntent(Intent intent) {
+        super.handleOnNewIntent(intent);
+        try {
+            if (intent != null && intent.getBooleanExtra("somnacare_auto_start_sleep", false)) {
+                getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                        .edit().putBoolean("auto_start_sleep", true).apply();
+                notifyListeners("bedtimeGood", new JSObject());
+            }
+        } catch (Exception ignored) {
+        }
     }
 
     @PluginMethod
