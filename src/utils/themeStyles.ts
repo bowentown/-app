@@ -15,6 +15,10 @@ export interface ThemeConfig {
   cardBorder: string;
   cardInnerBg: string;
   cardInnerBorder: string;
+  /** 文本选中高亮（Tailwind selection: 类） */
+  selectionBg: string;
+  /** 强调色边框类（border- 前缀完整类） */
+  accentBorder: string;
   // Highlights & accents
   accentColor: string;
   accentBg: string;
@@ -42,7 +46,7 @@ export const APP_THEMES: Record<ThemeMode, ThemeConfig> = {
     textPrimary: 'text-white',
     textSecondary: 'text-slate-200',
     textMuted: 'text-slate-400',
-    cardBg: 'bg-[#151d30]',
+    cardBg: 'bg-gradient-to-b from-[#1a2338] to-[#121a2c]',
     cardBorder: 'border-slate-700/80',
     cardInnerBg: 'bg-[#0c1222]',
     cardInnerBorder: 'border-slate-850',
@@ -51,6 +55,8 @@ export const APP_THEMES: Record<ThemeMode, ThemeConfig> = {
     accentText: 'text-indigo-400',
     accentRing: 'ring-indigo-400',
     accentHex: '#818cf8',
+    selectionBg: 'selection:bg-indigo-500/30',
+    accentBorder: 'border-indigo-400',
     navBg: 'bg-[#0f172a]',
     navBorder: 'border-slate-800',
     navActiveBg: 'bg-indigo-600/25',
@@ -67,7 +73,7 @@ export const APP_THEMES: Record<ThemeMode, ThemeConfig> = {
     textPrimary: 'text-white',
     textSecondary: 'text-zinc-200',
     textMuted: 'text-zinc-400',
-    cardBg: 'bg-[#121214]',
+    cardBg: 'bg-gradient-to-b from-[#19191d] to-[#101012]',
     cardBorder: 'border-zinc-800',
     cardInnerBg: 'bg-[#08080a]',
     cardInnerBorder: 'border-zinc-850',
@@ -76,6 +82,8 @@ export const APP_THEMES: Record<ThemeMode, ThemeConfig> = {
     accentText: 'text-zinc-200',
     accentRing: 'ring-zinc-500',
     accentHex: '#d4d4d8',
+    selectionBg: 'selection:bg-zinc-500/30',
+    accentBorder: 'border-zinc-500',
     navBg: 'bg-[#000000]',
     navBorder: 'border-zinc-800',
     navActiveBg: 'bg-zinc-800/80',
@@ -92,7 +100,7 @@ export const APP_THEMES: Record<ThemeMode, ThemeConfig> = {
     textPrimary: 'text-amber-50',
     textSecondary: 'text-amber-200',
     textMuted: 'text-amber-300/70',
-    cardBg: 'bg-[#261c14]',
+    cardBg: 'bg-gradient-to-b from-[#2d2117] to-[#221911]',
     cardBorder: 'border-amber-900/60',
     cardInnerBg: 'bg-[#2b1f13]',
     cardInnerBorder: 'border-amber-900/70',
@@ -101,6 +109,8 @@ export const APP_THEMES: Record<ThemeMode, ThemeConfig> = {
     accentText: 'text-amber-300',
     accentRing: 'ring-amber-400',
     accentHex: '#fcd34d',
+    selectionBg: 'selection:bg-amber-500/30',
+    accentBorder: 'border-amber-400',
     navBg: 'bg-[#1f1610]',
     navBorder: 'border-amber-950',
     navActiveBg: 'bg-amber-600/30',
@@ -117,7 +127,7 @@ export const APP_THEMES: Record<ThemeMode, ThemeConfig> = {
     textPrimary: 'text-cyan-50',
     textSecondary: 'text-cyan-200',
     textMuted: 'text-cyan-300/70',
-    cardBg: 'bg-[#0c2238]',
+    cardBg: 'bg-gradient-to-b from-[#102b46] to-[#0a1d31]',
     cardBorder: 'border-cyan-900/60',
     cardInnerBg: 'bg-[#102a42]',
     cardInnerBorder: 'border-cyan-900/70',
@@ -126,6 +136,8 @@ export const APP_THEMES: Record<ThemeMode, ThemeConfig> = {
     accentText: 'text-cyan-300',
     accentRing: 'ring-cyan-400',
     accentHex: '#67e8f9',
+    selectionBg: 'selection:bg-cyan-500/30',
+    accentBorder: 'border-cyan-400',
     navBg: 'bg-[#07192b]',
     navBorder: 'border-cyan-950',
     navActiveBg: 'bg-cyan-600/30',

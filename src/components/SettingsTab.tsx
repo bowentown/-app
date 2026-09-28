@@ -161,7 +161,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
       <div className={`${theme.cardBg} rounded-3xl p-5 border ${theme.cardBorder} shadow-xl space-y-3.5`}>
         <div className="flex items-center justify-between pb-2.5 border-b border-slate-700/60">
           <div className="flex items-center gap-2.5">
-            <div className={`w-8 h-8 rounded-xl ${theme.cardInnerBg} text-indigo-400 flex items-center justify-center border ${theme.cardBorder}`}>
+            <div className={`w-8 h-8 rounded-xl ${theme.cardInnerBg} ${theme.accentText} flex items-center justify-center border ${theme.cardBorder}`}>
               <Palette className="w-4 h-4" />
             </div>
             <div>
@@ -186,7 +186,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 }}
                 className={`p-3.5 rounded-2xl border text-left transition-all relative cursor-pointer ${
                   isSelected
-                    ? `border-indigo-400 ${theme.cardInnerBg} shadow-lg ring-1 ring-indigo-400/50`
+                    ? `${theme.accentBorder} ${theme.cardInnerBg} shadow-lg ring-1 ${theme.accentRing}/50`
                     : `${theme.cardInnerBg} border-slate-700/70 hover:border-slate-500`
                 }`}
               >
@@ -198,7 +198,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                     <span className="text-xs font-black text-white">{t.name}</span>
                   </div>
                   {isSelected ? (
-                    <span className="text-[11px] font-bold text-indigo-400">
+                    <span className={`text-[11px] font-bold ${theme.accentText}`}>
                       ✓ 使用中
                     </span>
                   ) : (
@@ -231,7 +231,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               <h3 className="text-sm font-bold text-white">AI 顾问</h3>
               <p className="text-xs text-slate-300">
                 当前运行：
-                <span className="text-indigo-300 font-bold ml-1">
+                <span className={`${theme.accentText} font-bold ml-1`}>
                   {userProfile.aiConfig?.provider === 'deepseek'
                     ? `DeepSeek (${userProfile.aiConfig.deepseekModel || 'deepseek-flash'})`
                     : userProfile.aiConfig?.provider === 'local_llm'
@@ -247,7 +247,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           <button
             type="button"
             onClick={() => setIsAIConfigOpen(true)}
-            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs shadow-md shadow-indigo-950 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+            className={`px-4 py-2 rounded-xl ${theme.accentBg} text-white font-black text-xs shadow-md active:scale-95 transition-all cursor-pointer whitespace-nowrap`}
           >
             配置与探查
           </button>
@@ -303,7 +303,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         <div className={`${theme.cardInnerBg} border ${theme.cardInnerBorder} rounded-2xl p-3.5 shadow-inner space-y-2`}>
           <div className="flex justify-between text-xs font-bold">
             <span className="text-slate-200">目标睡眠时长</span>
-            <span className="text-indigo-400 font-mono text-sm">{userProfile.targetDurationHours} 小时</span>
+            <span className={`${theme.accentText} font-mono text-sm`}>{userProfile.targetDurationHours} 小时</span>
           </div>
           <input
             type="range"
@@ -318,7 +318,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 targetWakeTime: toClock(toMin(userProfile.targetBedtime) + Math.round(h * 60)),
               });
             }}
-            className="w-full accent-indigo-500 cursor-pointer h-2 bg-slate-700 rounded-lg"
+            className={`w-full ${theme.accentBg.split(' ')[0].replace('bg-', 'accent-')} cursor-pointer h-2 bg-slate-700 rounded-lg`}
           />
         </div>
 
@@ -366,7 +366,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           </button>
 
           <label className={`py-2.5 px-3 rounded-xl ${theme.cardInnerBg} hover:opacity-90 border ${theme.cardBorder} text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow`}>
-            <Upload className="w-4 h-4 text-indigo-400" />
+            <Upload className={`w-4 h-4 ${theme.accentText}`} />
             <span>导入备份文件</span>
             <input
               type="file"

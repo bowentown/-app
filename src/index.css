@@ -147,7 +147,29 @@ html {
   .animate-moon-breathe,
   .animate-star-twinkle,
   .animate-tab-fade-in,
+  .animate-cta-breathe,
   .aurora-ring::before {
     animation: none;
   }
+}
+
+
+/* ===== 卡片质感：暗色主题下 shadow-xl 换成大半径柔影 + 顶部 1px 内高光 ===== */
+.theme-midnight .shadow-xl,
+.theme-pure_dark .shadow-xl,
+.theme-warm_amber .shadow-xl,
+.theme-serene_blue .shadow-xl {
+  box-shadow:
+    0 14px 40px -18px rgb(0 0 0 / 0.6),
+    0 2px 8px -4px rgb(0 0 0 / 0.5),
+    inset 0 1px 0 0 rgb(255 255 255 / 0.06);
+}
+
+/* ===== 主 CTA 呼吸光晕（currentColor 跟随主题文字强调色） ===== */
+@keyframes cta-breathe {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(255 255 255 / 0), 0 10px 28px -10px currentColor; }
+  50% { box-shadow: 0 0 0 5px rgb(255 255 255 / 0.05), 0 10px 36px -6px currentColor; }
+}
+.animate-cta-breathe {
+  animation: cta-breathe 3.4s ease-in-out infinite;
 }

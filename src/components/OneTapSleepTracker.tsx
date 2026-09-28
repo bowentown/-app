@@ -146,7 +146,7 @@ export const OneTapSleepTracker: React.FC<OneTapSleepTrackerProps> = ({ onSaveRe
             <button
               type="button"
               onClick={handleStartSleep}
-              className={`w-full py-3.5 px-5 rounded-2xl ${theme.accentBg} text-white font-black text-xs tracking-wider flex items-center justify-center gap-2 active:scale-[0.99] transition-all cursor-pointer shadow-lg`}
+              className={`w-full py-3.5 px-5 rounded-2xl ${theme.accentBg} text-white font-black text-xs tracking-wider flex items-center justify-center gap-2 active:scale-[0.99] transition-all cursor-pointer shadow-lg animate-cta-breathe`}
             >
               <span>轻按开启今夜就寝监测</span>
               <span className="text-sm">→</span>
@@ -197,8 +197,8 @@ export const OneTapSleepTracker: React.FC<OneTapSleepTrackerProps> = ({ onSaveRe
       {/* Completion Modal - 100% Solid & Strict Duration Display */}
       {showSummaryModal && completedRecord && (
         <div className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4">
-          <div className={`${theme.cardBg} border-2 border-indigo-400 rounded-3xl w-full max-w-sm p-6 text-white shadow-2xl text-center`}>
-            <div className="text-sm font-bold text-indigo-300 mb-1">
+          <div className={`${theme.cardBg} border-2 ${theme.accentBorder} rounded-3xl w-full max-w-sm p-6 text-white shadow-2xl text-center`}>
+            <div className={`text-sm font-bold ${theme.accentText} mb-1`}>
               {completedRecord.durationMinutes < 30 ? '记录完毕 · 微睡眠/短时记录' : '晨安！恭喜完成睡眠'}
             </div>
 
@@ -230,7 +230,7 @@ export const OneTapSleepTracker: React.FC<OneTapSleepTrackerProps> = ({ onSaveRe
               </div>
               <div className={`${theme.cardInnerBg} border ${theme.cardInnerBorder} rounded-2xl p-3`}>
                 <span className="text-xs text-slate-300 block mb-1 font-bold">睡眠效率</span>
-                <span className="text-base font-black font-mono text-indigo-300">
+                <span className={`text-base font-black font-mono ${theme.accentText}`}>
                   {completedRecord.sleepEfficiency}%
                 </span>
               </div>
@@ -239,7 +239,7 @@ export const OneTapSleepTracker: React.FC<OneTapSleepTrackerProps> = ({ onSaveRe
             <button
               type="button"
               onClick={() => setShowSummaryModal(false)}
-              className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-black text-sm transition-colors cursor-pointer shadow-lg"
+              className={`w-full py-3 rounded-xl ${theme.accentBg} text-white font-black text-sm transition-colors cursor-pointer shadow-lg`}
             >
               确定并查看详情
             </button>

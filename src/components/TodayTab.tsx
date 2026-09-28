@@ -53,7 +53,7 @@ export const TodayTab: React.FC<TodayTabProps> = ({
   }, [latestRecord?.sleepScore, latestRecord?.id]);
 
   const getScoreColor = (score: number) => {
-    if (score >= 88) return { text: 'text-indigo-400', stroke: '#818cf8', label: '优' };
+    if (score >= 88) return { text: theme.accentText, stroke: theme.accentHex, label: '优' };
     if (score >= 78) return { text: 'text-emerald-400', stroke: '#34d399', label: '良' };
     if (score >= 68) return { text: 'text-amber-400', stroke: '#fbbf24', label: '平' };
     return { text: 'text-rose-400', stroke: '#f87171', label: '差' };
@@ -71,7 +71,7 @@ export const TodayTab: React.FC<TodayTabProps> = ({
         <div className={`rounded-3xl p-5 ${theme.cardBg} border ${theme.cardBorder} shadow-xl transition-colors`}>
           <div className="flex items-center justify-between text-xs mb-3 font-medium">
             <span className="text-white font-black flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-indigo-400"></span>
+              <span className={`w-2.5 h-2.5 rounded-full ${theme.dot}`}></span>
               最近一次睡眠生理报告
             </span>
             <span className="font-mono text-slate-300 font-bold">{latestRecord.date}</span>
@@ -153,7 +153,7 @@ export const TodayTab: React.FC<TodayTabProps> = ({
 
           {latestRecord.dreamNotes && (
             <div className="mt-3 pt-3 border-t border-slate-700/80 text-xs text-slate-200">
-              <span className="text-indigo-300 font-bold">梦境记录：</span>{latestRecord.dreamNotes}
+              <span className={`${theme.accentText} font-bold`}>梦境记录：</span>{latestRecord.dreamNotes}
             </div>
           )}
         </div>

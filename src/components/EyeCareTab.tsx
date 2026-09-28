@@ -326,7 +326,7 @@ export const EyeCareTab: React.FC<EyeCareTabProps> = ({ userProfile, onUpdatePro
             step={5}
             value={cfg.dimStrength}
             onChange={(e) => patch({ dimStrength: Number(e.target.value) })}
-            className="w-full accent-indigo-500 cursor-pointer h-2 bg-slate-700 rounded-lg"
+            className="w-full accent-slate-400 cursor-pointer h-2 bg-slate-700 rounded-lg"
             aria-label="屏幕减光"
           />
         </div>

@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
 import {
+  Moon,
   Sparkles,
   Send,
   Loader2,
@@ -319,7 +320,7 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
           type="button"
           onClick={fetchAIAnalysis}
           disabled={isLoadingAnalysis}
-          className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow active:scale-95"
+          className={`px-3 py-1.5 rounded-xl ${theme.accentBg} text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow active:scale-95`}
         >
           {isLoadingAnalysis ? (
             <>
@@ -338,13 +339,13 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
       {/* Assessment result */}
       {analysis && (
         <div className={`${theme.cardBg} rounded-3xl p-4 border ${theme.cardBorder} space-y-3 animate-in fade-in`}>
-          <div className={`text-xs text-white ${theme.cardInnerBg} p-3 rounded-2xl border-l-3 border-indigo-400 leading-relaxed font-medium`}>
+          <div className={`text-xs text-white ${theme.cardInnerBg} p-3 rounded-2xl border-l-3 ${theme.accentBorder} leading-relaxed font-medium`}>
             “{analysis.scoreSummary}”
           </div>
 
           <div className="grid grid-cols-2 gap-2 text-xs">
             <div className={`p-3 rounded-2xl ${theme.cardInnerBg} border ${theme.cardInnerBorder}`}>
-              <span className="text-[11px] font-bold text-indigo-300 block mb-1">深睡机能恢复</span>
+              <span className={`text-[11px] font-bold ${theme.accentText} block mb-1`}>深睡机能恢复</span>
               <p className="text-slate-300 text-[11px] leading-relaxed">
                 {analysis.clinicalMetricsAnalysis.deepSleepAssessment}
               </p>
@@ -363,6 +364,18 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
       <div className={`${theme.cardBg} rounded-3xl p-4 border ${theme.cardBorder} flex flex-col h-[460px]`}>
         {/* Message feed */}
         <div className="flex-1 overflow-y-auto py-2 space-y-3 pr-1 text-xs no-scrollbar">
+          {chatMessages.length <= 1 && (
+            <div className="flex flex-col items-center justify-center py-7 gap-3 select-none" aria-hidden>
+              <div className="relative">
+                <div
+                  className="absolute -inset-5 rounded-full blur-xl opacity-40"
+                  style={{ background: `radial-gradient(circle, ${theme.accentHex}55, transparent 70%)` }}
+                />
+                <Moon className={`w-10 h-10 ${theme.accentText} relative`} />
+              </div>
+              <span className={`text-[11px] ${theme.accentText} font-bold tracking-[0.3em]`}>懂睡眠 · 更懂你</span>
+            </div>
+          )}
           {chatMessages.map((msg) => (
             <div
               key={msg.id}
@@ -371,7 +384,7 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
               <div
                 className={`max-w-[88%] rounded-2xl px-3.5 py-2.5 leading-relaxed text-xs ${
                   msg.role === 'user'
-                    ? 'bg-indigo-600 text-white font-medium rounded-br-none'
+                    ? `${theme.accentBg.split(' ')[0]} text-white font-medium rounded-br-none`
                     : `${theme.cardInnerBg} text-white border ${theme.cardInnerBorder} rounded-bl-none`
                 }`}
               >
@@ -382,7 +395,7 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
           ))}
 
           {isSendingChat && (
-            <div className="flex items-center gap-1.5 text-indigo-400 text-xs py-1">
+            <div className={`flex items-center gap-1.5 ${theme.accentText} text-xs py-1`}>
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
               <span>
                 {localStage === 'loading'
@@ -429,13 +442,13 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
               if (e.key === 'Enter') handleSendMessage();
             }}
             placeholder="输入睡眠疑问..."
-            className={`flex-1 ${theme.cardInnerBg} border ${theme.cardInnerBorder} rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-400 font-medium`}
+            className={`flex-1 ${theme.cardInnerBg} border ${theme.cardInnerBorder} rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:${theme.accentBorder} font-medium`}
           />
           <button
             type="button"
             onClick={() => handleSendMessage()}
             disabled={!inputText.trim() || isSendingChat}
-            className="p-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white transition-all cursor-pointer"
+            className={`p-2.5 rounded-xl ${theme.accentBg} disabled:opacity-40 text-white transition-all cursor-pointer`}
           >
             <Send className="w-4 h-4" />
           </button>

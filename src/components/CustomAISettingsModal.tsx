@@ -210,7 +210,7 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-slate-700/60">
           <div className="flex items-center gap-2">
-            <Cpu className="w-5 h-5 text-indigo-400" />
+            <Cpu className={`w-5 h-5 ${theme.accentText}`} />
             <h3 className="text-sm font-bold text-white">AI 顾问模型设置</h3>
           </div>
           <button
@@ -231,7 +231,7 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
               onClick={() => setProvider('deepseek')}
               className={`py-2 px-1 rounded-xl border text-center font-bold transition-all cursor-pointer ${
                 provider === 'deepseek'
-                  ? 'bg-indigo-600 border-white text-white'
+                  ? `${theme.accentBg.split(' ')[0]} border-white text-white`
                   : `${theme.cardInnerBg} border-slate-700 text-slate-300`
               }`}
             >
@@ -243,7 +243,7 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
               onClick={() => setProvider('local_rules')}
               className={`py-2 px-1 rounded-xl border text-center font-bold transition-all cursor-pointer ${
                 provider === 'local_rules'
-                  ? 'bg-indigo-600 border-white text-white'
+                  ? `${theme.accentBg.split(' ')[0]} border-white text-white`
                   : `${theme.cardInnerBg} border-slate-700 text-slate-300`
               }`}
             >
@@ -255,7 +255,7 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
               onClick={() => setProvider('local_llm')}
               className={`py-2 px-1 rounded-xl border text-center font-bold transition-all cursor-pointer ${
                 provider === 'local_llm'
-                  ? 'bg-indigo-600 border-white text-white'
+                  ? `${theme.accentBg.split(' ')[0]} border-white text-white`
                   : `${theme.cardInnerBg} border-slate-700 text-slate-300`
               }`}
             >
@@ -267,7 +267,7 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
               onClick={() => setProvider('custom_openai')}
               className={`py-2 px-1 rounded-xl border text-center font-bold transition-all cursor-pointer ${
                 provider === 'custom_openai'
-                  ? 'bg-indigo-600 border-white text-white'
+                  ? `${theme.accentBg.split(' ')[0]} border-white text-white`
                   : `${theme.cardInnerBg} border-slate-700 text-slate-300`
               }`}
             >
@@ -309,10 +309,10 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
             <div className={`p-4 rounded-2xl ${theme.cardInnerBg} border border-slate-700 space-y-3 text-xs`}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Cpu className="w-4 h-4 text-indigo-400" />
+                  <Cpu className={`w-4 h-4 ${theme.accentText}`} />
                   <span className="font-bold text-white">端侧小模型 · {getActiveModelLabel()}</span>
                 </div>
-                <span className="text-[10px] text-indigo-300 bg-indigo-950 px-2 py-0.5 rounded border border-indigo-600">
+                <span className={`text-[10px] ${theme.accentText} ${theme.accentBg.split(' ')[0]}/20 px-2 py-0.5 rounded border ${theme.accentBorder}`}>
                   离线可用 · 隐私不上传
                 </span>
               </div>
@@ -374,7 +374,7 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
                       setHfToken(e.target.value);
                     }}
                     placeholder="hf_xxxxxxxxxxxx"
-                    className="w-full bg-[#0a0f1d] border border-slate-600 rounded-xl px-2.5 py-2 text-xs text-white font-mono placeholder-slate-500 focus:outline-none focus:border-indigo-400"
+                    className={`w-full bg-[#0a0f1d] border border-slate-600 rounded-xl px-2.5 py-2 text-xs text-white font-mono placeholder-slate-500 focus:outline-none focus:${theme.accentBorder}`}
                   />
                   <p className="text-[10px] text-slate-500 leading-relaxed">
                     Gemma 为门控模型：在 huggingface.co 登录 → 打开 litert-community/gemma-3-1b-it →
@@ -396,7 +396,7 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
                   <div className="space-y-1.5">
                     <div className="flex justify-between text-[11px] text-slate-300">
                       <span className="flex items-center gap-1.5">
-                        <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-400" />
+                        <Loader2 className={`w-3.5 h-3.5 animate-spin ${theme.accentText}`} />
                         正在下载端侧模型...
                       </span>
                       <button
@@ -408,7 +408,7 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
                       </button>
                     </div>
                     <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
-                      <div style={{ width: `${llmProgress}%` }} className="h-full bg-indigo-500 transition-all duration-300" />
+                      <div style={{ width: `${llmProgress}%` }} className={`h-full ${theme.accentBg.split(' ')[0]} transition-all duration-300`} />
                     </div>
                     <div className="text-right text-[10px] text-slate-500 font-mono">{llmProgress}%</div>
                   </div>
@@ -426,7 +426,7 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
                     type="button"
                     onClick={handleDownloadLlm}
                     disabled={llmSupport !== null && !llmSupport.supported}
-                    className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold flex items-center justify-center gap-1.5 shadow cursor-pointer"
+                    className={`w-full py-2.5 rounded-xl ${theme.accentBg} disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold flex items-center justify-center gap-1.5 shadow cursor-pointer`}
                   >
                     <Download className="w-4 h-4" />
                     <span>下载端侧模型（约 462 MB）</span>
@@ -452,7 +452,7 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
                     value={deepseekApiKey}
                     onChange={(e) => setDeepseekApiKey(e.target.value)}
                     placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxx"
-                    className="w-full bg-[#0a0f1d] border border-slate-600 rounded-xl px-3 py-2 text-xs text-white font-mono pr-8 focus:outline-none focus:border-indigo-400"
+                    className={`w-full bg-[#0a0f1d] border border-slate-600 rounded-xl px-3 py-2 text-xs text-white font-mono pr-8 focus:outline-none focus:${theme.accentBorder}`}
                   />
                   <button
                     type="button"
@@ -471,7 +471,7 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
                     type="button"
                     onClick={handleQueryRemoteModels}
                     disabled={isQueryingModels}
-                    className="text-[10px] text-indigo-300 hover:text-white flex items-center gap-1 font-bold bg-indigo-950 px-2 py-0.5 rounded border border-indigo-700/60 cursor-pointer"
+                    className={`text-[10px] ${theme.accentText} hover:text-white flex items-center gap-1 font-bold ${theme.accentBg.split(' ')[0]}/20 px-2 py-0.5 rounded border ${theme.accentBorder} cursor-pointer`}
                   >
                     {isQueryingModels ? <Loader2 className="w-3 h-3 animate-spin" /> : <Search className="w-3 h-3" />}
                     <span>查询可用模型</span>
@@ -484,7 +484,7 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
                     onClick={() => setDeepseekModel('deepseek-flash')}
                     className={`py-1.5 px-2 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
                       deepseekModel === 'deepseek-flash'
-                        ? 'bg-indigo-600 border-white text-white'
+                        ? `${theme.accentBg.split(' ')[0]} border-white text-white`
                         : 'bg-[#0a0f1d] border-slate-700 text-slate-300'
                     }`}
                   >
@@ -496,7 +496,7 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
                     onClick={() => setDeepseekModel('deepseek-pro')}
                     className={`py-1.5 px-2 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
                       deepseekModel === 'deepseek-pro'
-                        ? 'bg-indigo-600 border-white text-white'
+                        ? `${theme.accentBg.split(' ')[0]} border-white text-white`
                         : 'bg-[#0a0f1d] border-slate-700 text-slate-300'
                     }`}
                   >
@@ -513,7 +513,7 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
                           key={m}
                           type="button"
                           onClick={() => setDeepseekModel(m)}
-                          className="px-2 py-0.5 rounded text-[10px] font-mono bg-indigo-950 text-indigo-200 border border-indigo-700"
+                          className={`px-2 py-0.5 rounded text-[10px] font-mono ${theme.accentBg.split(' ')[0]}/20 ${theme.accentText} border border-indigo-700`}
                         >
                           {m}
                         </button>
@@ -589,8 +589,8 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
 
           {/* AI Persona Prompt */}
           <div className={`p-3 rounded-2xl ${theme.cardInnerBg} border border-slate-700/60 space-y-1.5`}>
-            <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-300">
-              <UserCheck className="w-3.5 h-3.5 text-indigo-400" />
+            <div className={`flex items-center gap-1.5 text-xs font-bold ${theme.accentText}`}>
+              <UserCheck className={`w-3.5 h-3.5 ${theme.accentText}`} />
               <span>顾问角色设定 (System Prompt)</span>
             </div>
             <textarea
@@ -598,7 +598,7 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
               value={systemPersona}
               onChange={(e) => setSystemPersona(e.target.value)}
               placeholder="设定顾问身份与风格..."
-              className="w-full bg-[#0a0f1d] border border-slate-600 rounded-xl p-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-400 leading-relaxed"
+              className={`w-full bg-[#0a0f1d] border border-slate-600 rounded-xl p-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:${theme.accentBorder} leading-relaxed`}
             />
           </div>
 
@@ -630,7 +630,7 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
             <button
               type="button"
               onClick={handleSave}
-              className="px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold cursor-pointer shadow"
+              className={`px-4 py-1.5 rounded-xl ${theme.accentBg} text-white text-xs font-bold cursor-pointer shadow`}
             >
               保存
             </button>

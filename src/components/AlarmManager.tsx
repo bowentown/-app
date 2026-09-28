@@ -210,7 +210,7 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
       <div className="space-y-1">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
-            <Bell className="w-4 h-4 text-indigo-400 shrink-0" />
+            <Bell className={`w-4 h-4 ${theme?.accentText} shrink-0`} />
             <span className="text-sm font-bold text-white whitespace-nowrap">定时唤醒</span>
           </div>
 
@@ -223,7 +223,7 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
             }
             setIsAdding(!isAdding);
           }}
-          className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black flex items-center gap-1.5 transition-colors cursor-pointer shadow-md whitespace-nowrap"
+          className={`px-3 py-1.5 rounded-xl ${accentBg} text-white text-xs font-black flex items-center gap-1.5 transition-colors cursor-pointer shadow-md whitespace-nowrap`}
         >
           {isAdding ? '取消' : <><Plus className="w-3.5 h-3.5 stroke-[3]" /><span>添加闹钟</span></>}
         </button>
@@ -254,15 +254,15 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
 
       {/* Add New Alarm Form */}
       {isAdding && (
-        <div className={`p-4 rounded-2xl ${innerBg} border-2 border-indigo-400 space-y-4 animate-in fade-in duration-200 shadow-xl`}>
+        <div className={`p-4 rounded-2xl ${innerBg} border-2 ${theme?.accentBorder} space-y-4 animate-in fade-in duration-200 shadow-xl`}>
           <div className="flex items-center justify-between">
-            <span className="text-xs font-black text-indigo-300">新建自定义闹钟</span>
+            <span className={`text-xs font-black ${theme?.accentText}`}>新建自定义闹钟</span>
             <input
               type="text"
               value={newLabel}
               onChange={(e) => setNewLabel(e.target.value)}
               placeholder="闹钟备注（如：工作日晨读）"
-              className={`${innerBg} border border-slate-600 rounded-xl px-3 py-1.5 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-indigo-400 w-44 text-right font-bold`}
+              className={`${innerBg} border border-slate-600 rounded-xl px-3 py-1.5 text-xs text-white placeholder-slate-400 focus:outline-none focus:${theme?.accentBorder} w-44 text-right font-bold`}
             />
           </div>
 
@@ -329,7 +329,7 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
                   onClick={() => setNewTone(t.key as any)}
                   className={`p-2.5 rounded-xl border text-left cursor-pointer transition-all ${
                     newTone === t.key
-                      ? 'bg-indigo-600/40 border-indigo-400 text-white shadow-md'
+                      ? `${theme?.accentBg.split(' ')[0]}/40 ${theme?.accentBorder} text-white shadow-md`
                       : `${innerBg} ${innerBorder} text-slate-200 hover:border-slate-400`
                   }`}
                 >
@@ -341,7 +341,7 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
                         e.stopPropagation();
                         handleTestTone(t.key as any);
                       }}
-                      className="p-1 text-indigo-400 hover:text-white"
+                      className={`p-1 ${theme?.accentText} hover:text-white`}
                     >
                       {testingTone === t.key ? (
                         <Square className="w-3.5 h-3.5 fill-current text-amber-400" />
@@ -367,7 +367,7 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
                 type="checkbox"
                 checked={newSmartWake}
                 onChange={(e) => setNewSmartWake(e.target.checked)}
-                className="accent-indigo-600 w-5 h-5 rounded cursor-pointer"
+                className={`${theme?.accentBg.split(' ')[0].replace('bg-', 'accent-')} w-5 h-5 rounded cursor-pointer`}
               />
             </div>
             {newSmartWake && (
@@ -379,10 +379,10 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
                   max={30}
                   value={newSmartWindow}
                   onChange={(e) => setNewSmartWindow(Number(e.target.value))}
-                  className="flex-1 accent-indigo-500 cursor-pointer"
+                  className={`flex-1 ${theme?.accentBg.split(' ')[0].replace('bg-', 'accent-')} cursor-pointer`}
                 />
                 <span className="text-[10px] text-slate-400 font-mono">30m</span>
-                <span className="text-[11px] text-indigo-300 font-mono font-bold w-9 text-right tabular-nums">
+                <span className={`text-[11px] ${theme?.accentText} font-mono font-bold w-9 text-right tabular-nums`}>
                   {newSmartWindow}m
                 </span>
               </div>
@@ -432,12 +432,12 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
                     type="button"
                     onClick={() => handleTestTone(alarm.tone)}
                     title="试听铃声"
-                    className={`w-11 h-11 rounded-xl ${theme?.cardBg || 'bg-slate-800'} text-indigo-300 flex items-center justify-center transition-all shrink-0 border ${innerBorder} shadow-inner cursor-pointer`}
+                    className={`w-11 h-11 rounded-xl ${theme?.cardBg || 'bg-slate-800'} ${theme?.accentText} flex items-center justify-center transition-all shrink-0 border ${innerBorder} shadow-inner cursor-pointer`}
                   >
                     {testingTone === alarm.tone ? (
                       <Square className="w-4 h-4 fill-current text-amber-400" />
                     ) : (
-                      <Play className="w-4 h-4 fill-current ml-0.5 text-indigo-400" />
+                      <Play className={`w-4 h-4 fill-current ml-0.5 ${theme?.accentText}`} />
                     )}
                   </button>
 
@@ -451,7 +451,7 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
                     <div className="text-xs text-slate-300 mt-0.5 flex items-center flex-wrap gap-x-2 gap-y-1 font-medium">
                       <span className="whitespace-nowrap">{dayText}</span>
                       {alarm.smartWakeEnabled && (
-                        <span className="inline-flex items-center text-indigo-300 bg-indigo-950 border border-indigo-600 px-1 py-0.5 rounded text-[11px] font-bold">
+                        <span className={`inline-flex items-center ${theme?.accentText} ${theme?.accentBg.split(' ')[0]}/20 border ${theme?.accentBorder} px-1 py-0.5 rounded text-[11px] font-bold`}>
                           <button
                             type="button"
                             title="减小唤醒窗口"
@@ -489,7 +489,7 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
                     type="button"
                     onClick={() => handleToggleAlarm(alarm.id)}
                     className={`w-12 h-6 rounded-full transition-colors relative p-0.5 cursor-pointer ${
-                      alarm.enabled ? 'bg-indigo-600' : 'bg-slate-700'
+                      alarm.enabled ? theme?.accentBg.split(' ')[0] : 'bg-slate-700'
                     }`}
                   >
                     <div

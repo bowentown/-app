@@ -413,6 +413,51 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
           </div>
         )}
       </div>
+
+      {/* 本周睡眠小结：填充留白 + 周维度可读洞察 */}
+      {records.length > 0 && (() => {
+        const wk = records.slice(0, 7);
+        const avgScoreWk = Math.round(wk.reduce((a, r) => a + r.sleepScore, 0) / wk.length);
+        const avgDurWk = Math.round(wk.reduce((a, r) => a + r.durationMinutes, 0) / wk.length);
+        const avgDeepWk = Math.round(wk.reduce((a, r) => a + r.deepSleepMinutes, 0) / wk.length);
+        const best = wk.reduce((a, r) => (r.sleepScore > a.sleepScore ? r : a), wk[0]);
+        return (
+          <div className={`${theme.cardBg} rounded-3xl p-5 border ${theme.cardBorder} shadow-xl space-y-4`}>
+            <div className="flex items-center gap-2">
+              <Sparkles className={`w-4 h-4 ${theme.accentText}`} />
+              <h3 className="text-sm font-bold text-white">本周睡眠小结</h3>
+              <span className={`text-[10px] ${textMuted} font-mono ml-auto`}>近 {wk.length} 晚</span>
+            </div>
+            <div className="grid grid-cols-3 gap-2.5">
+              <div className={`${innerBg} border ${innerBorder} rounded-2xl p-3`}>
+                <span className="text-[10px] text-slate-400 block mb-0.5">平均评分</span>
+                <span className={`text-xl font-black font-mono ${theme.accentText} tabular-nums`}>{avgScoreWk}</span>
+              </div>
+              <div className={`${innerBg} border ${innerBorder} rounded-2xl p-3`}>
+                <span className="text-[10px] text-slate-400 block mb-0.5">日均时长</span>
+                <span className="text-xl font-black font-mono text-white tabular-nums">
+                  {Math.floor(avgDurWk / 60)}<span className="text-xs">h</span>
+                  {avgDurWk % 60}<span className="text-xs">m</span>
+                </span>
+              </div>
+              <div className={`${innerBg} border ${innerBorder} rounded-2xl p-3`}>
+                <span className="text-[10px] text-slate-400 block mb-0.5">场均深睡</span>
+                <span className="text-xl font-black font-mono text-emerald-400 tabular-nums">
+                  {avgDeepWk}<span className="text-xs">m</span>
+                </span>
+              </div>
+            </div>
+            <p className={`text-[11px] ${textMuted} leading-relaxed`}>
+              最佳一晚是 <span className="text-white font-bold">{best.date}</span>（{best.sleepScore} 分）。
+              {avgScoreWk >= 80
+                ? '整体节奏很稳，保持现在的作息。'
+                : avgScoreWk >= 70
+                  ? '状态尚可，试着把就寝时间再提前 20 分钟。'
+                  : '本周波动较大，建议先固定起床时间。'}
+            </p>
+          </div>
+        );
+      })()}
     </div>
   );
 };

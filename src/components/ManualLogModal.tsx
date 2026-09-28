@@ -108,14 +108,14 @@ export const ManualLogModal: React.FC<ManualLogModalProps> = ({
       aria-modal="true"
       className="fixed inset-0 z-[100] bg-black/95 flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto"
     >
-      <div className={`w-full max-w-md ${modalBg} border-2 border-indigo-400 rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl max-h-[90vh] overflow-y-auto no-scrollbar my-auto`}>
+      <div className={`w-full max-w-md ${modalBg} border-2 ${theme?.accentBorder} rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl max-h-[90vh] overflow-y-auto no-scrollbar my-auto`}>
         {/* Grab Handle */}
         <div className="w-12 h-1.5 bg-slate-500 rounded-full mx-auto mb-4 sm:hidden" />
 
         {/* Header */}
         <div className="flex items-center justify-between pb-3.5 border-b border-slate-700/60">
           <div className="flex items-center gap-2.5">
-            <div className={`w-9 h-9 rounded-xl ${innerBg} text-indigo-400 flex items-center justify-center border ${innerBorder}`}>
+            <div className={`w-9 h-9 rounded-xl ${innerBg} ${theme?.accentText} flex items-center justify-center border ${innerBorder}`}>
               <Moon className="w-5 h-5" />
             </div>
             <div>
@@ -142,7 +142,7 @@ export const ManualLogModal: React.FC<ManualLogModalProps> = ({
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className={`w-full ${innerBg} border ${innerBorder} rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-400 font-mono shadow-inner cursor-pointer`}
+              className={`w-full ${innerBg} border ${innerBorder} rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:${theme?.accentBorder} font-mono shadow-inner cursor-pointer`}
             />
           </div>
 
@@ -150,7 +150,7 @@ export const ManualLogModal: React.FC<ManualLogModalProps> = ({
           <div className="grid grid-cols-2 gap-3">
             <div className={`${innerBg} border ${innerBorder} rounded-2xl p-3.5 shadow-inner`}>
               <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5 mb-1">
-                <Clock className="w-3.5 h-3.5 text-indigo-400" />
+                <Clock className={`w-3.5 h-3.5 ${theme?.accentText}`} />
                 入睡时间
               </span>
               <input
@@ -180,7 +180,7 @@ export const ManualLogModal: React.FC<ManualLogModalProps> = ({
             <div className={`${innerBg} border ${innerBorder} rounded-2xl p-3.5 shadow-inner`}>
               <div className="flex justify-between text-xs text-slate-200 mb-1.5 font-bold">
                 <span>入睡耗时</span>
-                <span className="text-indigo-300 font-mono">{latencyMinutes} 分钟</span>
+                <span className={`${theme?.accentText} font-mono`}>{latencyMinutes} 分钟</span>
               </div>
               <input
                 type="range"
@@ -189,7 +189,7 @@ export const ManualLogModal: React.FC<ManualLogModalProps> = ({
                 step={5}
                 value={latencyMinutes}
                 onChange={(e) => setLatencyMinutes(Number(e.target.value))}
-                className="w-full accent-indigo-500 cursor-pointer h-2 bg-slate-700 rounded-lg"
+                className={`w-full ${theme?.accentBg.split(' ')[0].replace('bg-', 'accent-')} cursor-pointer h-2 bg-slate-700 rounded-lg`}
               />
             </div>
 
@@ -271,7 +271,7 @@ export const ManualLogModal: React.FC<ManualLogModalProps> = ({
               onChange={(e) => setDreamNotes(e.target.value)}
               placeholder="记录昨晚梦境场景、心情或特别的细节..."
               rows={2}
-              className={`w-full ${innerBg} border ${innerBorder} rounded-xl p-3 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-indigo-400 shadow-inner font-medium`}
+              className={`w-full ${innerBg} border ${innerBorder} rounded-xl p-3 text-xs text-white placeholder-slate-400 focus:outline-none focus:${theme?.accentBorder} shadow-inner font-medium`}
             />
           </div>
         </div>

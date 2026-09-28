@@ -171,8 +171,15 @@ export const App: React.FC = () => {
 
   return (
     <div
-      className={`min-h-screen w-full theme-${currentTheme.id} ${currentTheme.pageBg} ${currentTheme.textPrimary} selection:bg-indigo-500/30 relative flex flex-col transition-colors duration-300`}
+      className={`min-h-screen w-full theme-${currentTheme.id} ${currentTheme.pageBg} ${currentTheme.textPrimary} ${currentTheme.selectionBg} relative flex flex-col transition-colors duration-300`}
     >
+      {/* 品牌氛围：页首背后的主题色极光带（呼应开屏动画） */}
+      <div aria-hidden className="pointer-events-none absolute top-0 left-0 right-0 h-44 overflow-hidden">
+        <div
+          className="absolute -top-28 left-1/2 -translate-x-1/2 w-[130%] h-56 blur-3xl opacity-[0.2]"
+          style={{ background: `linear-gradient(100deg, transparent 12%, ${currentTheme.accentHex} 38%, transparent 52%, #8b5cf6 66%, transparent 84%)` }}
+        />
+      </div>
       <LaunchSplash theme={currentTheme} />
       {/* 夜间护眼：原生端由系统悬浮窗全局生效，应用内不再叠加（避免双重滤镜）；
           Web/PWA 端回退为应用内滤镜层 */}
@@ -200,8 +207,8 @@ export const App: React.FC = () => {
         ))}
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[90] px-5 py-3 rounded-2xl bg-indigo-600 text-white text-xs font-black shadow-2xl flex items-center gap-2.5 animate-bounce border border-indigo-400">
-          <CheckCircle2 className="w-5 h-5 text-indigo-200" />
+        <div className={`fixed top-5 left-1/2 -translate-x-1/2 z-[90] px-5 py-3 rounded-2xl ${currentTheme.accentBg.split(' ')[0]} text-white text-xs font-black shadow-2xl flex items-center gap-2.5 animate-bounce border border-white/10`}>
+          <CheckCircle2 className="w-5 h-5 text-white/90" />
           <span>{toastMessage}</span>
         </div>
       )}
@@ -211,8 +218,11 @@ export const App: React.FC = () => {
         {/* Scrollable Mobile Header */}
         <header className={`px-5 pt-5 pb-3.5 flex items-center justify-between border-b ${currentTheme.cardBorder} shrink-0`}>
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-md">
-              <Moon className="w-5 h-5 fill-white/40" />
+            <div
+              className="w-9 h-9 rounded-2xl text-white flex items-center justify-center shadow-md"
+              style={{ background: `linear-gradient(135deg, ${currentTheme.accentHex}, ${currentTheme.accentHex}55)` }}
+            >
+              <Moon className="w-5 h-5 fill-white/50" />
             </div>
             <h1 className="text-xl font-black tracking-tight text-white">
               极光睡眠
