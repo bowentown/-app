@@ -11,7 +11,7 @@ import {
   Download,
   Upload,
 } from 'lucide-react';
-import { UserProfile, CustomAlarmSetting, CustomAIConfig, SleepRecord } from '../types/sleep';
+import { UserProfile, CustomAlarmSetting, CustomAIConfig, SleepRecord, SleepStageSegment } from '../types/sleep';
 import { AlarmManager } from './AlarmManager';
 import { CustomAISettingsModal } from './CustomAISettingsModal';
 import { APP_THEMES, ThemeConfig } from '../utils/themeStyles';
@@ -38,6 +38,64 @@ const toClock = (min: number): string => {
   const norm = ((min % 1440) + 1440) % 1440;
   return `${String(Math.floor(norm / 60)).padStart(2, '0')}:${String(norm % 60).padStart(2, '0')}`;
 };
+
+// 导入备份的逐条清洗：任何非对象/缺日期/字段异常的条目都会被安全跳过或兜底
+const numOr = (v: unknown, fallback: number): number =>
+  typeof v === 'number' && Number.isFinite(v) ? v : fallback;
+const strOr = (v: unknown, fallback: string): string =>
+  typeof v === 'string' && v.length > 0 ? v : fallback;
+const clampMin = (v: unknown, max: number): number => Math.max(0, Math.min(max, numOr(v, 0)));
+
+function sanitizeRecord(raw: unknown): SleepRecord | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const r = raw as Record<string, unknown>;
+  const date = typeof r.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.date) ? r.date : null;
+  if (!date) return null;
+  const duration = clampMin(r.durationMinutes, 1440);
+  const stages = Array.isArray(r.stages)
+    ? (r.stages as unknown[])
+        .map((st): SleepStageSegment | null => {
+          if (typeof st !== 'object' || st === null) return null;
+          const s = st as Record<string, unknown>;
+          const stage = ['awake', 'rem', 'light', 'deep'].includes(s.stage as string)
+            ? (s.stage as SleepStageSegment['stage'])
+            : 'light';
+          return {
+            stage,
+            startTime: strOr(s.startTime, '23:30'),
+            endTime: strOr(s.endTime, '07:30'),
+            durationMinutes: Math.max(0, Math.round(numOr(s.durationMinutes, 0))),
+          };
+        })
+        .filter((x): x is SleepStageSegment => x !== null)
+    : [];
+  return {
+    id: strOr(r.id, `import-${Date.now()}-${Math.round(Math.random() * 1e6)}`),
+    date,
+    bedtime: strOr(r.bedtime, '23:30'),
+    wakeTime: strOr(r.wakeTime, '07:30'),
+    durationMinutes: duration || 1,
+    deepSleepMinutes: clampMin(r.deepSleepMinutes, duration),
+    lightSleepMinutes: clampMin(r.lightSleepMinutes, duration),
+    remSleepMinutes: clampMin(r.remSleepMinutes, duration),
+    awakeMinutes: clampMin(r.awakeMinutes, 720),
+    sleepScore: Math.max(0, Math.min(100, numOr(r.sleepScore, 60))),
+    sleepEfficiency: Math.max(0, Math.min(100, numOr(r.sleepEfficiency, 80))),
+    latencyMinutes: clampMin(r.latencyMinutes, 480),
+    wakeCount: Math.max(0, Math.round(numOr(r.wakeCount, 0))),
+    wakingMood: (['refreshed', 'neutral', 'tired', 'groggy'].includes(r.wakingMood as string)
+      ? r.wakingMood
+      : 'neutral') as SleepRecord['wakingMood'],
+    preSleepHabits: Array.isArray(r.preSleepHabits)
+      ? (r.preSleepHabits as unknown[]).filter((x): x is string => typeof x === 'string')
+      : [],
+    dreamNotes: typeof r.dreamNotes === 'string' ? r.dreamNotes : undefined,
+    stages,
+    soundEvents: Array.isArray(r.soundEvents)
+      ? (r.soundEvents as SleepRecord['soundEvents'])
+      : undefined,
+  };
+}
 
 interface SettingsTabProps {
   records: SleepRecord[];
@@ -74,11 +132,23 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
-        const parsed = JSON.parse(event.target?.result as string);
-        if (Array.isArray(parsed) && onImportRecords) {
-          onImportRecords(parsed);
+        const parsed: unknown = JSON.parse(event.target?.result as string);
+        if (!Array.isArray(parsed)) throw new Error('not-array');
+        // 逐条清洗：此前只校验 Array.isArray，导入 [1,2,3] 会让首页直接崩
+        const cleaned = parsed
+          .map((r) => sanitizeRecord(r))
+          .filter((r): r is SleepRecord => r !== null);
+        if (cleaned.length === 0) {
+          alert('导入失败：文件里没有可识别的睡眠记录');
+          return;
         }
-      } catch (err) {
+        if (onImportRecords) {
+          onImportRecords(cleaned);
+          if (cleaned.length < parsed.length) {
+            alert(`已导入 ${cleaned.length} 条记录，另有 ${parsed.length - cleaned.length} 条格式无效已跳过`);
+          }
+        }
+      } catch {
         alert('导入失败：不是合法的睡眠备份 JSON 文件');
       }
     };

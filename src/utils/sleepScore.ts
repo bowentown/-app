@@ -68,13 +68,18 @@ export function calculateSleepScore(
   if (wakeCount > 3) restScore -= (wakeCount - 3) * 2;
   if (latencyMinutes > 30) restScore -= Math.min(6, Math.floor((latencyMinutes - 30) / 10) * 2);
   if (efficiency < 85) restScore -= Math.min(6, Math.floor((85 - efficiency) / 3));
-  restScore = Math.max(4, restScore);
+  // CBT-I 对齐：效率极低（卧床时间远超实际睡眠）要显著扣分，
+  // 不能让"躺在床上更久"反而拿到更高分（与睡眠限制疗法方向一致）
+  if (efficiency < 60) restScore -= Math.min(12, Math.round((60 - efficiency) / 5));
+  restScore = Math.max(0, restScore);
 
-  const finalScore = Math.min(99, Math.max(25, durationScore + deepScore + remScore + restScore));
+  // 低分不托底：短睡/零深睡就该拿低分（此前 Math.max(25,…) 会让差记录虚高 15-20 分）
+  const finalScore = Math.min(99, Math.max(5, durationScore + deepScore + remScore + restScore));
 
   return {
     score: finalScore,
-    efficiency: Math.min(99, Math.max(50, efficiency)),
+    // 如实报告效率：此前 Math.max(50,…) 会把真实 25% 的效率显示成 50%
+    efficiency: Math.min(99, Math.max(0, efficiency)),
   };
 }
 
@@ -82,7 +87,11 @@ export function calculateSleepScore(
  * Generates realistic cyclical sleep stage segments (Deep -> Light -> REM -> Awake)
  * across 90-110 min sleep ultradian cycles.
  */
-export function generateSleepStages(bedtimeStr: string, wakeTimeStr: string): {
+export function generateSleepStages(
+  bedtimeStr: string,
+  wakeTimeStr: string,
+  latencyMinutes: number = 12
+): {
   stages: SleepStageSegment[];
   deepMinutes: number;
   lightMinutes: number;
@@ -110,15 +119,16 @@ export function generateSleepStages(bedtimeStr: string, wakeTimeStr: string): {
   let remMin = 0;
   let awakeMin = 0;
 
-  // Initial latency: awake 12 mins
+  // 入睡潜伏期：清醒段（时长由调用方给定，演示数据用各家真实值保持一致）
+  const latency = Math.max(1, Math.min(120, Math.round(latencyMinutes)));
   stages.push({
     stage: 'awake',
     startTime: formatTimeOffset(bedDate, currentMin),
-    endTime: formatTimeOffset(bedDate, currentMin + 12),
-    durationMinutes: 12,
+    endTime: formatTimeOffset(bedDate, currentMin + latency),
+    durationMinutes: latency,
   });
-  awakeMin += 12;
-  currentMin += 12;
+  awakeMin += latency;
+  currentMin += latency;
 
   // Cycles of ~90 mins: deep -> light -> rem
   let cycleNum = 0;
@@ -213,143 +223,79 @@ export function formatDurationChinese(minutes: number): string {
 }
 
 /**
- * 7 Days of realistic pre-seeded initial logs
+ * 7 Days of realistic pre-seeded initial logs.
+ * 数值字段全部从分期推演结果派生（deep/light/rem/awake/时长/得分互相自洽），
+ * 手写的只有作息时间、潜伏期与叙事字段——此前手写常量与分期各算各的，
+ * 分期总和比声明时长多 30-40 分钟、深睡最多差 61 分钟。
  */
-export function getInitialSleepLogs(): SleepRecord[] {
-  const logs: SleepRecord[] = [
-    {
-      id: 'log-7',
-      date: '2026-09-22', // Last night
-      bedtime: '23:15',
-      wakeTime: '07:10',
-      durationMinutes: 445, // 7h 25m
-      deepSleepMinutes: 98, // 22%
-      lightSleepMinutes: 227, // 51%
-      remSleepMinutes: 92, // 21%
-      awakeMinutes: 28,
-      sleepScore: 89,
-      sleepEfficiency: 94,
-      latencyMinutes: 14,
-      wakeCount: 1,
-      wakingMood: 'refreshed',
-      preSleepHabits: ['reading', 'hot_bath', 'meditation'],
-      dreamNotes: '梦见在海边森林散步，微风徐徐，很舒服。',
-      stages: generateSleepStages('23:15', '07:10').stages,
-      soundEvents: [
-        { time: '02:40', decibel: 32, label: '翻身微动' },
-        { time: '05:15', decibel: 38, label: '轻微呼吸声' },
-      ],
-    },
-    {
-      id: 'log-6',
-      date: '2026-09-21',
-      bedtime: '23:45',
-      wakeTime: '07:00',
-      durationMinutes: 405, // 6h 45m
-      deepSleepMinutes: 72,
-      lightSleepMinutes: 223,
-      remSleepMinutes: 80,
-      awakeMinutes: 30,
-      sleepScore: 81,
-      sleepEfficiency: 91,
-      latencyMinutes: 22,
-      wakeCount: 2,
-      wakingMood: 'neutral',
-      preSleepHabits: ['screen_time'],
-      stages: generateSleepStages('23:45', '07:00').stages,
-    },
-    {
-      id: 'log-5',
-      date: '2026-09-20',
-      bedtime: '00:20',
-      wakeTime: '07:30',
-      durationMinutes: 390, // 6h 30m
-      deepSleepMinutes: 58,
-      lightSleepMinutes: 232,
-      remSleepMinutes: 70,
-      awakeMinutes: 40,
-      sleepScore: 74,
-      sleepEfficiency: 86,
-      latencyMinutes: 28,
-      wakeCount: 3,
-      wakingMood: 'tired',
-      preSleepHabits: ['screen_time', 'caffeine'],
-      dreamNotes: '赶公交车迟到的紧张梦境。',
-      stages: generateSleepStages('00:20', '07:30').stages,
-    },
-    {
-      id: 'log-4',
-      date: '2026-09-19',
-      bedtime: '23:30',
-      wakeTime: '08:00',
-      durationMinutes: 480, // 8h
-      deepSleepMinutes: 110,
-      lightSleepMinutes: 240,
-      remSleepMinutes: 105,
-      awakeMinutes: 25,
-      sleepScore: 92,
-      sleepEfficiency: 95,
-      latencyMinutes: 12,
-      wakeCount: 1,
-      wakingMood: 'refreshed',
-      preSleepHabits: ['meditation', 'reading'],
-      stages: generateSleepStages('23:30', '08:00').stages,
-    },
-    {
-      id: 'log-3',
-      date: '2026-09-18',
-      bedtime: '23:10',
-      wakeTime: '06:55',
-      durationMinutes: 435, // 7h 15m
-      deepSleepMinutes: 90,
-      lightSleepMinutes: 225,
-      remSleepMinutes: 88,
-      awakeMinutes: 32,
-      sleepScore: 86,
-      sleepEfficiency: 92,
-      latencyMinutes: 16,
-      wakeCount: 1,
-      wakingMood: 'neutral',
-      preSleepHabits: ['hot_bath'],
-      stages: generateSleepStages('23:10', '06:55').stages,
-    },
-    {
-      id: 'log-2',
-      date: '2026-09-17',
-      bedtime: '01:05',
-      wakeTime: '07:15',
-      durationMinutes: 330, // 5h 30m
-      deepSleepMinutes: 45,
-      lightSleepMinutes: 200,
-      remSleepMinutes: 60,
-      awakeMinutes: 40,
-      sleepScore: 68,
-      sleepEfficiency: 82,
-      latencyMinutes: 35,
-      wakeCount: 4,
-      wakingMood: 'groggy',
-      preSleepHabits: ['screen_time', 'alcohol'],
-      stages: generateSleepStages('01:05', '07:15').stages,
-    },
-    {
-      id: 'log-1',
-      date: '2026-09-16',
-      bedtime: '23:00',
-      wakeTime: '07:05',
-      durationMinutes: 455, // 7h 35m
-      deepSleepMinutes: 104,
-      lightSleepMinutes: 231,
-      remSleepMinutes: 94,
-      awakeMinutes: 26,
-      sleepScore: 90,
-      sleepEfficiency: 94,
-      latencyMinutes: 15,
-      wakeCount: 1,
-      wakingMood: 'refreshed',
-      preSleepHabits: ['meditation'],
-      stages: generateSleepStages('23:00', '07:05').stages,
-    },
-  ];
+const DEMO_SPEC: Array<{
+  id: string;
+  date: string;
+  bedtime: string;
+  wakeTime: string;
+  latencyMinutes: number;
+  wakingMood: WakingMood;
+  preSleepHabits: string[];
+  dreamNotes?: string;
+}> = [
+  {
+    id: 'log-7',
+    date: '2026-09-22', // Last night
+    bedtime: '23:15',
+    wakeTime: '07:10',
+    latencyMinutes: 14,
+    wakingMood: 'refreshed',
+    preSleepHabits: ['reading', 'hot_bath', 'meditation'],
+    dreamNotes: '梦见在海边森林散步，微风徐徐，很舒服。',
+  },
+  { id: 'log-6', date: '2026-09-21', bedtime: '23:45', wakeTime: '07:00', latencyMinutes: 22, wakingMood: 'neutral', preSleepHabits: ['screen_time'] },
+  { id: 'log-5', date: '2026-09-20', bedtime: '00:20', wakeTime: '07:30', latencyMinutes: 28, wakingMood: 'tired', preSleepHabits: ['screen_time', 'caffeine'], dreamNotes: '赶公交车迟到的紧张梦境。' },
+  { id: 'log-4', date: '2026-09-19', bedtime: '23:30', wakeTime: '08:00', latencyMinutes: 12, wakingMood: 'refreshed', preSleepHabits: ['meditation', 'reading'] },
+  { id: 'log-3', date: '2026-09-18', bedtime: '23:10', wakeTime: '06:55', latencyMinutes: 16, wakingMood: 'neutral', preSleepHabits: ['hot_bath'] },
+  { id: 'log-2', date: '2026-09-17', bedtime: '01:05', wakeTime: '07:15', latencyMinutes: 35, wakingMood: 'groggy', preSleepHabits: ['screen_time', 'alcohol'] },
+  { id: 'log-1', date: '2026-09-16', bedtime: '23:00', wakeTime: '07:05', latencyMinutes: 15, wakingMood: 'refreshed', preSleepHabits: ['meditation'] },
+];
 
-  return logs;
+export function getInitialSleepLogs(): SleepRecord[] {
+  return DEMO_SPEC.map((spec) => {
+    const gen = generateSleepStages(spec.bedtime, spec.wakeTime, spec.latencyMinutes);
+    const durationMinutes = gen.deepMinutes + gen.lightMinutes + gen.remMinutes; // 总窗 - 清醒
+    // 夜醒次数 = 除入睡潜伏期外的清醒段数
+    const wakeCount = Math.max(0, gen.stages.filter((s) => s.stage === 'awake').length - 1);
+    const { score, efficiency } = calculateSleepScore(
+      durationMinutes,
+      gen.deepMinutes,
+      gen.remMinutes,
+      gen.awakeMinutes,
+      wakeCount,
+      spec.latencyMinutes
+    );
+    return {
+      id: spec.id,
+      date: spec.date,
+      bedtime: spec.bedtime,
+      wakeTime: spec.wakeTime,
+      durationMinutes,
+      deepSleepMinutes: gen.deepMinutes,
+      lightSleepMinutes: gen.lightMinutes,
+      remSleepMinutes: gen.remMinutes,
+      awakeMinutes: gen.awakeMinutes,
+      sleepScore: score,
+      sleepEfficiency: efficiency,
+      latencyMinutes: spec.latencyMinutes,
+      wakeCount,
+      wakingMood: spec.wakingMood,
+      preSleepHabits: spec.preSleepHabits,
+      dreamNotes: spec.dreamNotes,
+      stages: gen.stages,
+      ...(spec.id === 'log-7'
+        ? {
+            soundEvents: [
+              { time: '02:40', decibel: 32, label: '翻身微动' },
+              { time: '05:15', decibel: 38, label: '轻微呼吸声' },
+            ],
+          }
+        : {}),
+    } as SleepRecord;
+  });
 }

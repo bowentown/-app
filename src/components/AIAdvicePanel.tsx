@@ -117,7 +117,7 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
       const cfg = userProfile.aiConfig;
       const customPersona =
         cfg?.systemPersona ||
-        '你是一位资深临床睡眠医学顾问。结合用户的睡眠打分与深睡脑波，以关怀、科学、富有实操性的语气为用户答疑解惑。';
+        '你是一位资深临床睡眠医学顾问。结合用户的睡眠打分与周期推演数据（模型估算值，非传感器实测），以关怀、科学、富有实操性的语气为用户答疑解惑，并如实说明估算边界。';
 
       // 1. 端侧小模型（Qwen3-0.6B, llama.cpp WASM）：危机/用药安全护栏最高优先级，不经过任何模型
       if (cfg?.provider === 'local_llm') {
@@ -312,7 +312,7 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
       <div className={`${theme.cardBg} rounded-3xl p-4 border ${theme.cardBorder} flex items-center justify-between`}>
         <div>
           <h3 className="text-xs font-bold text-white">睡眠医学评估</h3>
-          <p className="text-[11px] text-slate-400 mt-0.5">模型：{activeProviderName}</p>
+          <p className="text-[11px] text-slate-400 mt-0.5">模型：{activeProviderName} · 评分为模型估算，非医疗诊断</p>
         </div>
 
         <button

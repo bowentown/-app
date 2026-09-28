@@ -48,6 +48,8 @@ export const ActiveSleepModal: React.FC<ActiveSleepModalProps> = ({
   // 声级历史（每 500ms 采样一次，保留最近 90 个点供迷你曲线）
   const splHistoryRef = useRef<number[]>([]);
   const lastSampleRef = useRef(0);
+  // 麦克风会话代号：权限等待期间用户关掉弹窗时，迟到的流要立刻释放（否则麦克风常开泄漏）
+  const micEpochRef = useRef(0);
   const [splHistory, setSplHistory] = useState<number[]>([]);
   // 夜空色调：晚间 19-23 点带一层更深的蓝调渐变（随真实时间演化）
   const eveningTint = useMemo(() => {
@@ -133,6 +135,7 @@ export const ActiveSleepModal: React.FC<ActiveSleepModalProps> = ({
   const startNoiseDetection = async () => {
     setMicStatus('requesting');
     setMicError(null);
+    const epoch = ++micEpochRef.current;
     try {
       if (!navigator.mediaDevices?.getUserMedia) {
         setMicStatus('unavailable');
@@ -157,10 +160,20 @@ export const ActiveSleepModal: React.FC<ActiveSleepModalProps> = ({
         setMicError(humanizeMicError(failName));
         return;
       }
+      if (micEpochRef.current !== epoch) {
+        // 弹窗已关闭：迟到的授权流立即停止，绝不挂到已卸载的会话上
+        stream.getTracks().forEach((t) => t.stop());
+        return;
+      }
       audioStreamRef.current = stream;
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
       const ctx = new AudioContextClass();
       if (ctx.state === 'suspended') await ctx.resume().catch(() => {});
+      if (micEpochRef.current !== epoch) {
+        stream.getTracks().forEach((t) => t.stop());
+        ctx.close().catch(() => {});
+        return;
+      }
       audioContextRef.current = ctx;
       const source = ctx.createMediaStreamSource(stream);
       const analyser = ctx.createAnalyser();
@@ -211,6 +224,7 @@ export const ActiveSleepModal: React.FC<ActiveSleepModalProps> = ({
   };
 
   const stopNoiseDetection = () => {
+    micEpochRef.current++;
     if (rafRef.current !== null) {
       cancelAnimationFrame(rafRef.current);
       rafRef.current = null;

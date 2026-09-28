@@ -84,7 +84,9 @@ export const OneTapSleepTracker: React.FC<OneTapSleepTrackerProps> = ({ onSaveRe
       Math.round((targetDurationHours || 8) * 60)
     );
 
-    const recordDate = new Date().toISOString().split('T')[0];
+    // 本地日期（此前 toISOString 是 UTC：早 6-9 点醒来会落到 UTC 前一天，跨夜记录互相覆盖）
+    const nowLocal = new Date();
+    const recordDate = `${nowLocal.getFullYear()}-${String(nowLocal.getMonth() + 1).padStart(2, '0')}-${String(nowLocal.getDate()).padStart(2, '0')}`;
 
     const newRecord: SleepRecord = {
       id: `onetap-${Date.now()}`,
@@ -207,7 +209,7 @@ export const OneTapSleepTracker: React.FC<OneTapSleepTrackerProps> = ({ onSaveRe
             {completedRecord.durationMinutes < 30 && (
               <div className="mb-4 text-xs text-amber-300 bg-amber-950/60 p-2.5 rounded-xl border border-amber-500/40 flex items-center gap-1.5 text-left">
                 <AlertTriangle className="w-4 h-4 shrink-0 text-amber-400" />
-                <span>实测时长为 {completedRecord.durationMinutes} 分钟，已如实记录，无任何虚假拉长。</span>
+                <span>记录时长为 {completedRecord.durationMinutes} 分钟，按你实际开始/结束时间计算，未做拉长。</span>
               </div>
             )}
 

@@ -79,7 +79,7 @@ export const SleepHypnogram: React.FC<SleepHypnogramProps> = ({ record, theme })
     <div className="w-full space-y-3">
       <div className="flex items-center justify-between mb-2 text-xs">
         <div>
-          <span className={`font-black ${theme?.textPrimary || 'text-white'} text-sm`}>90分钟脑波睡眠周期分布</span>
+          <span className={`font-black ${theme?.textPrimary || 'text-white'} text-sm`}>90分钟睡眠周期推演（估算值）</span>
           <span className={`${textSecondary} font-mono ml-2 font-bold`}>
             {record.bedtime} - {record.wakeTime}
           </span>

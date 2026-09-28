@@ -140,6 +140,9 @@ export const TodayTab: React.FC<TodayTabProps> = ({
                   </div>
                 );
               })()}
+              <div className="pt-1 text-[10px] text-slate-500">
+                评分为按作息推演的模型估算值，非医疗诊断，仅作生活方式参考。
+              </div>
               {latestRecord.sleepScore < 75 && (
                 <div className="pt-1 text-[11px] text-amber-300/90 font-medium">
                   💡 提示：睡眠评分自然波动属正常现象，身体今夜会自动通过增加深睡代偿，无需担忧。

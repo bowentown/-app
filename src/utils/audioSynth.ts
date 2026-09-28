@@ -9,6 +9,7 @@ class SleepAudioSynthesizer {
   private currentType: string | null = null;
   private masterGain: GainNode | null = null;
   private activeNodes: (AudioNode | number)[] = [];
+  private sessionEpoch = 0;
   private volume: number = 0.5;
 
   private initContext() {
@@ -43,44 +44,43 @@ class SleepAudioSynthesizer {
   }
 
   public stop() {
-    if (this.masterGain && this.ctx) {
-      this.masterGain.gain.setTargetAtTime(0.001, this.ctx.currentTime, 0.1);
-      setTimeout(() => {
-        this.cleanupNodes();
-        this.isPlaying = false;
-        this.currentType = null;
-      }, 150);
-    } else {
-      this.cleanupNodes();
-      this.isPlaying = false;
-      this.currentType = null;
+    // 竞态防护：清理只针对本次会话捕获的节点。此前清理延迟 150ms 且直接操作共享的
+    // activeNodes/masterGain，150ms 内快速切换音色时会误杀新会话的节点——
+    // 表现为"已经静音但 UI 仍显示正在播放"。
+    this.sessionEpoch++;
+    const epoch = this.sessionEpoch;
+    const nodes = this.activeNodes;
+    const master = this.masterGain;
+    this.activeNodes = [];
+    this.masterGain = null;
+    if (master && this.ctx) {
+      master.gain.setTargetAtTime(0.001, this.ctx.currentTime, 0.1);
     }
-  }
-
-  private cleanupNodes() {
-    for (const item of this.activeNodes) {
-      if (typeof item === 'number') {
-        window.clearInterval(item);
-      } else {
-        try {
-          if ('stop' in item && typeof (item as any).stop === 'function') {
-            (item as any).stop();
+    setTimeout(() => {
+      for (const item of nodes) {
+        if (typeof item === 'number') {
+          window.clearInterval(item);
+        } else {
+          try {
+            if ('stop' in item && typeof (item as any).stop === 'function') {
+              (item as any).stop();
+            }
+            item.disconnect();
+          } catch {
+            // ignore
           }
-          item.disconnect();
-        } catch {
-          // ignore disconnect errors
         }
       }
-    }
-    this.activeNodes = [];
-    if (this.masterGain) {
       try {
-        this.masterGain.disconnect();
+        master?.disconnect();
       } catch {
         // ignore
       }
-      this.masterGain = null;
-    }
+      if (epoch === this.sessionEpoch) {
+        this.isPlaying = false;
+        this.currentType = null;
+      }
+    }, 150);
   }
 
   public play(type: 'rain' | 'ocean' | 'forest' | 'whitenoise' | 'bowl') {

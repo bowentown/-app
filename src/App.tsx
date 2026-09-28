@@ -142,7 +142,7 @@ export const App: React.FC = () => {
         (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
       );
     });
-    showToast(`🌙 记录已保存！本次睡眠实测时长 ${newRecord.durationMinutes < 60 ? `${newRecord.durationMinutes}分钟` : `${(newRecord.durationMinutes / 60).toFixed(1)}小时`}`);
+    showToast(`🌙 记录已保存！本次睡眠记录时长 ${newRecord.durationMinutes < 60 ? `${newRecord.durationMinutes}分钟` : `${(newRecord.durationMinutes / 60).toFixed(1)}小时`}`);
   };
 
   const handleSaveManualRecord = (newRecord: SleepRecord) => {
