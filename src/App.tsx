@@ -350,6 +350,7 @@ export const App: React.FC = () => {
       {/* 作息目标到点提醒（Web/PWA 端；APK 端由原生悬浮窗跨应用弹出） */}
       {!isNativePlatform() && bedtimeReminder && (
         <BedtimeReminder
+          theme={currentTheme}
           phase={bedtimeReminder}
           onGood={() => setBedtimeReminder('good')}
           onIgnore={() => setBedtimeReminder('ignore')}

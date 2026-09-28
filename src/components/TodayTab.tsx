@@ -247,9 +247,16 @@ export const TodayTab: React.FC<TodayTabProps> = ({
 
       {/* 5. 作息目标（默认折叠；编辑器内详尽） */}
       <div className={`${theme.cardBg} rounded-3xl p-5 border ${theme.cardBorder} shadow-xl space-y-4`}>
-        <button
-          type="button"
+        <div
+          role="button"
+          tabIndex={0}
           onClick={() => setGoalOpen(!goalOpen)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setGoalOpen(!goalOpen);
+            }
+          }}
           className="w-full flex items-center justify-between cursor-pointer"
         >
           <div className="flex items-center gap-2.5">
@@ -262,7 +269,7 @@ export const TodayTab: React.FC<TodayTabProps> = ({
             {!goalOpen && `${userProfile.targetBedtime} · ${userProfile.targetDurationHours}h · ${userProfile.targetWakeTime}`}
             <ChevronDown className={`w-4 h-4 transition-transform ${goalOpen ? 'rotate-180' : ''}`} />
           </span>
-        </button>
+        </div>
 
         {/* 到点提醒开关（常驻显示；默认关闭） */}
         <div className={`${theme.cardInnerBg} border ${theme.cardInnerBorder} rounded-2xl p-3.5 flex items-center justify-between`}>
@@ -270,11 +277,19 @@ export const TodayTab: React.FC<TodayTabProps> = ({
             <span className="text-xs font-bold text-slate-200 block">到点提醒我</span>
             <span className="text-[10px] text-slate-500">到点弹出提醒动画，早点睡</span>
           </div>
-          <label className="relative inline-flex items-center cursor-pointer shrink-0">
+          <label
+            htmlFor="bedtime-reminder-toggle"
+            className="relative inline-flex items-center cursor-pointer shrink-0"
+            data-no-swipe
+          >
             <input
+              id="bedtime-reminder-toggle"
               type="checkbox"
               checked={!!userProfile.bedtimeReminderEnabled}
-              onChange={(e) => onUpdateProfile({ bedtimeReminderEnabled: e.target.checked })}
+              onChange={(e) => {
+                e.stopPropagation();
+                onUpdateProfile({ bedtimeReminderEnabled: e.target.checked });
+              }}
               className="sr-only peer"
             />
             <div className="w-10 h-5 bg-slate-600 peer-checked:bg-amber-500 rounded-full transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-4 after:h-4 after:bg-white after:rounded-full after:transition-transform peer-checked:after:translate-x-5" />

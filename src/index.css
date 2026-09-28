@@ -133,6 +133,12 @@ html {
   100% { transform: translate(-50%,-50%) scale(1); }
 }
 
+/* 到点提醒：文字从左到右映现（与 splash-rise 组合使用，互不覆盖） */
+@keyframes splash-ltr {
+  from { clip-path: inset(0 100% 0 0); }
+  to { clip-path: inset(0 -10% 0 0); }
+}
+
 /* 品牌开屏：极光弧线描绘 + 文字上浮 */
 @keyframes splash-draw {
   to { stroke-dashoffset: 0; }

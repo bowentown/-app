@@ -4,55 +4,57 @@ import { ThemeConfig } from '../utils/themeStyles';
 const KEY = 'somnacare_splash_shown';
 
 /** 四主题月色：受光渐变亮色 / 暗部深色 / 极光双色 */
-const MOON_THEMES: Record<string, { lit: string; deep: string; aur1: string; aur2: string }> = {
+export const MOON_THEMES: Record<string, { lit: string; deep: string; aur1: string; aur2: string }> = {
   midnight: { lit: '#a8e6ff', deep: '#2563eb', aur1: '#2d529e', aur2: '#9db4ff' },
   pure_dark: { lit: '#f1f5f9', deep: '#475569', aur1: '#1e293b', aur2: '#94a3b8' },
   warm_amber: { lit: '#fff7e0', deep: '#f59e0b', aur1: '#92400e', aur2: '#fcd34d' },
   serene_blue: { lit: '#ccfbf1', deep: '#0891b2', aur1: '#155e75', aur2: '#67e8f9' },
 };
 
+/** 文字从左到右映现：上浮 + 裁剪双动画（transform 定位会被 splash-rise 覆盖，一律用 left 定位） */
+const RISE_LTR: React.CSSProperties = {
+  animation: 'splash-rise 500ms ease-out both, splash-ltr 900ms ease-out 180ms both',
+};
+
+export interface SplashSceneProps {
+  theme: ThemeConfig;
+  /** bedtime：标语区替换为就寝提醒文案 + 好的/无视按钮（文字布局在月亮环右下侧） */
+  variant?: 'splash' | 'bedtime';
+  /** bedtime 专用：主文案（如"夜深喽，该睡了"/"晚安💤"/"随便你🙄"） */
+  message?: string;
+  /** bedtime 专用：副文案（可省） */
+  subMessage?: string;
+  /** bedtime 专用：显示操作按钮 */
+  showActions?: boolean;
+  onGood?: () => void;
+  onIgnore?: () => void;
+}
+
 /**
- * 品牌开屏（三段式，冷启动一次）：
+ * 品牌动画场景（开屏与到点提醒共用同一实现）：
  * 1. 一滴水落入湖面，涟漪扩散；
  * 2. 镜头拉远，月亮顺时针渲染成形（主题色渐变）；
- * 3. 极光条带浮现于月亮后方，涟漪倒影与宣传词“懂睡眠，更懂你”随之出现。
- * 结束后 500ms 淡出进主界面。原生启动屏与首帧同色，衔接无缝。
+ * 3. 极光条带浮现于月亮后方，水面倒影波纹与文字随之出现。
+ * 开屏：文字为宣传词"懂睡眠，更懂你"，3.5s 自动淡出；
+ * 到点提醒：文字为"夜深喽，该睡了"（从左到右映现，位于月亮右下侧），
+ *           无宣传词；"好的/无视"按钮 + 晚安💤 / 随便你🙄 回应。
  */
-export const LaunchSplash: React.FC<{ theme: ThemeConfig }> = ({ theme }) => {
-  const [visible, setVisible] = useState(() => {
-    try {
-      return sessionStorage.getItem(KEY) !== '1';
-    } catch {
-      return true;
-    }
-  });
-  const [fading, setFading] = useState(false);
-
-  useEffect(() => {
-    if (!visible) return;
-    const t1 = setTimeout(() => setFading(true), 2950);
-    const t2 = setTimeout(() => {
-      try {
-        sessionStorage.setItem(KEY, '1');
-      } catch {
-        // ignore
-      }
-      setVisible(false);
-    }, 3500);
-    return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-    };
-  }, [visible]);
-
-  if (!visible) return null;
-
+export const SplashScene: React.FC<SplashSceneProps> = ({
+  theme,
+  variant = 'splash',
+  message,
+  subMessage,
+  showActions = false,
+  onGood,
+  onIgnore,
+}) => {
   const mc = MOON_THEMES[theme.id] ?? MOON_THEMES.midnight;
   const CIRC = 2 * Math.PI * 62;
+  const isBedtime = variant === 'bedtime';
 
   return (
     <div
-      className={`fixed inset-0 z-[200] overflow-hidden transition-opacity duration-500 ${fading ? 'opacity-0' : 'opacity-100'}`}
+      className="absolute inset-0 overflow-hidden"
       style={{ background: 'linear-gradient(180deg, #060b1a 0%, #03060f 100%)' }}
     >
       {/* 第三步：极光条带（月亮后方浮现） */}
@@ -142,12 +144,12 @@ export const LaunchSplash: React.FC<{ theme: ThemeConfig }> = ({ theme }) => {
         </svg>
       </div>
 
-      {/* 第三步：月亮下方的水面倒影涟漪 */}
+      {/* 第三步：月亮下方的水面倒影波纹 */}
       <div
-        className="absolute left-1/2"
+        className="absolute"
         style={{
+          left: 'calc(50% - 115px)',
           top: 'calc(38% + 118px)',
-          transform: 'translateX(-50%)',
           opacity: 0,
           animation: 'splash-rise 650ms ease-out 1950ms both',
         }}
@@ -168,20 +170,106 @@ export const LaunchSplash: React.FC<{ theme: ThemeConfig }> = ({ theme }) => {
         </svg>
       </div>
 
-      {/* 宣传词 */}
-      <p
-        className="absolute left-1/2 text-[14px] text-slate-300 whitespace-nowrap"
-        style={{
-          top: 'calc(38% + 178px)',
-          transform: 'translateX(-50%)',
-          letterSpacing: '0.42em',
-          paddingLeft: '0.42em',
-          opacity: 0,
-          animation: 'splash-rise 750ms ease-out 2150ms both',
-        }}
-      >
-        懂睡眠，更懂你
-      </p>
+      {/* 文字区：开屏=宣传词居中；到点提醒=主文案左→右映现于月亮右下侧 + 按钮组 */}
+      {isBedtime ? (
+        <div
+          className="absolute w-max max-w-[86vw]"
+          style={{
+            left: 'calc(50% - 30px)',
+            top: 'calc(38% + 168px)',
+            opacity: 0,
+            animation: 'splash-rise 520ms ease-out 2050ms both',
+          }}
+        >
+          <h2
+            className="text-2xl font-black text-white tracking-wide whitespace-nowrap"
+            style={RISE_LTR}
+          >
+            {message}
+          </h2>
+          {subMessage && (
+            <p
+              className="text-[11px] text-slate-400 mt-1.5 tracking-wider whitespace-nowrap"
+              style={{ ...RISE_LTR, animationDelay: '220ms' }}
+            >
+              {subMessage}
+            </p>
+          )}
+          {showActions && (
+            <div className="flex items-center gap-3.5 mt-5" style={RISE_LTR}>
+              <button
+                type="button"
+                onClick={onGood}
+                className="px-10 py-3 rounded-2xl text-slate-950 text-sm font-black cursor-pointer active:scale-95 transition-transform shadow-lg"
+                style={{ background: `linear-gradient(90deg, ${mc.lit}, #3b82f6)` }}
+              >
+                好的
+              </button>
+              <button
+                type="button"
+                onClick={onIgnore}
+                className="px-10 py-3 rounded-2xl border border-white/15 text-slate-300 text-sm font-bold cursor-pointer active:scale-95 transition-transform hover:border-white/30"
+              >
+                无视
+              </button>
+            </div>
+          )}
+        </div>
+      ) : (
+        <p
+          className="absolute left-0 right-0 text-center text-[14px] text-slate-300 whitespace-nowrap"
+          style={{
+            top: 'calc(38% + 178px)',
+            letterSpacing: '0.42em',
+            opacity: 0,
+            animation: 'splash-rise 750ms ease-out 2150ms both',
+          }}
+        >
+          懂睡眠，更懂你
+        </p>
+      )}
+    </div>
+  );
+};
+
+/**
+ * 品牌开屏（冷启动一次，sessionStorage 门控）：
+ * 包装 SplashScene(splash)，3.5s 后淡出卸载。
+ */
+export const LaunchSplash: React.FC<{ theme: ThemeConfig }> = ({ theme }) => {
+  const [visible, setVisible] = useState(() => {
+    try {
+      return sessionStorage.getItem(KEY) !== '1';
+    } catch {
+      return true;
+    }
+  });
+  const [fading, setFading] = useState(false);
+
+  useEffect(() => {
+    if (!visible) return;
+    const t1 = setTimeout(() => setFading(true), 2950);
+    const t2 = setTimeout(() => {
+      try {
+        sessionStorage.setItem(KEY, '1');
+      } catch {
+        // ignore
+      }
+      setVisible(false);
+    }, 3500);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, [visible]);
+
+  if (!visible) return null;
+
+  return (
+    <div
+      className={`fixed inset-0 z-[200] overflow-hidden transition-opacity duration-500 ${fading ? 'opacity-0' : 'opacity-100'}`}
+    >
+      <SplashScene theme={theme} variant="splash" />
     </div>
   );
 };
