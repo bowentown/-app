@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   Moon,
   Sparkles,
@@ -12,9 +12,11 @@ import {
   MessageSquare,
   RefreshCw,
   Zap,
+  ChevronDown,
+  Info,
 } from 'lucide-react';
 import { SleepRecord, SleepAnalysisResult, ChatMessage, UserProfile } from '../types/sleep';
-import { generateLocalClinicalAnalysis, generateLocalChatReply, classifyIntent } from '../utils/clinicalSleepEngine';
+import { generateLocalClinicalAnalysis, generateLocalChatReply, classifyIntent, generatePersonalInsights, PersonalInsight } from '../utils/clinicalSleepEngine';
 import {
   getActiveModelLabel,
   generateLocalLlmReply,
@@ -58,21 +60,65 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
   ]);
   const [inputText, setInputText] = useState('');
   const [isSendingChat, setIsSendingChat] = useState(false);
+  const [showAssessment, setShowAssessment] = useState(false);
+
+  // 数据驱动的个性化洞察（本地推导，随记录更新）+ 动态快捷问题
+  const insights = useMemo(() => generatePersonalInsights(records), [records]);
+  const quickPrompts = useMemo(() => {
+    const seen = new Set<string>();
+    const merged: string[] = [];
+    for (const p of [...insights.map((i) => i.quickPrompt), '怎么提升深睡占比？', '半夜易醒怎么办？']) {
+      if (!seen.has(p)) {
+        seen.add(p);
+        merged.push(p);
+      }
+    }
+    return merged.slice(0, 4);
+  }, [insights]);
+
+  const severityIcon = (sev: PersonalInsight['severity']) =>
+    sev === 'good' ? <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+    : sev === 'warn' ? <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+    : <Info className="w-4 h-4 text-indigo-300 shrink-0" />;
+  const severityBorder = (sev: PersonalInsight['severity']) =>
+    sev === 'good' ? 'border-emerald-500/40' : sev === 'warn' ? 'border-amber-500/40' : 'border-indigo-500/40';
+
+  // /api 请求超时熔断：网络挂起时 12s 后走本地兜底（此前 fetch 无超时，
+  // 环境异常时聊天会永远没有回复）
+  const fetchWithTimeout = async (url: string, options: RequestInit, ms = 12000) => {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), ms);
+    try {
+      return await fetch(url, { ...options, signal: ctrl.signal });
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+
+  // 云端引擎注入的个人数据上下文（让云端回答引用真实数字）
+  const personalCtx = useMemo(() => {
+    if (records.length === 0) return '';
+    const recent = records.slice(0, 7);
+    const avg = (f: (r: SleepRecord) => number) => Math.round(recent.reduce((a, r) => a + f(r), 0) / recent.length);
+    const parts = [
+      `用户近${recent.length}晚平均评分${avg((r) => r.sleepScore)}分、平均时长${(avg((r) => r.durationMinutes) / 60).toFixed(1)}小时、深睡占比${Math.round(
+        (avg((r) => r.deepSleepMinutes) / Math.max(1, avg((r) => r.durationMinutes))) * 100
+      )}%`,
+      `最近一晚：就寝${records[0].bedtime}、醒来${records[0].wakeTime}、评分${records[0].sleepScore}分`,
+    ];
+    if (insights.length > 0 && insights[0].id !== 'start') {
+      parts.push(`关键洞察：${insights[0].title}——${insights[0].body}`);
+    }
+    return `【用户真实数据】${parts.join('；')}。回答时请引用这些真实数字，给出针对该用户的具体建议。`;
+  }, [records, insights]);
   const [localStage, setLocalStage] = useState<'loading' | 'generating' | null>(null);
   const localGenAbortRef = useRef<AbortController | null>(null);
-
-  const QUICK_PROMPTS = [
-    '深睡偏低怎么提升？',
-    '如何快速入睡？',
-    '半夜易醒怎么办？',
-    '下午喝茶影响睡眠吗？',
-  ];
 
   const fetchAIAnalysis = async () => {
     setIsLoadingAnalysis(true);
 
     try {
-      const response = await fetch('/api/sleep/analyze', {
+      const response = await fetchWithTimeout('/api/sleep/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -169,8 +215,13 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
           },
         ]);
         localGenAbortRef.current = new AbortController();
+        // 首个 token 60s 超时兜底：模型加载卡死时自动降级到规则引擎
+        let gotFirstToken = false;
+        const firstTokenTimer = window.setTimeout(() => {
+          if (!gotFirstToken) localGenAbortRef.current?.abort();
+        }, 60000);
         try {
-          const systemContent = `${customPersona}\n用户当前数据：昨夜得分 ${latestRecord?.sleepScore || 85}分，时长 ${latestRecord ? (latestRecord.durationMinutes / 60).toFixed(1) : 7.5}h，深睡 ${latestRecord?.deepSleepMinutes || 90}分。回答保持简短（200字内），语气温和。`;
+          const systemContent = `${customPersona}\n${personalCtx}\n回答保持简短（200字内），语气温和。`;
           const history = newHistory.slice(-4).map((m) => ({
             role: m.role === 'assistant' ? ('assistant' as const) : ('user' as const),
             content: m.content,
@@ -178,10 +229,15 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
           await generateLocalLlmReply(
             [{ role: 'system', content: systemContent }, ...history],
             {
-              onToken: (token) =>
+              onToken: (token) => {
+                if (!gotFirstToken) {
+                  gotFirstToken = true;
+                  window.clearTimeout(firstTokenTimer);
+                }
                 setChatMessages((prev) =>
                   prev.map((m) => (m.id === aiId ? { ...m, content: m.content === '……' ? token : m.content + token } : m))
-                ),
+                );
+              },
               onStage: (stage) => setLocalStage(stage),
             },
             localGenAbortRef.current.signal
@@ -196,8 +252,10 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
           const aborted =
             localGenAbortRef.current?.signal.aborted || err?.name === 'AbortError' || /abort/i.test(String(err?.message));
           if (aborted) {
+            // 超时/手动停止：不给死胡同提示，用规则引擎即时回复兜底
+            const fallbackReply = generateLocalChatReply(text, latestRecord, records);
             setChatMessages((prev) =>
-              prev.map((m) => (m.id === aiId && m.content.trim() === '' ? { ...m, content: '（已停止生成）' } : m))
+              prev.map((m) => (m.id === aiId ? { ...m, content: fallbackReply } : m))
             );
           } else {
             setActiveProviderName('本地引擎（端侧模型异常，规则兜底）');
@@ -205,6 +263,7 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
             setChatMessages((prev) => prev.map((m) => (m.id === aiId ? { ...m, content: fallbackReply } : m)));
           }
         } finally {
+          window.clearTimeout(firstTokenTimer);
           localGenAbortRef.current = null;
           setLocalStage(null);
         }
@@ -243,7 +302,7 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
             messages: [
               {
                 role: 'system',
-                content: `${customPersona}\n用户当前数据：昨夜得分 ${latestRecord?.sleepScore || 85}分，时长 ${latestRecord ? (latestRecord.durationMinutes / 60).toFixed(1) : 7.5}h，深睡 ${latestRecord?.deepSleepMinutes || 90}分。`,
+                content: `${customPersona}\n${personalCtx}`,
               },
               ...newHistory.map((m) => ({ role: m.role, content: m.content })),
             ],
@@ -266,7 +325,7 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
       }
 
       // 3. Fallback to app server proxy
-      const response = await fetch('/api/sleep/chat', {
+      const response = await fetchWithTimeout('/api/sleep/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -309,56 +368,88 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
 
   return (
     <div className={`space-y-3 pb-28 ${theme.textPrimary}`}>
-      {/* 1. Concise Assessment Banner */}
-      <div className={`${theme.cardBg} rounded-3xl p-4 border ${theme.cardBorder} flex items-center justify-between`}>
-        <div>
-          <h3 className="text-xs font-bold text-white">睡眠医学评估</h3>
-          <p className="text-[11px] text-slate-400 mt-0.5">模型：{activeProviderName} · 估算非诊断</p>
-        </div>
+      {/* 1. 个性化洞察（数据驱动，点按即提问） */}
+      {insights.map((ins) => (
+        <button
+          key={ins.id}
+          type="button"
+          onClick={() => handleSendMessage(ins.quickPrompt)}
+          className={`w-full ${theme.cardBg} rounded-3xl p-4 border ${severityBorder(ins.severity)} text-left cursor-pointer active:scale-[0.99] transition-transform shadow-lg space-y-1.5`}
+        >
+          <div className="flex items-center gap-2">
+            {severityIcon(ins.severity)}
+            <h3 className="text-xs font-black text-white">{ins.title}</h3>
+          </div>
+          <p className="text-[11px] text-slate-300 leading-relaxed">{ins.body}</p>
+          <span className={`text-[10px] font-bold ${theme.accentText} inline-flex items-center gap-1`}>
+            问顾问：{ins.quickPrompt} →
+          </span>
+        </button>
+      ))}
 
+      {/* 2. 完整评估（默认折叠） */}
+      <div className={`${theme.cardBg} rounded-3xl border ${theme.cardBorder} shadow-lg overflow-hidden`}>
         <button
           type="button"
-          onClick={fetchAIAnalysis}
-          disabled={isLoadingAnalysis}
-          className={`px-3 py-1.5 rounded-xl ${theme.accentBg} text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow active:scale-95`}
+          onClick={() => setShowAssessment(!showAssessment)}
+          className="w-full p-4 flex items-center justify-between cursor-pointer"
         >
-          {isLoadingAnalysis ? (
-            <>
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              <span>评估中</span>
-            </>
-          ) : (
-            <>
-              <RefreshCw className="w-3 h-3" />
-              <span>{analysis ? '刷新评估' : '生成评估'}</span>
-            </>
-          )}
+          <div className="text-left">
+            <h3 className="text-xs font-bold text-white">睡眠医学完整评估</h3>
+            <p className="text-[10px] text-slate-400 mt-0.5">时型推断 · 五维临床指标 · 习惯阻碍分析</p>
+          </div>
+          <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${showAssessment ? 'rotate-180' : ''}`} />
         </button>
-      </div>
 
-      {/* Assessment result */}
-      {analysis && (
-        <div className={`${theme.cardBg} rounded-3xl p-4 border ${theme.cardBorder} space-y-3 animate-in fade-in`}>
+        {showAssessment && (
+          <div className="px-4 pb-4 space-y-3 animate-in fade-in duration-200">
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] text-slate-400">模型：{activeProviderName} · 估算非诊断</p>
+              <button
+                type="button"
+                onClick={fetchAIAnalysis}
+                disabled={isLoadingAnalysis}
+                className={`px-3 py-1.5 rounded-xl ${theme.accentBg} text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow active:scale-95`}
+              >
+                {isLoadingAnalysis ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>评估中</span>
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="w-3 h-3" />
+                    <span>{analysis ? '刷新评估' : '生成评估'}</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {analysis && (
+          <div className={`${theme.cardInnerBg} rounded-2xl p-4 border ${theme.cardInnerBorder} space-y-3`}>
           <div className={`text-xs text-white ${theme.cardInnerBg} p-3 rounded-2xl border-l-3 ${theme.accentBorder} leading-relaxed font-medium`}>
             “{analysis.scoreSummary}”
           </div>
 
           <div className="grid grid-cols-2 gap-2 text-xs">
-            <div className={`p-3 rounded-2xl ${theme.cardInnerBg} border ${theme.cardInnerBorder}`}>
+            <div className={`p-3 rounded-2xl bg-black/20 border ${theme.cardInnerBorder}`}>
               <span className={`text-[11px] font-bold ${theme.accentText} block mb-1`}>深睡机能恢复</span>
               <p className="text-slate-300 text-[11px] leading-relaxed">
                 {analysis.clinicalMetricsAnalysis.deepSleepAssessment}
               </p>
             </div>
-            <div className={`p-3 rounded-2xl ${theme.cardInnerBg} border ${theme.cardInnerBorder}`}>
+            <div className={`p-3 rounded-2xl bg-black/20 border ${theme.cardInnerBorder}`}>
               <span className="text-[11px] font-bold text-emerald-300 block mb-1">入睡与睡眠效率</span>
               <p className="text-slate-300 text-[11px] leading-relaxed">
                 {analysis.clinicalMetricsAnalysis.efficiencyAssessment}
               </p>
             </div>
           </div>
-        </div>
-      )}
+          </div>
+        )}
+          </div>
+        )}
+      </div>
 
       {/* 2. Interactive AI Consultation Chat */}
       <div className={`${theme.cardBg} rounded-3xl p-4 border ${theme.cardBorder} flex flex-col h-[460px]`}>
@@ -419,7 +510,7 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
 
         {/* Quick prompt suggestions */}
         <div className="py-2 flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
-          {QUICK_PROMPTS.map((prompt, i) => (
+          {quickPrompts.map((prompt: string, i: number) => (
             <button
               key={i}
               type="button"

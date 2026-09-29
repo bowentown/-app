@@ -280,6 +280,151 @@ export function generateLocalClinicalAnalysis(
   };
 }
 
+
+/**
+ * 个性化洞察（Sleep Cycle/Welltory 式数据关联分析）：
+ * 从用户自己的记录里挖掘"什么在影响你的睡眠"——就寝漂移、深睡趋势、
+ * 睡前习惯关联、心情与时长关联、周末补觉，按显著度取前 3 条。
+ * 全部为本地推导，只有数据足够时才输出对应洞察。
+ */
+export interface PersonalInsight {
+  id: string;
+  severity: 'good' | 'warn' | 'info';
+  title: string;
+  body: string;
+  quickPrompt: string;
+}
+
+const insightBedMin = (bedtime: string): number => {
+  const [h, m] = bedtime.split(':').map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return 1380;
+  return (h < 12 ? h + 24 : h) * 60 + m;
+};
+
+const insightWeekend = (date: string): boolean => {
+  const [y, m, d] = date.split('-').map(Number);
+  if (!y || !m || !d) return false;
+  const day = new Date(y, m - 1, d).getDay();
+  return day === 0 || day === 6;
+};
+
+export function generatePersonalInsights(records: SleepRecord[] = []): PersonalInsight[] {
+  const list: PersonalInsight[] = [];
+  const avgOf = (arr: SleepRecord[], f: (r: SleepRecord) => number): number =>
+    arr.length ? arr.reduce((a, r) => a + f(r), 0) / arr.length : 0;
+
+  if (records.length >= 3) {
+    const recent = records.slice(0, 3);
+    const earlier = records.slice(3, 7);
+    const week = records.slice(0, 7);
+    const deepPct = (r: SleepRecord) => (r.durationMinutes > 0 ? (r.deepSleepMinutes / r.durationMinutes) * 100 : 0);
+
+    // 1. 睡前屏幕习惯 ↔ 评分关联
+    const screen = week.filter((r) => (r.preSleepHabits || []).includes('screen_time'));
+    const noScreen = week.filter((r) => !(r.preSleepHabits || []).includes('screen_time'));
+    if (screen.length >= 1 && noScreen.length >= 2) {
+      const delta = Math.round(avgOf(noScreen, (r) => r.sleepScore) - avgOf(screen, (r) => r.sleepScore));
+      if (delta >= 4) {
+        list.push({
+          id: 'screen',
+          severity: 'warn',
+          title: '睡前屏幕正在拉低你的睡眠质量',
+          body: `有睡前屏幕习惯的夜晚平均 ${Math.round(avgOf(screen, (r) => r.sleepScore))} 分，其余夜晚 ${Math.round(
+            avgOf(noScreen, (r) => r.sleepScore)
+          )} 分——相差 ${delta} 分。睡前 1 小时收起手机是目前对你最划算的改善。`,
+          quickPrompt: '睡前玩手机影响有多大？',
+        });
+      }
+    }
+
+    // 2. 就寝漂移（近 3 晚 vs 之前）
+    if (recent.length >= 2 && earlier.length >= 2) {
+      const drift = Math.round(avgOf(recent, (r) => insightBedMin(r.bedtime)) - avgOf(earlier, (r) => insightBedMin(r.bedtime)));
+      if (Math.abs(drift) >= 25) {
+        const late = drift > 0;
+        const scoreDelta = Math.round(avgOf(recent, (r) => r.sleepScore) - avgOf(earlier, (r) => r.sleepScore));
+        const scoreTxt =
+          scoreDelta >= 2 ? `平均评分随之下降 ${Math.abs(scoreDelta)} 分` : scoreDelta <= -2 ? `平均评分反而回升 ${Math.abs(scoreDelta)} 分` : '平均评分基本持平';
+        list.push({
+          id: 'drift',
+          severity: late ? 'warn' : 'good',
+          title: late ? '最近就寝在往后拖' : '最近就寝提前了',
+          body: `近 3 晚平均就寝比之前${late ? '晚' : '早'} ${Math.abs(drift)} 分钟，${scoreTxt}。固定起床时间（比固定就寝更有效）是校准生物钟的第一步。`,
+          quickPrompt: '最近作息变乱了怎么调回来？',
+        });
+      }
+    }
+
+    // 3. 深睡占比趋势
+    if (recent.length >= 2 && earlier.length >= 2) {
+      const d = Math.round(avgOf(recent, deepPct) - avgOf(earlier, deepPct));
+      if (Math.abs(d) >= 2) {
+        list.push({
+          id: 'deep',
+          severity: d < 0 ? 'warn' : 'good',
+          title: d < 0 ? '深睡占比在下滑' : '深睡占比在提升',
+          body: `近 3 晚深睡占比 ${Math.round(avgOf(recent, deepPct))}%，比之前${d < 0 ? '低' : '高'} ${Math.abs(d)} 个百分点。${
+            d < 0
+              ? '深睡集中在前半夜——尝试把就寝提前 30 分钟，并避免睡前酒精（它会显著抑制慢波睡眠）。'
+              : '保持当前节奏。深睡集中在前半夜，就寝时间越稳定，深睡波峰越集中。'
+          }`,
+          quickPrompt: '深睡占比怎么提升？',
+        });
+      }
+    }
+
+    // 4. 醒来心情 ↔ 时长关联
+    const good = week.filter((r) => r.wakingMood === 'refreshed');
+    const bad = week.filter((r) => r.wakingMood === 'tired' || r.wakingMood === 'groggy');
+    if (good.length >= 1 && bad.length >= 2) {
+      const dd = Math.round(avgOf(good, (r) => r.durationMinutes) - avgOf(bad, (r) => r.durationMinutes));
+      if (dd >= 30) {
+        list.push({
+          id: 'mood',
+          severity: 'info',
+          title: '睡得久的那几晚，醒来更清爽',
+          body: `醒来感觉清爽的夜晚平均睡 ${Math.round(avgOf(good, (r) => r.durationMinutes))} 分钟，醒后疲惫的夜晚平均 ${Math.round(
+            avgOf(bad, (r) => r.durationMinutes)
+          )} 分钟——相差约 ${(dd / 60).toFixed(1)} 小时。`,
+          quickPrompt: '怎么才能睡够时长？',
+        });
+      }
+    }
+
+    // 5. 周末报复性补觉
+    const wknd = week.filter((r) => insightWeekend(r.date));
+    const wkdy = week.filter((r) => !insightWeekend(r.date));
+    if (wknd.length >= 1 && wkdy.length >= 2) {
+      const dd = Math.round(avgOf(wknd, (r) => r.durationMinutes) - avgOf(wkdy, (r) => r.durationMinutes));
+      if (dd >= 45) {
+        list.push({
+          id: 'weekend',
+          severity: 'warn',
+          title: '周末在报复性补觉',
+          body: `周末平均比工作日多睡 ${dd} 分钟。长时间补觉会推迟夜间睡眠压力的积累，让周日更难入睡、周一更疲惫——周末起床时间与工作日相差建议不超过 1 小时。`,
+          quickPrompt: '周末补觉到底好不好？',
+        });
+      }
+    }
+  }
+
+  if (list.length === 0) {
+    list.push({
+      id: 'start',
+      severity: 'info',
+      title: records.length === 0 ? '记录第一晚，解锁个性化洞察' : '继续记录，洞察会越来越准',
+      body:
+        records.length === 0
+          ? '通过一键就寝或手动补录累计 3 晚以上记录，我会从你的真实作息里找出影响睡眠的因素（就寝漂移、习惯关联、深睡趋势）。'
+          : '已有少量记录。累计 3 晚以上即可进行趋势对比：就寝漂移、深睡占比趋势、睡前习惯与评分的关联。',
+      quickPrompt: records.length === 0 ? '怎么开始记录睡眠？' : '哪些习惯最影响睡眠？',
+    });
+  }
+
+  const rank = { warn: 0, good: 1, info: 2 } as const;
+  return list.sort((a, b) => rank[a.severity] - rank[b.severity]).slice(0, 3);
+}
+
 /**
  * 做厚做深的高质量本地对话引擎（意图驱动 + 临床插值 + 安全护栏）
  */
