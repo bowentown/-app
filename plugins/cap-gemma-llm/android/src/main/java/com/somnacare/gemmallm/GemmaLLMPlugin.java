@@ -299,9 +299,6 @@ public class GemmaLLMPlugin extends Plugin {
         } catch (Exception ignored) {
         }
         getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-                .putString(PetOverlayService.K_STATUS, safe(call, "status", "陪你到入睡"))
-                .putString(PetOverlayService.K_ROW_TODAY, safe(call, "rowToday", "目标 23:30"))
-                .putString(PetOverlayService.K_ROW_SUB, safe(call, "rowSub", "记得早点休息"))
                 .putString(PetOverlayService.K_PET_SAY, safe(call, "say", ""))
                 .putInt(PetOverlayService.K_BUBBLE_EVERY, every)
                 .apply();

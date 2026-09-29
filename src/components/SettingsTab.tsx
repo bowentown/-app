@@ -30,7 +30,7 @@ function switchLauncherIcon(themeId: string) {
 }
 import { getActiveModelLabel } from '../utils/localLlmEngine';
 import {
-  buildPetSnapshot,
+  buildPetSayLines,
   getBubbleEvery,
   isPetEnabled,
   isPetNative,
@@ -130,7 +130,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   const [themeOpen, setThemeOpen] = useState(false);
   const [isAIConfigOpen, setIsAIConfigOpen] = useState(false);
 
-  // 鲸鱼娘桌宠
+  // 大肥鱼桌宠
   const petNative = isPetNative();
   const [petOn, setPetOn] = useState(() => isPetEnabled());
   const [petGranted, setPetGranted] = useState(true);
@@ -142,8 +142,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     void petPermissionGranted().then(setPetGranted);
   }, [petNative]);
 
-  // 速览卡里那几行文案，随数据实时预览
-  const petPreview = buildPetSnapshot(records, userProfile);
+  // 大肥鱼的傲娇播报词，随数据实时预览
+  const petSay = buildPetSayLines(records, userProfile);
 
   // 播报频率改动后立即推给桌宠（开着的话）
   const handlePetEveryChange = (next: number) => {
@@ -277,7 +277,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         )}
       </div>
 
-      {/* 4. 鲸鱼娘桌宠悬浮窗 */}
+      {/* 4. 大肥鱼桌宠悬浮窗 */}
       <div className={`${theme.cardBg} rounded-3xl p-5 border ${theme.cardBorder} shadow-xl space-y-3`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
@@ -285,11 +285,11 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               <Fish className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-sm font-black text-white">鲸鱼娘桌宠</h3>
+              <h3 className="text-sm font-black text-white">大肥鱼桌宠</h3>
               <p className="text-[10px] text-slate-400" aria-live="polite">
                 {petNative
                   ? petOn
-                    ? '常驻桌面 · 点她打开速览卡'
+                    ? '常驻桌面 · 点她看消息或开护眼'
                     : '开启后常驻在其他应用之上'
                   : '网页预览不可用，安装 APK 后生效'}
               </p>
@@ -309,26 +309,20 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           )}
         </div>
 
-        {/* 速览卡预览：桌宠面板里就是这两行 */}
+        {/* 播报词预览：点「消息」按钮看到的傲娇发言 */}
         <div className="rounded-2xl bg-slate-900/60 border border-slate-700/60 p-3.5 space-y-1.5">
-          <p className="text-[11px] font-bold text-sky-300">{petPreview.status}</p>
-          <div className="flex items-center justify-between text-[11px]">
-            <span className="text-slate-400 font-medium">今晚</span>
-            <span className="text-sky-200 font-bold text-right">{petPreview.rowToday}</span>
-          </div>
-          <p className="text-[10px] text-slate-500 pl-1">{petPreview.rowSub}</p>
-          <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-700/40">
-            <span className="text-slate-400 font-medium">护眼滤镜</span>
-            <span className="text-sky-200 font-bold text-right">点她可直接开关</span>
-          </div>
+          <p className="text-[10px] font-bold text-sky-300">🐋 蓝色大肥鱼 · 傲娇播报预览</p>
+          {petSay.slice(0, 3).map((line, i) => (
+            <p key={i} className="text-[11px] text-slate-300 leading-relaxed">{line}</p>
+          ))}
         </div>
 
-        {/* 播报频率：每 N 次点击鲸鱼娘，她会以女仆口吻播报一次睡眠提醒 */}
+        {/* 播报频率：每 N 次点击大肥鱼，她自动傲娇播报一次 */}
         <div className="flex items-center justify-between">
           <div className="min-w-0">
             <p className="text-[11px] font-bold text-white">女仆播报频率</p>
             <p className="text-[10px] text-slate-500 leading-relaxed">
-              每 {petEvery} 次点她会用女仆的口吻播报一次睡眠提醒，其余点击打开速览卡
+              每 {petEvery} 次点她，大肥鱼会自动傲娇播报一次，其余点击弹出「消息 / 护眼」按钮
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -363,7 +357,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         )}
         {petNative && (
           <p className="text-[10px] text-slate-500">
-            拖动可挪位置，松手自动吸附到屏幕边缘；点她会弹速览卡，达到播报次数时会头顶弹出气泡、用女仆的口吻关心您的睡眠。
+            拖动可挪位置，松手自动吸附到屏幕边缘。点她弹「💬 消息 / 👁 护眼」两个按钮：消息看她头顶冒傲娇播报，护眼就地开关滤镜。
           </p>
         )}
       </div>

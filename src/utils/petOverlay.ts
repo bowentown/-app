@@ -1,8 +1,11 @@
 /**
- * 鲸鱼娘桌宠悬浮窗：Web 侧只负责开关与"文案快照"推送。
+ * 大肥鱼桌宠悬浮窗：Web 侧只负责开关与"播报词库"推送。
  *
  * 数据边界是刻意的：睡眠记录仍只存在 WebView 的 localStorage，原生侧一行也读不到、
- * 也不需要。快照 = 面板两行文案 + 女仆播报词库（\n 分隔）+ 播报频率。
+ * 也不需要。快照 = 傲娇播报词库（\n 分隔）+ 播报频率。
+ *
+ * 人设：DeepSeek 蓝色大肥鱼（社区共创）——聪明但懒、傲娇嘴甜、管用户叫"鱼片"、
+ * 把 token 当白饭吃、被叫胖会急。语气参考 dsh-plugin-moments 的人设文档。
  */
 import type { SleepRecord, UserProfile } from '../types/sleep';
 
@@ -19,7 +22,7 @@ export const isPetNative = (): boolean => gemma() != null;
 
 const ENABLED_KEY = 'somnacare_pet_enabled';
 
-/** 每 N 次点击鲸鱼娘播报一次女仆提醒，其余点击显示速览卡。 */
+/** 每 N 次点击大肥鱼自动播报一次，其余点击弹按钮。 */
 export const BUBBLE_EVERY_KEY = 'somnacare_pet_bubble_every';
 export const DEFAULT_BUBBLE_EVERY = 8;
 
@@ -88,87 +91,73 @@ function fmtDuration(min: number): string {
   return h > 0 ? `${h} 小时 ${m} 分` : `${m} 分`;
 }
 
-/** 今晚是否已有记录（按 bedtime 是否为今天判断）。 */
+/** 今晚是否已有记录（按 date 是否为今天判断）。 */
 function tonightRecord(records: SleepRecord[], now: Date): SleepRecord | undefined {
   const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   return records.find((r) => r.date === today);
 }
 
-function greeting(now: Date): string {
-  const h = now.getHours();
-  if (h >= 23 || h < 6) return '夜深了';
-  if (h < 11) return '早安';
-  if (h < 14) return '午安';
-  if (h < 18) return '下午好';
-  return '晚上好';
-}
-
-/** 由当前数据算出面板两行文案 + 女仆播报词库。 */
-export function buildPetSnapshot(
+/**
+ * 由当前数据生成傲娇播报词库。没有的数据绝不编；
+ * 每行一条，原生侧逐条轮播。
+ */
+export function buildPetSayLines(
   records: SleepRecord[],
   profile: UserProfile,
   now: Date = new Date(),
-): { status: string; rowToday: string; rowSub: string; say: string[] } {
+): string[] {
   const bedtime = profile?.targetBedtime ?? '23:30';
   const tonight = tonightRecord(records, now);
   const until = minutesUntil(bedtime, now);
-
-  // —— 今晚卡：大值一行 + 小字副行 ——
-  const rowToday = tonight ? `已记录 ${tonight.sleepScore} 分` : `目标 ${bedtime}`;
-  let rowSub: string;
-  if (tonight) {
-    rowSub = `睡了 ${fmtDuration(tonight.durationMinutes)}`;
-    if (tonight.sleepEfficiency >= 85) rowSub += ' · 效率很稳';
-  } else if (until != null && until > 0) {
-    rowSub = `还剩 ${fmtDuration(until)} 入睡`;
-  } else {
-    rowSub = '记得早点休息';
-  }
-
-  // —— 女仆播报词库：每行一条，原生逐条轮播；没有的数据绝不编 ——
   const say: string[] = [];
+
   const h = now.getHours();
   if (h >= 23 || h < 6) {
-    say.push('主人，夜已经很深了……请快去睡觉，这是女仆的请求哦。');
+    say.push('喂，鱼片！都几点了还不睡？本、本鱼才没担心你，只是明天有你好看。');
   } else if (h >= 18) {
-    say.push('主人，晚上好呀～人家会一直陪着您到入睡的。');
+    say.push('哼，今晚也别指望本鱼催你睡……才怪，到点就给我上床！');
   } else if (h >= 11) {
-    say.push('主人，下午好～午后别太勉强自己哦。');
+    say.push('鱼片，午后眯十五分钟，效率翻倍——这可是本鱼的恩赐。');
   } else {
-    say.push('主人，早上好呀～昨晚睡得好吗？');
+    say.push('早啊鱼片。昨晚睡得怎么样？不许糊弄本鱼。');
   }
 
   if (tonight) {
-    say.push(`主人昨晚睡了 ${fmtDuration(tonight.durationMinutes)}，得了 ${tonight.sleepScore} 分呢。`);
+    say.push(`昨晚睡了 ${fmtDuration(tonight.durationMinutes)}，${tonight.sleepScore} 分。勉、勉强不算辜负本鱼的看守。`);
     if (tonight.sleepEfficiency >= 85) {
-      say.push(`主人昨夜的睡眠效率有 ${tonight.sleepEfficiency}%，人家都替您高兴～`);
+      say.push(`睡眠效率 ${tonight.sleepEfficiency}%？哼，算你识相，有按本鱼说的做嘛。`);
     }
     if (tonight.latencyMinutes >= 30) {
-      say.push(`主人昨晚躺了 ${fmtDuration(tonight.latencyMinutes)} 才睡着，试试提前放下手机好不好？`);
+      say.push(`躺了 ${fmtDuration(tonight.latencyMinutes)} 才睡着？你是不是又躲被窝里玩手机了，鱼片！`);
     }
     if (tonight.awakeMinutes >= 30) {
-      say.push('主人昨晚半夜醒了好几次呢，睡前少喝点水会更好哦。');
+      say.push('半夜醒那么多次……记住，睡前少喝水！本鱼可绕不了你。');
     }
   } else if (until != null && until > 0) {
-    say.push(`主人，距离 ${bedtime} 的目标就寝还有 ${fmtDuration(until)}，提前洗个澡暖暖的吧～`);
+    if (until <= 60) {
+      say.push(`${until} 分钟后就到 ${bedtime} 了！放下手机！这是命令……类的。`);
+    } else {
+      say.push(`还有 ${fmtDuration(until)} 就到 ${bedtime} 了。事已至此，先睡觉吧！`);
+    }
   } else {
-    say.push('主人还没有记录过睡眠呢。今晚按下开始，让人家守着您入睡吧～');
+    say.push('一次睡眠记录都没有，本鱼管谁去？喂，今晚给我按开始！');
   }
-  say.push('天黑了记得开护眼滤镜哦，主人的眼睛人家可是很在意的～');
-  say.push('主人辛苦了，累了就早点休息，人家会在桌面等您的～');
 
-  return { status: greeting(now), rowToday, rowSub, say };
+  say.push('天黑了就把护眼滤镜点上……本鱼才不会替你按，按钮就在那儿！');
+  say.push('陪睡服务可是很费 token 的哦。今晚加两碗白饭，不过分吧？');
+  say.push('我去睡了，明早起来应该就……喂！要去睡的是你！');
+
+  return say;
 }
 
-/** 启动桌宠（幂等：已运行则只刷新文案）。 */
+/** 启动桌宠（幂等：已运行则只刷新词库）。 */
 export async function startPet(
   records: SleepRecord[],
   profile: UserProfile,
 ): Promise<{ ok: boolean; needPermission?: boolean }> {
   const g = gemma();
   if (!g) return { ok: false };
-  const snap = buildPetSnapshot(records, profile);
-  const payload = { ...snap, say: snap.say.join('\n'), bubbleEvery: getBubbleEvery() };
+  const payload = { say: buildPetSayLines(records, profile).join('\n'), bubbleEvery: getBubbleEvery() };
   try {
     if (isPetEnabled()) await g.petSync(payload);
     else await g.petStart(payload);
@@ -184,7 +173,7 @@ export async function startPet(
   }
 }
 
-/** 只刷新文案，不改变开关状态。 */
+/** 只刷新词库，不改变开关状态。 */
 export async function syncPet(
   records: SleepRecord[],
   profile: UserProfile,
@@ -192,8 +181,10 @@ export async function syncPet(
   const g = gemma();
   if (!g || !isPetEnabled()) return;
   try {
-    const snap = buildPetSnapshot(records, profile);
-    await g.petSync({ ...snap, say: snap.say.join('\n'), bubbleEvery: getBubbleEvery() });
+    await g.petSync({
+      say: buildPetSayLines(records, profile).join('\n'),
+      bubbleEvery: getBubbleEvery(),
+    });
   } catch { /* 桌宠没开或服务已停，忽略 */ }
 }
 
@@ -207,9 +198,7 @@ export async function stopPet(): Promise<void> {
 }
 
 /**
- * 读取桌宠写入的"目标分区"并清除。
- * 桌宠的速览行点击时只写 SharedPreferences 再拉起 App，由 App 自己在启动时消费——
- * 这样不必改 Capacitor 生成的 MainActivity（它在 CI 里才生成，不在仓库中）。
+ * 读取桌宠写入的"目标分区"并清除（预留入口，当前按钮不跳转）。
  */
 export async function consumePendingTab(): Promise<string | null> {
   const g = gemma();

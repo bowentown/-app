@@ -14,6 +14,7 @@ import {
   Zap,
   ChevronDown,
   Info,
+  Camera,
 } from 'lucide-react';
 import { SleepRecord, SleepAnalysisResult, ChatMessage, UserProfile } from '../types/sleep';
 import { generateLocalClinicalAnalysis, generateLocalChatReply, classifyIntent, generatePersonalInsights, PersonalInsight } from '../utils/clinicalSleepEngine';
@@ -25,6 +26,7 @@ import {
 } from '../utils/localLlmEngine';
 import { ThemeConfig } from '../utils/themeStyles';
 import { attachHScroll } from '../utils/hscroll';
+import { MomentsOverlay } from './MomentsOverlay';
 
 interface AIAdvicePanelProps {
   records: SleepRecord[];
@@ -35,6 +37,7 @@ interface AIAdvicePanelProps {
 export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfile, theme }) => {
   const [analysis, setAnalysis] = useState<SleepAnalysisResult | null>(null);
   const [isLoadingAnalysis, setIsLoadingAnalysis] = useState(false);
+  const [showMoments, setShowMoments] = useState(false);
   const [activeProviderName, setActiveProviderName] = useState<string>(() => {
     // 初始标签反映用户已保存的档位，而非写死的默认值
     switch (userProfile.aiConfig?.provider) {
@@ -377,6 +380,27 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
 
   return (
     <div className={`space-y-3 pb-28 ${theme.textPrimary}`}>
+      {/* 0. 大肥鱼的朋友圈（真实睡眠数据 · LLM 只写文案不编数据） */}
+      <button
+        type="button"
+        onClick={() => setShowMoments(true)}
+        className={`w-full ${theme.cardBg} rounded-3xl p-4 border ${theme.cardBorder} text-left cursor-pointer active:scale-[0.99] transition-transform shadow-lg flex items-center gap-3`}
+      >
+        <div className="w-10 h-10 shrink-0 rounded-2xl bg-gradient-to-br from-sky-400 to-blue-600 flex items-center justify-center text-xl">
+          🐋
+        </div>
+        <div className="flex-1 min-w-0">
+          <h3 className="text-xs font-black text-white flex items-center gap-1.5">
+            大肥鱼的朋友圈
+            <Camera className="w-3.5 h-3.5 text-sky-400" />
+          </h3>
+          <p className="text-[10px] text-slate-400 leading-relaxed mt-0.5">
+            她每天根据你的真实睡眠数据发动态，AI 好友来毒舌，你可以评论——她会傲娇地回
+          </p>
+        </div>
+        <span className="text-[10px] font-black text-sky-300 shrink-0">进入 ›</span>
+      </button>
+
       {/* 1. 个性化洞察（数据驱动，点按即提问） */}
       {insights.map((ins) => (
         <button
@@ -562,6 +586,15 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
           </button>
         </div>
       </div>
+
+      {/* 大肥鱼的朋友圈 */}
+      {showMoments && (
+        <MomentsOverlay
+          records={records}
+          userProfile={userProfile}
+          onClose={() => setShowMoments(false)}
+        />
+      )}
     </div>
   );
 };

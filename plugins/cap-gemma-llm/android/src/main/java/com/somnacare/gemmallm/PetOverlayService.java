@@ -26,16 +26,11 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 /**
- * 鲸鱼娘桌宠悬浮窗：常驻其他应用之上，把五个分区压缩成一张速览卡。
+ * 大肥鱼桌宠悬浮窗（原型是社区共创的 DeepSeek 蓝色大肥鱼人设）。
  *
- * 两个独立窗口而不是一个大窗口：
- * - {@code petWindow}  只有角色，可拖拽，边缘吸附；尺寸小，不挡内容
- * - {@code panelWindow} 点角色才出现，贴着角色摆放；FLAG_WATCH_OUTSIDE_TOUCH
- *   让"点到卡外"能收到 ACTION_OUTSIDE 自动收起
- *
- * 之所以全部原生绘制、不过 WebView：应用已有 MediaPipe 端侧推理占用 WebView 内存预算，
- * 再挂一个 WebView 悬浮窗会重演此前的进程崩溃；且数据在 localStorage，原生也读不到，
- * 折中方案是 Web 侧把少量"文案快照"推入 SharedPreferences，原生只读快照。
+ * 交互刻意做得极简（参考 AutoJs6 悬浮窗）：点角色只弹两个圆形按钮——
+ * 「消息」看她的傲娇播报、「护眼」就地开关滤镜。没有大卡片、没有成段文字，
+ * 长文案只出现在头顶气泡里。气泡与按钮是两个窗口、两套动画。
  *
  * 触摸可达性：本服务是前台服务，满足 Android 12+ "可信触摸"豁免，
  * 因此角色窗可以正常接收事件而不必把窗口整体不透明度抬到 0.78。
@@ -49,34 +44,30 @@ public class PetOverlayService extends Service {
     private static final int NOTIFICATION_ID = 20260930;
 
     private static final String PREFS = "somnacare_prefs";
-    // Web 侧推送的文案快照（原生只读，不反向解析业务数据）
-    static final String K_STATUS = "pet_status";
-    static final String K_ROW_TODAY = "pet_row_today";
-    static final String K_ROW_SUB = "pet_row_sub";
-    // 女仆播报词库（\n 分隔多条，逐条轮播）；K_BUBBLE_EVERY = 每 N 次点击播报 1 次
+    // Web 侧推送的播报词库（\n 分隔多条，逐条轮播）；原生只读，不解析业务数据
     static final String K_PET_SAY = "pet_say";
+    // 每 N 次点击角色自动播报 1 次，其余点击弹按钮
     static final String K_BUBBLE_EVERY = "pet_bubble_every";
-    // 拉起 App 时要落的分区，由 Web 侧写入、App 读取后清除
+    // 拉起 App 时要落的分区，由 Web 侧写入、App 读取后清除（保留给后续入口用）
     static final String K_PENDING_TAB = "somnacare_pending_tab";
 
     private static final int COLLAPSED_W_DP = 104;
     private static final int COLLAPSED_H_DP = 122;
-    private static final int PANEL_W_DP = 264;
-    private static final int PANEL_MAX_H_DP = 380;
-    private static final int SNAP_MS = 200;
+    private static final int FAN_BTN_DP = 46;
+    private static final int FAN_GAP_DP = 12;
+    private static final long BUBBLE_MS = 7000;
+    private static final long FEEDBACK_MS = 3200;
 
     private WindowManager wm;
     private FrameLayout petRoot;
-    private FrameLayout panelRoot;
+    private FrameLayout fanRoot;
+    private WindowManager.LayoutParams fanLp;
+    private TextView eyeBtn;
     private WhaleGirlView whale;
     private WindowManager.LayoutParams petParams;
     private final android.os.Handler main = new android.os.Handler(android.os.Looper.getMainLooper());
 
-    private boolean expanded;
-    private int touchSlop;
-    private WindowManager.LayoutParams panelLp;
-
-    // ---- 女仆播报气泡（与速览卡是两个窗口、两种动画）----
+    // ---- 女仆播报气泡（与按钮窗是两个窗口、两种动画）----
     private FrameLayout bubbleRoot;
     private WindowManager.LayoutParams bubbleLp;
     private boolean bubbleShown;
@@ -85,6 +76,9 @@ public class PetOverlayService extends Service {
     private final Runnable bubbleHide = new Runnable() {
         @Override public void run() { hideBubble(); }
     };
+
+    private boolean fanShown;
+    private int touchSlop;
 
     // ---- 拖拽状态 ----
     private int downRawX, downRawY, downWinX, downWinY;
@@ -110,7 +104,7 @@ public class PetOverlayService extends Service {
         wm = (WindowManager) getSystemService(Context.WINDOW_SERVICE);
         touchSlop = ViewConfiguration.get(this).getScaledTouchSlop();
         ensureChannel();
-        startForegroundCompat("点鲸鱼娘打开速览卡");
+        startForegroundCompat("点大肥鱼看消息 · 开护眼");
         IntentFilter f = new IntentFilter();
         f.addAction(Intent.ACTION_SCREEN_OFF);
         f.addAction(Intent.ACTION_SCREEN_ON);
@@ -133,9 +127,9 @@ public class PetOverlayService extends Service {
         }
         if (petRoot == null) {
             showPet();
-        } else {
-            // 幂等重启：刷新一次文案快照即可，不重建窗口
-            refreshPanel();
+        } else if (fanShown) {
+            // 幂等重启：按钮窗开着就刷新护眼键的颜色状态
+            updateEyeButton();
         }
         return START_STICKY;
     }
@@ -157,13 +151,13 @@ public class PetOverlayService extends Service {
                     WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
                     // 只加 NOT_FOCUSABLE：不能抢输入法。刻意不加 FLAG_LAYOUT_NO_LIMITS——
                     // 那个 flag 会把窗口原点推到显示区之外，x/y 就不再是屏幕坐标，
-                    // 吸边与贴面板的位置计算会整体偏移。
+                    // 吸边与贴按钮/气泡的位置计算会整体偏移。
                     WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
                             | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
                             | WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
                     PixelFormat.TRANSLUCENT);
             petParams.gravity = Gravity.TOP | Gravity.START;
-            petParams.setTitle("鲸鱼娘");
+            petParams.setTitle("大肥鱼");
             petParams.x = sp.getInt("pet_x", dp(12));
             petParams.y = sp.getInt("pet_y", dp(260));
             clampToScreen(petParams);
@@ -200,8 +194,9 @@ public class PetOverlayService extends Service {
                     if (whale != null) whale.setDragging(true);
                 }
                 if (dragging) {
-                    // 拖到面板开着时先收面板，避免角色与卡片错位
-                    if (expanded) collapsePanel();
+                    // 拖到按钮/气泡开着时先收起，避免窗口错位
+                    if (fanShown) hideFan();
+                    if (bubbleShown) hideBubble();
                     petParams.x = downWinX + dx;
                     petParams.y = downWinY + dy;
                     clampToScreen(petParams);
@@ -216,13 +211,18 @@ public class PetOverlayService extends Service {
                 } else if (whale != null) {
                     whale.cheer();
                     if (bubbleShown) {
-                        hideBubble();   // 播报期间再点：先收气泡，不叠加面板
+                        hideBubble();   // 播报期间再点：先收气泡
                     } else {
                         tapCount++;
                         int every = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                                 .getInt(K_BUBBLE_EVERY, 8);
-                        if (every > 0 && tapCount % every == 0) showBubble();
-                        else togglePanel();
+                        if (every > 0 && tapCount % every == 0) {
+                            showBubble(nextSayLine(), BUBBLE_MS);
+                        } else if (fanShown) {
+                            hideFan();
+                        } else {
+                            showFan();
+                        }
                     }
                 }
                 return true;
@@ -253,121 +253,131 @@ public class PetOverlayService extends Service {
                 .apply();
     }
 
-    // ================= 速览面板 =================
+    // ================= 按钮窗（AutoJs6 式双圆钮） =================
 
-    private void togglePanel() {
-        if (expanded) collapsePanel(); else expandPanel();
-    }
-
-    private void expandPanel() {
-        if (panelRoot != null) {
-            panelRoot.setVisibility(View.VISIBLE);
-            refreshPanel();
-            placePanel(panelRoot);
-            safeUpdate(panelRoot, panelLp);
-            expanded = true;
-            return;
-        }
+    private void showFan() {
+        if (fanShown) return;
+        hideBubble();
         try {
-            panelRoot = buildPanel();
-            panelLp = new WindowManager.LayoutParams(
-                    dp(PANEL_W_DP), WindowManager.LayoutParams.WRAP_CONTENT,
+            FrameLayout v = buildFan();
+            v.setOnTouchListener((vv, e) -> {
+                if (e.getActionMasked() == MotionEvent.ACTION_OUTSIDE) hideFan();
+                return false;
+            });
+            fanLp = new WindowManager.LayoutParams(
+                    WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT,
                     WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
                     WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
                             | WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
                             | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
                     PixelFormat.TRANSLUCENT);
-            panelLp.gravity = Gravity.TOP | Gravity.START;
-            panelLp.setTitle("鲸鱼娘速览");
-            panelRoot.measure(
-                    View.MeasureSpec.makeMeasureSpec(dp(PANEL_W_DP), View.MeasureSpec.AT_MOST),
-                    View.MeasureSpec.makeMeasureSpec(dp(PANEL_MAX_H_DP), View.MeasureSpec.AT_MOST));
-            placePanel(panelRoot);
-            wm.addView(panelRoot, panelLp);
-            panelRoot.setAlpha(0f);
-            panelRoot.setTranslationY(dp(10));
-            panelRoot.animate().alpha(1f).translationY(0f).setDuration(170).start();
-            expanded = true;
+            fanLp.gravity = Gravity.TOP | Gravity.START;
+            fanLp.setTitle("大肥鱼按钮");
+
+            v.measure(View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+                    View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
+            placeBeside(v.getMeasuredWidth(), v.getMeasuredHeight());
+            wm.addView(v, fanLp);
+            fanRoot = v;
+            fanShown = true;
+
+            // 逐个带回弹弹出，比面板的整卡滑入轻快
+            LinearLayout row = (LinearLayout) v.getChildAt(0);
+            for (int i = 0; i < row.getChildCount(); i++) {
+                View b = row.getChildAt(i);
+                b.setAlpha(0f);
+                b.setScaleX(0.2f);
+                b.setScaleY(0.2f);
+                b.animate().alpha(1f).scaleX(1f).scaleY(1f).setStartDelay(i * 55L)
+                        .setDuration(210)
+                        .setInterpolator(new android.view.animation.OvershootInterpolator(1.8f))
+                        .start();
+            }
         } catch (Exception e) {
-            panelRoot = null;
+            fanRoot = null;
+            fanShown = false;
         }
     }
 
-    private void collapsePanel() {
-        expanded = false;
-        final FrameLayout v = panelRoot;
-        panelRoot = null;
+    private void hideFan() {
+        final FrameLayout v = fanRoot;
+        fanRoot = null;
+        fanShown = false;
         if (v == null) return;
         try {
-            v.animate().alpha(0f).translationY(dp(8)).setDuration(140)
-                    .withEndAction(() -> {
-                        try { wm.removeView(v); } catch (Exception ignored) { }
-                    }).start();
+            v.animate().alpha(0f).scaleX(0.6f).scaleY(0.6f).setDuration(120)
+                    .withEndAction(() -> { try { wm.removeView(v); } catch (Exception ignored) { } })
+                    .start();
         } catch (Exception e) {
-            try { wm.removeView(v); } catch (Exception ignored) { }
+            try { wm.removeViewImmediate(v); } catch (Exception ignored) { }
         }
     }
 
-    private FrameLayout buildPanel() {
-        android.content.SharedPreferences sp = getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+    private FrameLayout buildFan() {
+        FrameLayout wrap = new FrameLayout(this);
+        wrap.setPadding(dp(4), dp(4), dp(4), dp(4));   // 给回弹缩放留出窗口内的余量
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
 
-        FrameLayout root = new FrameLayout(this);
-        // 上浅下深的靛蓝渐变 + 描边 + 投影，卡片才有"浮起"的体积感
-        GradientDrawable bg = new GradientDrawable(
-                GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{0xFF1A2542, 0xFF0A0F1E});
-        bg.setCornerRadius(dp(26));
-        bg.setStroke(dp(1), 0x2EFFFFFF);
-        root.setBackground(bg);
-        root.setPadding(dp(15), dp(14), dp(15), dp(14));
-        root.setElevation(dp(12));
-        // 点到卡外 → 收起
-        root.setOnTouchListener(new View.OnTouchListener() {
-            @Override public boolean onTouch(View v, MotionEvent e) {
-                if (e.getActionMasked() == MotionEvent.ACTION_OUTSIDE) collapsePanel();
-                return false;
+        row.addView(fanButton("\uD83D\uDCAC", 0xF22FA8E8, new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                hideFan();
+                showBubble(nextSayLine(), BUBBLE_MS);
+            }
+        }));
+
+        eyeBtn = fanButton("👁", eyeColor(), new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                toggleEyeCare();
+                if (whale != null) whale.cheer();
+                // 服务异步生效，稍等一下再刷新键色与气泡反馈
+                main.postDelayed(() -> {
+                    updateEyeButton();
+                    showBubble(EyeCareService.isActive()
+                            ? "护眼滤镜给你开了哦～别再瞪着屏幕啦，鱼片。"
+                            : "滤镜关掉了……哼，记得谢本鱼。", FEEDBACK_MS);
+                }, 600);
             }
         });
+        row.addView(eyeBtn);
 
-        LinearLayout col = new LinearLayout(this);
-        col.setOrientation(LinearLayout.VERTICAL);
-        root.addView(col, new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT));
-
-        col.addView(header(sp), lpv(0, 11));
-
-        // 今晚卡：大值一行 + 小字副行，排版规整；整卡可点进 App
-        LinearLayout card = card();
-        View todayRow = row("\u25F4", 0xFF7FD8FF, "今晚", "today",
-                sp.getString(K_ROW_TODAY, "目标 23:30"));
-        todayRow.setOnClickListener(v -> openApp("today"));
-        card.addView(todayRow, lpv(0, 0));
-        TextView sub = text(sp.getString(K_ROW_SUB, "记得早点休息"), 10.5f, 0xFF8798AE, false);
-        sub.setTag(K_ROW_SUB);
-        LinearLayout.LayoutParams subLp = new LinearLayout.LayoutParams(-1, -2);
-        subLp.leftMargin = dp(44);   // 与行内文字对齐：padding 8 + 图标 26 + 间距 10
-        subLp.bottomMargin = dp(9);
-        card.addView(sub, subLp);
-        col.addView(card, lpv(0, 0));
-
-        // 护眼滤镜：就地开关，单独成卡
-        LinearLayout actionCard = card();
-        View eyeRow = row("\u25D1", 0xFFB9A6FF, "护眼滤镜", "eyecare", eyeValue());
-        eyeRow.setOnClickListener(v -> {
-            toggleEyeCare((TextView) eyeRow.findViewWithTag("eyecare"));
-            if (whale != null) whale.cheer();
-        });
-        actionCard.addView(eyeRow, lpv(0, 0));
-        col.addView(actionCard, lpv(0, 0));
-
-        return root;
+        wrap.addView(row, new FrameLayout.LayoutParams(-2, -2));
+        return wrap;
     }
 
-    /** 面板摆位：优先贴角色左右不遮挡的一侧；放不下就挪到角色上/下方，绝不盖住角色。 */
-    private void placePanel(View v) {
+    private TextView fanButton(String glyph, int color, View.OnClickListener click) {
+        FrameLayout btn = new FrameLayout(this);
+        GradientDrawable g = new GradientDrawable();
+        g.setShape(GradientDrawable.OVAL);
+        g.setColor(color);
+        g.setStroke(dp(1), 0x40FFFFFF);
+        btn.setBackground(g);
+        btn.setOnClickListener(click);
+        btn.setContentDescription(glyph);
+
+        TextView t = text(glyph, 18f, 0xFFFFFFFF, false);
+        t.setGravity(Gravity.CENTER);
+        btn.addView(t, new FrameLayout.LayoutParams(-1, -1));
+        return btn;
+    }
+
+    private int eyeColor() {
+        return EyeCareService.isActive() ? 0xF2B9822B : 0xF237B87B;
+    }
+
+    private void updateEyeButton() {
+        if (eyeBtn == null || !fanShown) return;
+        GradientDrawable g = new GradientDrawable();
+        g.setShape(GradientDrawable.OVAL);
+        g.setColor(eyeColor());
+        g.setStroke(dp(1), 0x40FFFFFF);
+        eyeBtn.setBackground(g);
+    }
+
+    /** 按钮摆位：贴角色左右不遮挡的一侧；放不下挪到角色下/上方。 */
+    private void placeBeside(int pw, int ph) {
         DisplayInfo di = displayInfo();
-        int pw = v.getMeasuredWidth() > 0 ? v.getMeasuredWidth() : dp(PANEL_W_DP);
-        int ph = v.getMeasuredHeight() > 0 ? v.getMeasuredHeight() : dp(PANEL_MAX_H_DP);
         int wx = petParams.x, wy = petParams.y;
         int ww = dp(COLLAPSED_W_DP), wh = dp(COLLAPSED_H_DP);
         int gap = dp(8), m = dp(4);
@@ -375,27 +385,31 @@ public class PetOverlayService extends Service {
         int rightRoom = di.width - (wx + ww) - gap - m;
         int px, py;
         if (leftRoom >= pw || rightRoom >= pw) {
-            // 左右都能放时选更宽的一侧；垂直方向面板中心对齐角色中心
             boolean goLeft = leftRoom >= pw && (rightRoom < pw || leftRoom >= rightRoom);
             px = goLeft ? wx - pw - gap : wx + ww + gap;
             py = wy + wh / 2 - ph / 2;
         } else {
-            // 屏幕放不下左右（窄屏）→ 放角色下方，不够再放上方；水平与角色对齐
             px = wx + ww / 2 - pw / 2;
             boolean belowOk = wy + wh + gap + ph <= di.height - m;
             py = belowOk ? wy + wh + gap : wy - ph - gap;
         }
-        panelLp.x = Math.max(m, Math.min(px, di.width - pw - m));
-        panelLp.y = Math.max(m, Math.min(py, di.height - ph - m));
+        fanLp.x = Math.max(m, Math.min(px, di.width - pw - m));
+        fanLp.y = Math.max(m, Math.min(py, di.height - ph - m));
     }
 
-    // ================= 女仆播报气泡 =================
+    // ================= 大肥鱼播报气泡 =================
 
-    private void showBubble() {
-        if (bubbleShown) return;
-        collapsePanel();
+    private void showBubble(String msg, long durationMs) {
         try {
-            FrameLayout v = buildBubble(nextSayLine());
+            if (bubbleShown && bubbleRoot != null) {
+                // 已经在播：只换词、重新计时，不闪窗
+                TextView body = bubbleRoot.findViewWithTag("pet_body");
+                if (body != null) body.setText(msg);
+                main.removeCallbacks(bubbleHide);
+                main.postDelayed(bubbleHide, durationMs);
+                return;
+            }
+            FrameLayout v = buildBubble(msg);
             v.setOnTouchListener((vv, e) -> {
                 if (e.getActionMasked() == MotionEvent.ACTION_OUTSIDE) hideBubble();
                 return false;
@@ -409,9 +423,9 @@ public class PetOverlayService extends Service {
                             | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
                     PixelFormat.TRANSLUCENT);
             bubbleLp.gravity = Gravity.TOP | Gravity.START;
-            bubbleLp.setTitle("鲸鱼娘播报");
+            bubbleLp.setTitle("大肥鱼播报");
 
-            int bw = dp(240);
+            int bw = dp(236);
             v.measure(View.MeasureSpec.makeMeasureSpec(bw, View.MeasureSpec.AT_MOST),
                     View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
             bw = Math.max(v.getMeasuredWidth(), dp(140));
@@ -439,7 +453,7 @@ public class PetOverlayService extends Service {
             bubbleRoot = v;
             bubbleShown = true;
             if (whale != null) whale.setTalking(true);
-            // 播报动画：从尾巴处弹出带回弹的放大，与速览卡的滑入区分
+            // 播报动画：从尾巴处带回弹放大弹出
             v.setAlpha(0f);
             v.setPivotX(Math.max(dp(1), tailCx));
             v.setPivotY(bh - dp(10));
@@ -448,7 +462,7 @@ public class PetOverlayService extends Service {
             v.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(230)
                     .setInterpolator(new android.view.animation.OvershootInterpolator(1.7f))
                     .start();
-            main.postDelayed(bubbleHide, 7000);
+            main.postDelayed(bubbleHide, durationMs);
         } catch (Exception e) {
             bubbleRoot = null;
             bubbleShown = false;
@@ -495,9 +509,10 @@ public class PetOverlayService extends Service {
         bubble.setBackground(bg);
         bubble.setPadding(dp(14), dp(11), dp(14), dp(12));
 
-        TextView name = text("鲸鱼娘 · 睡眠女仆", 9.5f, 0xFF7FD8FF, true);
+        TextView name = text("蓝色大肥鱼 \uD83D\uDC0B", 9.5f, 0xFF7FD8FF, true);
         bubble.addView(name, new LinearLayout.LayoutParams(-2, -2));
         TextView body = text(msg, 12f, 0xFFF2F7FD, false);
+        body.setTag("pet_body");
         body.setLineSpacing(dp(2.5f), 1f);
         LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(-2, -2);
         blp.topMargin = dp(5);
@@ -516,130 +531,19 @@ public class PetOverlayService extends Service {
             l = l.trim();
             if (!l.isEmpty()) lines.add(l);
         }
-        if (lines.isEmpty()) return "主人，今晚也要早点休息哦～";
+        if (lines.isEmpty()) return "哼，词库还没装上呢……事已至此，先吃饭吧！";
         String line = lines.get(sayIdx % lines.size());
         sayIdx++;
         return line;
     }
 
-    /** 顶部：青色竖条 + 标题 + 右侧状态胶囊。 */    /** 顶部：青色竖条 + 标题 + 右侧状态胶囊。 */
-    private View header(android.content.SharedPreferences sp) {
-        LinearLayout h = new LinearLayout(this);
-        h.setOrientation(LinearLayout.HORIZONTAL);
-        h.setGravity(Gravity.CENTER_VERTICAL);
-
-        View bar = new View(this);
-        bar.setBackground(pill(0xFF6FD8FF, dp(2)));
-        h.addView(bar, new LinearLayout.LayoutParams(dp(3), dp(20)));
-
-        TextView title = text("鲸鱼娘速览", 14.5f, 0xFFFFFFFF, true);
-        LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(0, -2, 1f);
-        tp.leftMargin = dp(9);
-        h.addView(title, tp);
-
-        TextView status = text(sp.getString(K_STATUS, "陪你到入睡"), 10.5f, 0xFF8FE3FF, true);
-        status.setTag(K_STATUS);
-        status.setBackground(pill(0x1F6FD8FF, dp(20)));
-        status.setPadding(dp(11), dp(4), dp(11), dp(4));
-        status.setMaxLines(1);
-        h.addView(status, new LinearLayout.LayoutParams(-2, -2));
-
-        return h;
-    }
-
-    /** 内层分组卡：比外卡略浅一点的半透明面，两层叠出层次。 */
-    private LinearLayout card() {
-        LinearLayout c = new LinearLayout(this);
-        c.setOrientation(LinearLayout.VERTICAL);
-        c.setBackground(pill(0x0FFFFFFF, dp(18)));
-        c.setPadding(dp(4), dp(5), dp(4), dp(5));
-        return c;
-    }
-
-    /** 刷新面板文案（Web 侧推快照后由 ACTION_START 再次进入时调用）。 */
-    private void refreshPanel() {
-        if (panelRoot == null) return;
-        android.content.SharedPreferences sp = getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        setRowValue(panelRoot, K_STATUS, sp.getString(K_STATUS, "陪你到入睡"));
-        setRowValue(panelRoot, "today", sp.getString(K_ROW_TODAY, "目标 23:30"));
-        setRowValue(panelRoot, K_ROW_SUB, sp.getString(K_ROW_SUB, "记得早点休息"));
-        setRowValue(panelRoot, "eyecare", eyeValue());
-    }
-
-    private String eyeValue() {
-        return EyeCareService.isActive() ? "已开启 · 点此关闭" : "已关闭 · 点此开启";
-    }
-
-    private void setRowValue(View root, String tag, String value) {
-        View v = root.findViewWithTag(tag);
-        if (!(v instanceof TextView)) return;
-        TextView tv = (TextView) v;
-        tv.setText(value);
-        if ("eyecare".equals(tag)) {
-            // 开关态用颜色区分，省掉一个真 Switch 的体积
-            boolean on = EyeCareService.isActive();
-            tv.setTextColor(on ? 0xFF9BE7C4 : 0xFF8593A8);
-        }
-    }
-
-    /**
-     * 一行速览：图标块 + 左标签 + 右值，整行可点。
-     * 除护眼是就地开关外，其余四行都是"带着目标分区拉起 App"。
-     */
-    private View row(String glyph, int chipColor, String label, String tab, String value) {
-        LinearLayout line = new LinearLayout(this);
-        line.setOrientation(LinearLayout.HORIZONTAL);
-        line.setGravity(Gravity.CENTER_VERTICAL);
-        line.setPadding(dp(8), dp(8), dp(10), dp(8));
-        line.setBackground(ripple(dp(14), 0x00000000));
-
-        TextView ic = text(glyph, 11.5f, chipColor, true);
-        ic.setGravity(Gravity.CENTER);
-        ic.setBackground(pill(chipColor & 0x33FFFFFF, dp(8)));
-        line.addView(ic, new LinearLayout.LayoutParams(dp(26), dp(26)));
-
-        TextView l = text(label, 12.5f, 0xFF93A2B8, false);
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, -2, 0.5f);
-        lp.leftMargin = dp(10);
-        line.addView(l, lp);
-
-        TextView v = text(value, 11.5f, 0xFFE6F0FA, true);
-        v.setTag(tab);
-        v.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
-        v.setMaxLines(1);
-        v.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        line.addView(v, new LinearLayout.LayoutParams(0, -2, 1.0f));
-
-        if (!"eyecare".equals(tab)) {
-            line.setOnClickListener(click -> openApp(tab));
-        }
-        return line;
-    }
-
     // ================= 动作 =================
 
-    /** 把 App 拉起到指定分区：先写 pending tab，再拉起（App 读取后自行清除）。 */
-    private void openApp(String tab) {
-        try {
-            getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                    .edit().putString(K_PENDING_TAB, tab).apply();
-            Intent launch = getPackageManager().getLaunchIntentForPackage(getPackageName());
-            if (launch != null) {
-                launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
-                        | Intent.FLAG_ACTIVITY_SINGLE_TOP
-                        | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-                startActivity(launch);
-            }
-        } catch (Exception ignored) {
-        }
-        collapsePanel();
-    }
-
     /**
-     * 就地开关护眼滤镜。参数沿用上次应用的值（EyeCareService 已持久化），
+     * 就地开关护眼滤镜。参数沿用上次应用的值（EyeCareService 已落盘），
      * 因此这里不需要 Web 层参与，也不受定时窗口影响——这是用户显式的手动操作。
      */
-    private void toggleEyeCare(TextView valueView) {
+    private void toggleEyeCare() {
         try {
             android.content.SharedPreferences sp = getSharedPreferences(PREFS, Context.MODE_PRIVATE);
             boolean wasOn = sp.getBoolean("eyecare_on", false) || EyeCareService.isActive();
@@ -647,7 +551,6 @@ public class PetOverlayService extends Service {
             if (wasOn) {
                 i.setAction(EyeCareService.ACTION_STOP);
                 sp.edit().putBoolean("eyecare_on", false).apply();
-                valueView.setText("已关闭 · 点击开启");
             } else {
                 i.setAction(EyeCareService.ACTION_APPLY);
                 String color = sp.getString("eyecare_color", null);
@@ -664,7 +567,6 @@ public class PetOverlayService extends Service {
                 i.putExtra(EyeCareService.EXTRA_WARM_ALPHA, warm);
                 i.putExtra(EyeCareService.EXTRA_DIM_ALPHA, dim);
                 sp.edit().putBoolean("eyecare_on", true).apply();
-                valueView.setText("已开启 · 点击关闭");
             }
             if (Build.VERSION.SDK_INT >= 26) startForegroundService(i); else startService(i);
         } catch (Exception ignored) {
@@ -724,37 +626,12 @@ public class PetOverlayService extends Service {
         return t;
     }
 
-    private LinearLayout.LayoutParams lpv(int topDp, int bottomDp) {
-        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, -2);
-        p.topMargin = dp(topDp);
-        p.bottomMargin = dp(bottomDp);
-        return p;
-    }
-
-    /** 纯色圆角块：卡片底、状态胶囊、图标块共用，避免每处各写一份 GradientDrawable。 */
-    private android.graphics.drawable.Drawable pill(int color, int radiusDp) {
-        GradientDrawable g = new GradientDrawable();
-        g.setColor(color);
-        g.setCornerRadius(dp(radiusDp));
-        return g;
-    }
-
-    /** 可点击行的水波纹背景（API 21+ 用 ripple 近似圆角高亮）。 */
-    private android.graphics.drawable.Drawable ripple(int radiusDp, int color) {
-        GradientDrawable g = new GradientDrawable();
-        g.setColor(color);
-        g.setCornerRadius(dp(radiusDp));
-        android.graphics.drawable.RippleDrawable rd = new android.graphics.drawable.RippleDrawable(
-                android.content.res.ColorStateList.valueOf(0x33FFFFFF), g, null);
-        return rd;
-    }
-
     private void ensureChannel() {
         try {
             NotificationManager nm = getSystemService(NotificationManager.class);
             if (nm != null && nm.getNotificationChannel(CHANNEL_ID) == null) {
                 NotificationChannel ch = new NotificationChannel(
-                        CHANNEL_ID, "鲸鱼娘桌宠", NotificationManager.IMPORTANCE_LOW);
+                        CHANNEL_ID, "大肥鱼桌宠", NotificationManager.IMPORTANCE_LOW);
                 ch.setShowBadge(false);
                 nm.createNotificationChannel(ch);
             }
@@ -774,7 +651,7 @@ public class PetOverlayService extends Service {
                     ? new Notification.Builder(this, CHANNEL_ID)
                     : new Notification.Builder(this);
             Notification n = b.setSmallIcon(android.R.drawable.ic_menu_compass)
-                    .setContentTitle("鲸鱼娘陪着你")
+                    .setContentTitle("大肥鱼陪着你")
                     .setContentText(text)
                     .setContentIntent(pi)
                     .setOngoing(true)
@@ -798,7 +675,7 @@ public class PetOverlayService extends Service {
         try { unregisterReceiver(screenReceiver); } catch (Exception ignored) { }
         if (whale != null) whale.stop();
         hideBubble();
-        collapsePanel();
+        hideFan();
         if (petRoot != null) {
             try { wm.removeViewImmediate(petRoot); } catch (Exception ignored) { }
             petRoot = null;

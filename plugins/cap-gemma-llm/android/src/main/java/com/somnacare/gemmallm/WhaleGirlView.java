@@ -28,6 +28,11 @@ public class WhaleGirlView extends View {
     private static final String DIR = "pet/";
     private static final long TICK_MS = 33; // ~30fps 重绘节拍
     private static final long BLINK_CYCLE_MS = 3400;
+    // 小动作节奏：待机歇 25-60s 才来一段，一段播 6-12s——切换太频繁会显得怪异不流畅
+    private static final long IDLE_PAUSE_MIN = 25000;
+    private static final long IDLE_PAUSE_VAR = 35000;
+    private static final long AMBIENT_MIN = 6000;
+    private static final long AMBIENT_VAR = 6000;
 
     /** 一个状态的素材与播放参数（参数抄自上游 manifest.json）。 */
     private static final class Anim {
@@ -85,19 +90,21 @@ public class WhaleGirlView extends View {
             if (!resumed || ambient.length == 0) return;
             long now = System.currentTimeMillis();
             if (now >= ambientUntil) {
-                if (current != idle && current != sleep && ambientUntil > 0) {
-                    // 一段小动作播完，回到待机，歇一段随机时长再出发
+                if (dragging || talking) {
+                    ambientUntil = now + 5000;   // 拖拽/说话由各自的收尾逻辑接管
+                } else if (current != idle && current != sleep) {
+                    // 欢迎/小动作/庆祝播完 → 回待机，长歇一段随机时长再出发
                     pick(idle);
-                    ambientUntil = now + 5000 + rng.nextInt(9000);
-                } else if (drowsy <= 0.5f) {
+                    ambientUntil = now + IDLE_PAUSE_MIN + rng.nextInt(IDLE_PAUSE_VAR);
+                } else if (drowsy > 0.5f) {
+                    ambientUntil = now + 15000;  // 深夜困倦时不折腾，安静睡觉
+                } else {
                     // 待机歇够了 → 随机来一段小动作
                     Anim next = ambient[rng.nextInt(ambient.length)];
                     if (next != null) {
                         pick(next);
-                        ambientUntil = now + 3500 + rng.nextInt(5000);
+                        ambientUntil = now + AMBIENT_MIN + rng.nextInt(AMBIENT_VAR);
                     }
-                } else {
-                    ambientUntil = now + 8000; // 深夜困倦时不折腾
                 }
             }
             main.postDelayed(this, 500);
@@ -130,6 +137,7 @@ public class WhaleGirlView extends View {
 
         current = welcome != null ? welcome : idle;
         stateSince = System.currentTimeMillis();
+        ambientUntil = stateSince + 6000;   // 先让 welcome 播完再进待机节奏
     }
 
     private static Anim[] buildPool(Anim... list) {
@@ -197,8 +205,12 @@ public class WhaleGirlView extends View {
     public void setTalking(boolean t) {
         talking = t;
         if (!dragging) {
-            if (t) pick(headtilt != null ? headtilt : idle);
-            else pick(drowsy > 0.5f && sleep != null ? sleep : idle);
+            if (t) {
+                pick(headtilt != null ? headtilt : idle);
+            } else {
+                pick(drowsy > 0.5f && sleep != null ? sleep : idle);
+                ambientUntil = System.currentTimeMillis() + IDLE_PAUSE_MIN;
+            }
         }
     }
 
