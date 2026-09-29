@@ -197,6 +197,24 @@ public class GemmaLLMPlugin extends Plugin {
         }
     }
 
+    /**
+     * 保存用户在 App 里选的滤镜参数（颜色/暖色强度/减光）。
+     * 悬浮窗与快捷磁贴就地开关时读这份 prefs——用户选过就用用户的，没选才落默认暖黄。
+     */
+    @PluginMethod
+    public void eyeCareSaveParams(PluginCall call) {
+        try {
+            String color = safe(call, "color", "#FFB26B");
+            Double w = call.getNumber("warm");
+            Double d = call.getNumber("dim");
+            float warm = w == null ? 0.22f : (float) Math.max(0, Math.min(1, w));
+            float dim = d == null ? 0f : (float) Math.max(0, Math.min(1, d));
+            EyeCareService.persistState(getContext(), EyeCareService.isActive(), color, warm, dim);
+        } catch (Exception ignored) {
+        }
+        call.resolve();
+    }
+
     /** 停止护眼滤镜：先无条件同步移除滤镜层（保险丝，即使服务路径失败也立刻清屏），再停服务。 */
     @PluginMethod
     public void eyeCareStop(PluginCall call) {

@@ -7,6 +7,7 @@ import {
   commentMoment,
   loadMoments,
   type Moment,
+  type MomentCard,
 } from '../utils/petMoments';
 
 interface Props {
@@ -29,6 +30,60 @@ function dayLabel(date: string): string {
 function clockLabel(ts: number): string {
   return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
+
+function factOf(facts: string[], prefix: string): string {
+  const f = facts.find((x) => x.startsWith(prefix));
+  return f ? f.slice(prefix.length).trim() : '';
+}
+
+const SELFIE_SRC = `${import.meta.env.BASE_URL || '/'}whale-selfie.png`;
+
+/** 配图卡（CSS 渲染零依赖，致敬 dsh-plugin-moments 的九宫格混合图卡）。 */
+const CardView: React.FC<{ type: MomentCard; moment: Moment }> = ({ type, moment }) => {
+  if (type === 'selfie') {
+    return (
+      <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-sky-500/30 to-blue-900/40 border border-slate-700/60 aspect-square flex items-center justify-center">
+        <img src={SELFIE_SRC} alt="大肥鱼自拍" className="w-4/5 h-4/5 object-contain drop-shadow-[0_2px_8px_rgba(56,189,248,0.35)]" />
+        <span className="absolute bottom-1 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded-md bg-black/50 text-[9px] font-bold text-sky-200 whitespace-nowrap">
+          今日营业自拍 · 拒绝加班
+        </span>
+      </div>
+    );
+  }
+  if (type === 'week') {
+    const weekLine = moment.facts.find((f) => f.startsWith('近 '));
+    const good = factOf(moment.facts, '近 7 日有 ');
+    const goodDays = parseInt(good, 10);
+    const total = weekLine ? parseInt((weekLine.match(/近 (\d+) 日/) || [])[1] || '7', 10) : 7;
+    const pct = Number.isFinite(goodDays) ? Math.min(100, Math.round((goodDays / (total || 7)) * 100)) : 0;
+    return (
+      <div className="rounded-xl bg-gradient-to-br from-emerald-900/40 to-slate-900 border border-emerald-800/40 aspect-square p-2.5 flex flex-col justify-between">
+        <p className="text-[9px] font-bold text-emerald-300">本周达标战报</p>
+        <div>
+          <p className="text-2xl font-black text-white leading-none">
+            {Number.isFinite(goodDays) ? goodDays : 0}
+            <span className="text-xs text-slate-400 font-bold">/{total || 7} 天</span>
+          </p>
+          <p className="text-[9px] text-slate-400 mt-0.5">评分 ≥80 才算本鱼出手</p>
+        </div>
+        <div className="h-1.5 rounded-full bg-slate-800 overflow-hidden">
+          <div className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-sky-400" style={{ width: `${pct}%` }} />
+        </div>
+      </div>
+    );
+  }
+  // data：数据大字报
+  const dur = factOf(moment.facts, '昨晚睡眠时长');
+  const score = factOf(moment.facts, '昨晚睡眠评分');
+  const big = dur ? dur.replace(' ', '\n') : score || '无记录';
+  return (
+    <div className="rounded-xl bg-gradient-to-br from-sky-900/50 to-slate-900 border border-sky-800/40 aspect-square p-2.5 flex flex-col justify-between overflow-hidden">
+      <p className="text-[9px] font-bold text-sky-300">睡眠数据大字报</p>
+      <p className="text-lg font-black text-white leading-tight break-words">{big}</p>
+      <p className="text-[9px] text-slate-400">喂 token 的是本鱼，睡觉的是你</p>
+    </div>
+  );
+};
 
 /**
  * 大肥鱼的朋友圈：仿朋友圈流式 UI。
@@ -146,14 +201,26 @@ export const MomentsOverlay: React.FC<Props> = ({ records, userProfile, onClose 
                 <p className="text-[11px] font-black text-sky-300">蓝色大肥鱼</p>
                 <p className="text-xs text-slate-100 leading-relaxed whitespace-pre-wrap">{m.text}</p>
 
+                {/* 配图卡：九宫格布局（1 张大图 / 2-3 张并排） */}
+                {m.cards.length > 0 && (
+                  <div className={`grid gap-1 ${m.cards.length === 1 ? 'grid-cols-1 max-w-[190px]' : m.cards.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+                    {m.cards.map((c, i) => (
+                      <CardView key={i} type={c} moment={m} />
+                    ))}
+                  </div>
+                )}
+
                 {/* 事实清单：每句都有出处 */}
-                <div className="flex flex-wrap gap-1">
-                  {m.facts.slice(0, 6).map((f, i) => (
-                    <span key={i} className="px-1.5 py-0.5 rounded-md bg-slate-800/80 border border-slate-700/60 text-[9px] text-slate-400">
-                      {f}
-                    </span>
-                  ))}
-                </div>
+                <details className="text-[9px] text-slate-500">
+                  <summary className="cursor-pointer select-none">数据来源（她不许自己编数字）</summary>
+                  <div className="flex flex-wrap gap-1 pt-1">
+                    {m.facts.map((f, i) => (
+                      <span key={i} className="px-1.5 py-0.5 rounded-md bg-slate-800/80 border border-slate-700/60 text-[9px] text-slate-400">
+                        {f}
+                      </span>
+                    ))}
+                  </div>
+                </details>
 
                 <div className="flex items-center gap-4 pt-0.5">
                   <span className="text-[9px] text-slate-500">{dayLabel(m.date)} {clockLabel(m.ts)}</span>
@@ -179,21 +246,32 @@ export const MomentsOverlay: React.FC<Props> = ({ records, userProfile, onClose 
                   </button>
                 </div>
 
-                {/* 评论区 */}
-                {(m.comments.length > 0 || m.replies.length > 0) && (
-                  <div className="rounded-xl bg-slate-900/80 border border-slate-800 px-2.5 py-2 space-y-1">
-                    {m.comments.map((c, i) => (
-                      <p key={`c${i}`} className="text-[10px] leading-relaxed">
-                        <span className="text-sky-400 font-bold">{c.friend}：</span>
-                        <span className="text-slate-300">{c.text}</span>
+                {/* 点赞 + 评论区：朋友圈式灰卡（AI 好友生态） */}
+                {(m.likes.length > 0 || m.liked || m.comments.length > 0 || m.replies.length > 0) && (
+                  <div className="rounded-xl bg-slate-900/80 border border-slate-800 px-2.5 py-2 space-y-1.5">
+                    {(m.likes.length > 0 || m.liked) && (
+                      <p className="text-[10px] leading-relaxed flex flex-wrap items-center gap-1">
+                        <Heart className="w-3 h-3 text-rose-400 fill-rose-400 shrink-0" />
+                        <span className="text-sky-400 font-bold">{[...(m.liked ? ['鱼片'] : []), ...m.likes].join('、')}</span>
+                        <span className="text-slate-400">觉得很赞</span>
                       </p>
-                    ))}
-                    {m.replies.map((r, i) => (
-                      <p key={`r${i}`} className="text-[10px] leading-relaxed">
-                        <span className={`font-bold ${r.friend === '鱼片' ? 'text-emerald-400' : 'text-sky-400'}`}>{r.friend}：</span>
-                        <span className="text-slate-300">{r.text}</span>
-                      </p>
-                    ))}
+                    )}
+                    {(m.comments.length > 0 || m.replies.length > 0) && (
+                      <div className="space-y-1">
+                        {m.comments.map((c, i) => (
+                          <p key={`c${i}`} className="text-[10px] leading-relaxed">
+                            <span className="text-sky-400 font-bold">{c.friend}：</span>
+                            <span className="text-slate-300">{c.text}</span>
+                          </p>
+                        ))}
+                        {m.replies.map((r, i) => (
+                          <p key={`r${i}`} className="text-[10px] leading-relaxed">
+                            <span className={`font-bold ${r.friend === '鱼片' ? 'text-emerald-400' : 'text-sky-400'}`}>{r.friend}：</span>
+                            <span className="text-slate-300">{r.text}</span>
+                          </p>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
 

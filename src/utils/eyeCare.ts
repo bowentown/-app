@@ -145,6 +145,9 @@ export async function applyEyeCare(cfg: EyeCareConfig | undefined, force = false
 
   const eff = withAutoStrength(cfg);
   const { warmColor, warmAlpha, dimAlpha } = eyeCareOverlayParams(eff);
+  // 悬浮窗/快捷磁贴就地开关读的是落盘参数：用户选过颜色/强度就必须用用户的，
+  // 所以每次参数变化都推一份给原生（与滤镜是否正开着无关）
+  try { await g.eyeCareSaveParams?.({ color: warmColor, warm: warmAlpha, dim: dimAlpha }); } catch { /* ignore */ }
   const shouldRun = cfg.enabled && isInEyeCareWindow(cfg);
   const sig = shouldRun ? `on|${warmColor}|${warmAlpha.toFixed(3)}|${dimAlpha.toFixed(3)}` : 'off';
   // 目标状态与上次一致且已在生效 → 跳过（避免 30s 轮询反复 startForegroundService）

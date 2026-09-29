@@ -9,6 +9,9 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.PixelFormat;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -320,18 +323,18 @@ public class PetOverlayService extends Service {
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
 
-        row.addView(fanButton("\uD83D\uDCAC", 0xF22FA8E8, new View.OnClickListener() {
+        row.addView(fanButton(true, "看播报", new View.OnClickListener() {
             @Override public void onClick(View v) {
                 hideFan();
                 showBubble(nextSayLine(), BUBBLE_MS);
             }
         }));
 
-        eyeBtn = fanButton("👁", eyeColor(), new View.OnClickListener() {
+        eyeBtn = fanButton(false, "护眼滤镜", new View.OnClickListener() {
             @Override public void onClick(View v) {
                 toggleEyeCare();
                 if (whale != null) whale.cheer();
-                // 服务异步生效，稍等一下再刷新键色与气泡反馈
+                // 服务异步生效，稍等一下再刷新状态点与气泡反馈
                 main.postDelayed(() -> {
                     updateEyeButton();
                     showBubble(EyeCareService.isActive()
@@ -346,33 +349,99 @@ public class PetOverlayService extends Service {
         return wrap;
     }
 
-    private FrameLayout fanButton(String glyph, int color, View.OnClickListener click) {
+    /**
+     * 磨砂深色圆钮 + 自绘白色矢量图标（对话气泡 / 眼睛）。
+     * 之前拿 emoji 当图标，各机型渲染差异大、和整体风格不搭，改成 Paint 手绘。
+     */
+    private FrameLayout fanButton(boolean chatIcon, String desc, View.OnClickListener click) {
         FrameLayout btn = new FrameLayout(this);
         GradientDrawable g = new GradientDrawable();
         g.setShape(GradientDrawable.OVAL);
-        g.setColor(color);
-        g.setStroke(dp(1), 0x40FFFFFF);
+        g.setColor(0xE61A2542);
+        g.setStroke(dp(1), 0x667FD8FF);
         btn.setBackground(g);
         btn.setOnClickListener(click);
-        btn.setContentDescription(glyph);
+        btn.setContentDescription(desc);
 
-        TextView t = text(glyph, 18f, 0xFFFFFFFF, false);
-        t.setGravity(Gravity.CENTER);
-        btn.addView(t, new FrameLayout.LayoutParams(-1, -1));
+        btn.addView(new IconView(this, chatIcon), new FrameLayout.LayoutParams(-1, -1));
+
+        // 护眼钮右上角一个状态点：绿=可开、琥珀=已开
+        if (!chatIcon) {
+            View dot = new View(this);
+            dot.setTag("pet_eye_dot");
+            GradientDrawable dg = new GradientDrawable();
+            dg.setShape(GradientDrawable.OVAL);
+            dg.setColor(0xFF37B87B);
+            dot.setBackground(dg);
+            FrameLayout.LayoutParams dlp = new FrameLayout.LayoutParams(dp(7), dp(7),
+                    Gravity.TOP | Gravity.END);
+            dlp.rightMargin = dp(6);
+            dlp.topMargin = dp(6);
+            btn.addView(dot, dlp);
+        }
         return btn;
-    }
-
-    private int eyeColor() {
-        return EyeCareService.isActive() ? 0xF2B9822B : 0xF237B87B;
     }
 
     private void updateEyeButton() {
         if (eyeBtn == null || !fanShown) return;
-        GradientDrawable g = new GradientDrawable();
-        g.setShape(GradientDrawable.OVAL);
-        g.setColor(eyeColor());
-        g.setStroke(dp(1), 0x40FFFFFF);
-        eyeBtn.setBackground(g);
+        View dot = eyeBtn.findViewWithTag("pet_eye_dot");
+        if (dot == null) return;
+        GradientDrawable dg = new GradientDrawable();
+        dg.setShape(GradientDrawable.OVAL);
+        dg.setColor(EyeCareService.isActive() ? 0xFFB9822B : 0xFF37B87B);
+        dot.setBackground(dg);
+    }
+
+    /** 自绘矢量图标：对话气泡（带尖角 + 三个点）与眼睛。 */
+    private static final class IconView extends View {
+        private final boolean chat;
+        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Path path = new Path();
+
+        IconView(Context c, boolean chat) {
+            super(c);
+            this.chat = chat;
+        }
+
+        @Override protected void onDraw(Canvas cv) {
+            float w = getWidth(), h = getHeight();
+            if (w == 0 || h == 0) return;
+            float cx = w / 2f, cy = h / 2f, s = Math.min(w, h);
+            path.reset();
+            paint.setColor(0xFFFFFFFF);
+            paint.setStyle(Paint.Style.FILL);
+            if (chat) {
+                // 圆角气泡 + 左下尖角
+                float bw = s * 0.60f, bh = s * 0.42f;
+                float left = cx - bw / 2, top = cy - bh / 2 - s * 0.05f;
+                path.addRoundRect(left, top, left + bw, top + bh,
+                        bh * 0.42f, bh * 0.42f, Path.Direction.CW);
+                path.moveTo(left + bw * 0.16f, top + bh - 1f);
+                path.lineTo(left + bw * 0.30f, top + bh + s * 0.14f);
+                path.lineTo(left + bw * 0.44f, top + bh - 1f);
+                path.close();
+                cv.drawPath(path, paint);
+                // 气泡里三个点（用底色镂空）
+                paint.setColor(0xFF1A2542);
+                float dy = top + bh / 2f;
+                for (int i = -1; i <= 1; i++) {
+                    cv.drawCircle(cx + i * s * 0.13f, dy, s * 0.045f, paint);
+                }
+            } else {
+                // 眼睛：上下两段弧线勾轮廓 + 实心瞳孔
+                float ew = s * 0.62f, eh = s * 0.40f;
+                paint.setStyle(Paint.Style.STROKE);
+                paint.setStrokeWidth(s * 0.08f);
+                paint.setStrokeCap(Paint.Cap.ROUND);
+                path.moveTo(cx - ew / 2, cy);
+                path.quadTo(cx, cy - eh, cx + ew / 2, cy);
+                path.quadTo(cx, cy + eh, cx - ew / 2, cy);
+                path.close();
+                cv.drawPath(path, paint);
+                paint.setStyle(Paint.Style.FILL);
+                cv.drawCircle(cx, cy, s * 0.105f, paint);
+            }
+        }
     }
 
     /** 按钮摆位：贴角色左右不遮挡的一侧；放不下挪到角色下/上方。 */
@@ -409,7 +478,9 @@ public class PetOverlayService extends Service {
                 main.postDelayed(bubbleHide, durationMs);
                 return;
             }
-            FrameLayout v = buildBubble(msg);
+            DisplayInfo di = displayInfo();
+            boolean above = petParams.y - dp(150) >= dp(4);   // 预估放得下就贴头上，否则贴脚下来
+            FrameLayout v = buildBubble(msg, above);
             v.setOnTouchListener((vv, e) -> {
                 if (e.getActionMasked() == MotionEvent.ACTION_OUTSIDE) hideBubble();
                 return false;
@@ -425,28 +496,28 @@ public class PetOverlayService extends Service {
             bubbleLp.gravity = Gravity.TOP | Gravity.START;
             bubbleLp.setTitle("大肥鱼播报");
 
-            int bw = dp(236);
+            int bw = dp(204);
             v.measure(View.MeasureSpec.makeMeasureSpec(bw, View.MeasureSpec.AT_MOST),
                     View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
             bw = Math.max(v.getMeasuredWidth(), dp(140));
             int bh = v.getMeasuredHeight();
-            DisplayInfo di = displayInfo();
-            int m = dp(4), gap = dp(10);
+            int m = dp(4);
             int cx = petParams.x + dp(COLLAPSED_W_DP) / 2;
-            bubbleLp.x = Math.max(m, Math.min(cx - bw / 2, di.width - bw - m));
-            int above = petParams.y - bh - gap;
-            if (above >= m) bubbleLp.y = above;
-            else bubbleLp.y = Math.max(m, Math.min(
-                    petParams.y + dp(COLLAPSED_H_DP) + gap, di.height - bh - m));
 
-            // 尾巴对准角色头顶
+            // 气泡底(顶)边直接压在角色窗内 14dp 处：尾巴尖正好点到她头顶/脚边，
+            // 之前"卡片悬在半空"就是因为整块气泡被推到了角色窗上方还留了 10dp
+            if (above) bubbleLp.y = Math.max(m, petParams.y - bh + dp(14));
+            else bubbleLp.y = Math.min(di.height - bh - m, petParams.y + dp(COLLAPSED_H_DP) - dp(14));
+            bubbleLp.x = Math.max(m, Math.min(cx - bw / 2, di.width - bw - m));
+
+            // 尾巴尖对准角色头顶中心
             View tail = v.findViewWithTag("pet_tail");
             int tailCx = 0;
             if (tail != null) {
                 FrameLayout.LayoutParams tlp = (FrameLayout.LayoutParams) tail.getLayoutParams();
-                tlp.leftMargin = Math.max(dp(14), Math.min(cx - bubbleLp.x - dp(6), bw - dp(26)));
+                tlp.leftMargin = Math.max(dp(12), Math.min(cx - bubbleLp.x - dp(8), bw - dp(24)));
                 tail.setLayoutParams(tlp);
-                tailCx = tlp.leftMargin + dp(6);
+                tailCx = tlp.leftMargin + dp(8);
             }
 
             wm.addView(v, bubbleLp);
@@ -456,7 +527,7 @@ public class PetOverlayService extends Service {
             // 播报动画：从尾巴处带回弹放大弹出
             v.setAlpha(0f);
             v.setPivotX(Math.max(dp(1), tailCx));
-            v.setPivotY(bh - dp(10));
+            v.setPivotY(above ? bh - dp(9) : dp(9));
             v.setScaleX(0.55f);
             v.setScaleY(0.55f);
             v.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(230)
@@ -485,29 +556,32 @@ public class PetOverlayService extends Service {
         }
     }
 
-    /** 头顶对话气泡：名牌 + 正文 + 指向角色的尾巴。 */
-    private FrameLayout buildBubble(String msg) {
+    /**
+     * 头顶对话气泡：名牌 + 正文 + 一个真正的三角尖角（Path 手绘），
+     * 尖角指向角色。above=false 时从角色脚下弹出、尖角朝上。
+     */
+    private FrameLayout buildBubble(String msg, boolean above) {
         FrameLayout wrap = new FrameLayout(this);
-        wrap.setPadding(0, 0, 0, dp(10));   // 给尾巴留出窗口内的空间（窗口会裁掉越界内容）
+        // 给尾巴留出窗口内的空间（窗口会裁掉越界内容），尾巴与卡面重叠 2dp 防接缝
+        wrap.setPadding(0, above ? 0 : dp(11), 0, above ? dp(11) : 0);
 
         View tail = new View(this);
         tail.setTag("pet_tail");
-        GradientDrawable tg = new GradientDrawable();
-        tg.setColor(0xFF1B2846);
-        tg.setCornerRadius(dp(3));
-        tail.setBackground(tg);
-        tail.setRotation(45f);
-        wrap.addView(tail, new FrameLayout.LayoutParams(dp(11), dp(11),
-                Gravity.BOTTOM | Gravity.START));
+        tail.setBackground(new TriangleDrawable(0xFF223457, !above));
+        FrameLayout.LayoutParams tlp = new FrameLayout.LayoutParams(dp(16), dp(11),
+                (above ? Gravity.BOTTOM : Gravity.TOP) | Gravity.START);
+        if (above) tlp.bottomMargin = dp(9);
+        else tlp.topMargin = dp(9);
+        wrap.addView(tail, tlp);
 
         LinearLayout bubble = new LinearLayout(this);
         bubble.setOrientation(LinearLayout.VERTICAL);
         GradientDrawable bg = new GradientDrawable(
-                GradientDrawable.Orientation.TL_BR, new int[]{0xFF2A3C63, 0xFF1B2846});
-        bg.setCornerRadius(dp(18));
+                GradientDrawable.Orientation.TL_BR, new int[]{0xFF2E4470, 0xFF223457});
+        bg.setCornerRadius(dp(14));
         bg.setStroke(dp(1), 0x36FFFFFF);
         bubble.setBackground(bg);
-        bubble.setPadding(dp(14), dp(11), dp(14), dp(12));
+        bubble.setPadding(dp(13), dp(10), dp(13), dp(11));
 
         TextView name = text("蓝色大肥鱼 \uD83D\uDC0B", 9.5f, 0xFF7FD8FF, true);
         bubble.addView(name, new LinearLayout.LayoutParams(-2, -2));
@@ -515,11 +589,46 @@ public class PetOverlayService extends Service {
         body.setTag("pet_body");
         body.setLineSpacing(dp(2.5f), 1f);
         LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(-2, -2);
-        blp.topMargin = dp(5);
+        blp.topMargin = dp(4);
         bubble.addView(body, blp);
 
         wrap.addView(bubble, new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.START));
         return wrap;
+    }
+
+    /** 三角尾巴：base 在上、尖朝下（pointUp 时相反），颜色与气泡底边一致。 */
+    private static final class TriangleDrawable extends android.graphics.drawable.Drawable {
+        private final int color;
+        private final boolean pointUp;
+        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Path path = new Path();
+
+        TriangleDrawable(int color, boolean pointUp) {
+            this.color = color;
+            this.pointUp = pointUp;
+        }
+
+        @Override public void draw(Canvas cv) {
+            float w = getBounds().width(), h = getBounds().height();
+            if (w == 0 || h == 0) return;
+            paint.setColor(color);
+            path.reset();
+            if (pointUp) {
+                path.moveTo(0, h);
+                path.lineTo(w, h);
+                path.lineTo(w / 2f, 0);
+            } else {
+                path.moveTo(0, 0);
+                path.lineTo(w, 0);
+                path.lineTo(w / 2f, h);
+            }
+            path.close();
+            cv.drawPath(path, paint);
+        }
+
+        @Override public void setAlpha(int a) { }
+        @Override public void setColorFilter(android.graphics.ColorFilter cf) { }
+        @Override public int getOpacity() { return android.graphics.PixelFormat.TRANSLUCENT; }
     }
 
     /** 轮播取一条播报词。 */

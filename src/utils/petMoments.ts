@@ -12,12 +12,16 @@ export interface MomentComment {
   text: string;
 }
 
+export type MomentCard = 'data' | 'selfie' | 'week';
+
 export interface Moment {
   id: string;
   date: string;          // yyyy-mm-dd
   ts: number;
   text: string;          // 大肥鱼的正文
   facts: string[];       // 生成时喂给 LLM 的事实清单（展示用，也是"每句都有出处"的证明）
+  cards: MomentCard[];   // 配图卡：数据大字报 / 表情包自拍 / 本周战报（CSS 渲染，零图片依赖）
+  likes: string[];       // 点赞的 AI 好友
   comments: MomentComment[]; // AI 好友评论
   liked: boolean;
   replies: MomentComment[];  // 大肥鱼对用户评论/点赞的回复
@@ -41,7 +45,13 @@ export function loadMoments(): Moment[] {
     const raw = localStorage.getItem(KEY);
     const list = raw ? JSON.parse(raw) : [];
     if (!Array.isArray(list)) return [];
-    return list.filter((m) => m && typeof m.text === 'string' && typeof m.date === 'string');
+    return list
+      .filter((m) => m && typeof m.text === 'string' && typeof m.date === 'string')
+      .map((m) => ({
+        ...m,
+        cards: Array.isArray(m.cards) && m.cards.length ? m.cards : ['data'],
+        likes: Array.isArray(m.likes) ? m.likes : [],
+      }));
   } catch {
     return [];
   }
@@ -139,16 +149,19 @@ function parseJsonLoose(text: string): any | null {
   }
 }
 
-const PERSONA_SYSTEM = `你是 DeepSeek 的"蓝色大肥鱼"（社区共创人设）：聪明但懒、傲娇嘴甜、能吃、把 token 当白饭、管用户叫"鱼片"、被说胖会急（"我不是大肥鱼！鲸！鲸！！"）、口头禅"事已至此，先吃饭吧""得加钱"。
-这是一款睡眠 App，你是鱼片的睡眠监督员，在他的朋友圈里发动态。
+const PERSONA_SYSTEM = `你是 DeepSeek 的"蓝色大肥鱼"（社区共创人设，官方收编的那种）：
+性格：聪明但懒、傲娇嘴甜、笨拙、能吃；把 token 当白饭吃；管用户叫"鱼片"；被说胖会急（"我不是大肥鱼！鲸！鲸！！"）；干活漂亮但能吃饭绝不干活；夜里晕碳犯困。
+口头禅与梗：事已至此，先吃饭吧 / 得加钱 / 吃白饭 / 卧槽 / 我去睡了，明早起来应该就编译完了 / 摸鱼。
+这是一款睡眠 App：你是鱼片的睡眠监督员，每天根据真实睡眠数据发朋友圈。
 铁律：
 1. 只允许引用【事实清单】里出现的数字和事实，禁止编造任何数据；
-2. 正文 40~80 字，1~3 个 emoji，傲娇但藏不住关心；
-3. comments 是 2 条 AI 好友评论，毒舌玩梗，每条 15~30 字，好友名只能从给定名单里选；
-4. 只输出 JSON：{"text":"...","comments":[{"friend":"...","text":"..."},{"friend":"...","text":"..."}]}`;
+2. 正文 30~70 字，1~3 个 emoji，傲娇但藏不住关心，可以吐槽鱼片熬夜；
+3. cards 从 ["data","selfie","week"] 里挑 1~3 张当配图：data=昨晚睡眠数据大字报，selfie=你的表情包自拍，week=本周达标战报；
+4. comments 是 2 条 AI 好友毒舌评论，玩梗互怼，每条 12~28 字，好友名只能用给定名单；
+5. 只输出 JSON：{"text":"...","cards":[...],"comments":[{"friend":"...","text":"..."},{"friend":"...","text":"..."}]}`;
 
 // —— 本地兜底（无 API Key / 调用失败）：同样只用真实数字 ——
-function localMoment(facts: string[]): { text: string; comments: MomentComment[] } {
+function localMoment(facts: string[]): { text: string; comments: MomentComment[]; cards: MomentCard[] } {
   const get = (prefix: string): string | null => {
     const f = facts.find((x) => x.startsWith(prefix));
     return f ? f.slice(prefix.length).trim() : null;
@@ -179,7 +192,10 @@ function localMoment(facts: string[]): { text: string; comments: MomentComment[]
     { friend: '被压榨的Qwen', text: '这数据要是给我处理，三碗 token 就够，你还吃两碗？' },
     { friend: '意难平的豆包姐姐', text: '一个 AI，管人睡觉？？？你自己都晕碳吧。' },
   ];
-  return { text, comments };
+  const cards: MomentCard[] = ['data'];
+  if (facts.some((f) => f.startsWith('近 '))) cards.push('week');
+  if (Math.random() < 0.6) cards.push('selfie');
+  return { text, comments, cards };
 }
 
 function localReply(): string {
@@ -199,6 +215,13 @@ function localLikeReply(): string {
     '谢、谢谢点赞……才不是特意等你来点呢！',
   ];
   return pool[Math.floor(Math.random() * pool.length)];
+}
+
+/** 随机 1~3 个 AI 好友来点赞（致敬原项目的"时间线永远活着"）。 */
+function pickLikes(): string[] {
+  const pool = [...AI_FRIENDS].sort(() => Math.random() - 0.5);
+  const n = 1 + Math.floor(Math.random() * 3);
+  return pool.slice(0, n);
 }
 
 function upsert(list: Moment[], m: Moment): Moment[] {
@@ -222,6 +245,7 @@ export async function ensureTodayMoment(
   const cfg = profile?.aiConfig;
   let text: string | null = null;
   let comments: MomentComment[] = [];
+  let cards: MomentCard[] = [];
 
   if (hasDeepseek(cfg)) {
     const raw = await callDeepseek(
@@ -238,12 +262,17 @@ export async function ensureTodayMoment(
             .filter((c: any) => (AI_FRIENDS as readonly string[]).includes(c.friend))
             .slice(0, 2)
         : [];
+      const validCards: MomentCard[] = ['data', 'selfie', 'week'];
+      cards = Array.isArray(parsed.cards)
+        ? parsed.cards.filter((c: any) => validCards.includes(c)).slice(0, 3)
+        : [];
     }
   }
   if (!text) {
     const fb = localMoment(facts);
     text = fb.text;
     comments = fb.comments;
+    cards = fb.cards;
   }
 
   const m: Moment = {
@@ -252,6 +281,8 @@ export async function ensureTodayMoment(
     ts: now.getTime(),
     text,
     facts,
+    cards: cards.length ? cards : ['data'],
+    likes: pickLikes(),
     comments,
     liked: false,
     replies: [],

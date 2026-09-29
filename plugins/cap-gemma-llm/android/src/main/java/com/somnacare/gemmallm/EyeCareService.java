@@ -95,7 +95,9 @@ public class EyeCareService extends Service {
             String action = intent != null ? intent.getAction() : ACTION_APPLY;
             if (ACTION_STOP.equals(action)) {
                 removeOverlayInternal();
-                persistState(getApplicationContext(), false, null, 0f, 0f);
+                // 关闭只改开关位，保留用户选的颜色/强度——悬浮窗与磁贴再开时
+                // 才能沿用用户的选择，而不是回落到默认暖黄
+                persistState(getApplicationContext(), false, lastColorHex, lastWarm, lastDim);
                 stopForeground(STOP_FOREGROUND_REMOVE);
                 stopSelf();
                 return START_NOT_STICKY;
@@ -123,7 +125,7 @@ public class EyeCareService extends Service {
     }
 
     /** 持久化当前开关与参数（快捷设置磁贴在进程外/冷启动时使用） */
-    private static void persistState(Context context, boolean on, String color, float w, float d) {
+    static void persistState(Context context, boolean on, String color, float w, float d) {
         try {
             context.getSharedPreferences("somnacare_prefs", Context.MODE_PRIVATE)
                     .edit()

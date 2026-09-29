@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Moon,
   Sparkles,
@@ -587,14 +588,17 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
         </div>
       </div>
 
-      {/* 大肥鱼的朋友圈 */}
-      {showMoments && (
-        <MomentsOverlay
-          records={records}
-          userProfile={userProfile}
-          onClose={() => setShowMoments(false)}
-        />
-      )}
+      {/* 大肥鱼的朋友圈：portal 到 body——外层滑动容器带 translate3d，
+          fixed 定位会退化成相对它定位，弹窗就会"横跨几个区" */}
+      {showMoments &&
+        createPortal(
+          <MomentsOverlay
+            records={records}
+            userProfile={userProfile}
+            onClose={() => setShowMoments(false)}
+          />,
+          document.body,
+        )}
     </div>
   );
 };

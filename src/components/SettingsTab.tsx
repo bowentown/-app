@@ -15,6 +15,7 @@ import {
 import { UserProfile, CustomAlarmSetting, CustomAIConfig, SleepRecord, SleepStageSegment } from '../types/sleep';
 import { AlarmManager } from './AlarmManager';
 import { CustomAISettingsModal } from './CustomAISettingsModal';
+import { createPortal } from 'react-dom';
 import { APP_THEMES, ThemeConfig } from '../utils/themeStyles';
 
 // 主题切换时同步切换桌面图标（原生 activity-alias 启停；Web 环境跳过）
@@ -452,14 +453,18 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         </button>
       </div>
 
-      {/* Custom AI Config Modal */}
-      <CustomAISettingsModal
-        isOpen={isAIConfigOpen}
-        onClose={() => setIsAIConfigOpen(false)}
-        config={userProfile.aiConfig || { provider: 'deepseek' }}
-        onSaveConfig={(cfg: CustomAIConfig) => onUpdateProfile({ aiConfig: cfg })}
-        theme={theme}
-      />
+      {/* Custom AI Config Modal：fixed 弹窗必须 portal 到 body——外层滑动容器带
+          translate3d，fixed 会退化成相对滑动层定位，弹窗就会横跨几个分区 */}
+      {createPortal(
+        <CustomAISettingsModal
+          isOpen={isAIConfigOpen}
+          onClose={() => setIsAIConfigOpen(false)}
+          config={userProfile.aiConfig || { provider: 'deepseek' }}
+          onSaveConfig={(cfg: CustomAIConfig) => onUpdateProfile({ aiConfig: cfg })}
+          theme={theme}
+        />,
+        document.body,
+      )}
     </div>
   );
 };
