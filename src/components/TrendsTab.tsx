@@ -389,6 +389,13 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
       {/* 本周睡眠小结：填充留白 + 周维度可读洞察 */}
       {records.length > 0 && (() => {
         const wk = records.slice(0, 7);
+        // 就寝波动：近 7 晚就寝时间的平均绝对偏差（跨午夜统一到 24h+ 轴）
+        const bedMins = wk.map((r) => {
+          const [bh, bm] = r.bedtime.split(':').map(Number);
+          return bh < 12 ? (bh + 24) * 60 + bm : bh * 60 + bm;
+        });
+        const bedMean = bedMins.reduce((a, b) => a + b, 0) / bedMins.length;
+        const bedDev = Math.round(bedMins.reduce((a, b) => a + Math.abs(b - bedMean), 0) / bedMins.length);
         const avgScoreWk = Math.round(wk.reduce((a, r) => a + r.sleepScore, 0) / wk.length);
         const avgDurWk = Math.round(wk.reduce((a, r) => a + r.durationMinutes, 0) / wk.length);
         const avgDeepWk = Math.round(wk.reduce((a, r) => a + r.deepSleepMinutes, 0) / wk.length);
@@ -423,8 +430,11 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
               </div>
             </div>
             <p className={`text-[11px] ${textMuted} leading-relaxed`}>
-              最佳 <span className="text-white font-bold">{best.date}</span> · {best.sleepScore} 分 ·{' '}
-              {avgScoreWk >= 80 ? '节奏很稳' : avgScoreWk >= 70 ? '就寝可再提前些' : '先固定起床时间'}
+              最佳 <span className="text-white font-bold">{best.date}</span> · {best.sleepScore} 分 · 就寝波动{' '}
+              <span className={`font-mono font-bold ${bedDev <= 25 ? 'text-emerald-400' : bedDev <= 45 ? 'text-amber-400' : 'text-rose-400'}`}>
+                ±{bedDev}m
+              </span>
+              · {bedDev <= 25 ? '作息很稳' : bedDev <= 45 ? '就寝时间尚稳' : '作息波动大'}
             </p>
           </div>
         );

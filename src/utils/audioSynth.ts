@@ -3,6 +3,8 @@
  * Supports Rain, Ocean Surf, Night Forest/Crickets, Deep Pink Noise, and Tibetan Singing Bowl
  */
 
+type LayerKey = 'rain' | 'ocean' | 'forest' | 'whitenoise' | 'bowl';
+
 class SleepAudioSynthesizer {
   private ctx: AudioContext | null = null;
   private isPlaying: boolean = false;
@@ -10,6 +12,8 @@ class SleepAudioSynthesizer {
   private masterGain: GainNode | null = null;
   private activeNodes: (AudioNode | number)[] = [];
   private sessionEpoch = 0;
+  // 多层混音：每个音效一层独立增益（BetterSleep 式叠加）
+  private layers = new Map<LayerKey, { gain: GainNode; nodes: (AudioNode | number)[] }>();
   private volume: number = 0.5;
 
   private initContext() {
@@ -47,6 +51,7 @@ class SleepAudioSynthesizer {
     // 竞态防护：清理只针对本次会话捕获的节点。此前清理延迟 150ms 且直接操作共享的
     // activeNodes/masterGain，150ms 内快速切换音色时会误杀新会话的节点——
     // 表现为"已经静音但 UI 仍显示正在播放"。
+    this.stopAllLayers(true);
     this.sessionEpoch++;
     const epoch = this.sessionEpoch;
     const nodes = this.activeNodes;
@@ -94,33 +99,114 @@ class SleepAudioSynthesizer {
 
     this.stop();
 
-    // Create master gain
-    const master = this.ctx.createGain();
-    master.gain.setValueAtTime(0.001, this.ctx.currentTime);
-    master.gain.linearRampToValueAtTime(this.volume, this.ctx.currentTime + 0.3);
-    master.connect(this.ctx.destination);
-    this.masterGain = master;
+    // 单层播放：停掉所有层后以满层增益启动（保持旧响度语义）
+    this.stopAllLayers(true);
+    const master = this.ensureMaster();
+    master.gain.setValueAtTime(this.volume, this.ctx.currentTime);
+    this.startLayer(type, 1);
+  }
 
-    this.isPlaying = true;
-    this.currentType = type;
-
-    switch (type) {
-      case 'rain':
-        this.startRain(master);
-        break;
-      case 'ocean':
-        this.startOcean(master);
-        break;
-      case 'forest':
-        this.startForest(master);
-        break;
-      case 'whitenoise':
-        this.startPinkNoise(master);
-        break;
-      case 'bowl':
-        this.startTibetanBowl(master);
-        break;
+  /** 确保主增益节点存在（initContext 之后调用） */
+  private ensureMaster(): GainNode {
+    if (!this.masterGain) {
+      const master = this.ctx!.createGain();
+      master.gain.value = this.volume;
+      master.connect(this.ctx!.destination);
+      this.masterGain = master;
     }
+    return this.masterGain;
+  }
+
+  /** 启动一层音效（独立增益，不影响其他层） */
+  public startLayer(type: LayerKey, vol = 0.6) {
+    this.initContext();
+    if (!this.ctx) return;
+    if (this.layers.has(type)) return;
+    const master = this.ensureMaster();
+    const gain = this.ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, this.ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(Math.max(0, Math.min(1, vol)), this.ctx.currentTime + 0.35);
+    gain.connect(master);
+    const nodes: (AudioNode | number)[] = [];
+    switch (type) {
+      case 'rain': this.startRain(gain, (...ns) => ns.forEach((n) => nodes.push(n))); break;
+      case 'ocean': this.startOcean(gain, (...ns) => ns.forEach((n) => nodes.push(n))); break;
+      case 'forest': this.startForest(gain, (...ns) => ns.forEach((n) => nodes.push(n))); break;
+      case 'whitenoise': this.startPinkNoise(gain, (...ns) => ns.forEach((n) => nodes.push(n))); break;
+      case 'bowl': this.startTibetanBowl(gain, (...ns) => ns.forEach((n) => nodes.push(n))); break;
+    }
+    this.layers.set(type, { gain, nodes });
+    this.isPlaying = true;
+  }
+
+  /** 停止一层 */
+  public stopLayer(type: LayerKey) {
+    const layer = this.layers.get(type);
+    if (!layer) return;
+    this.layers.delete(type);
+    if (this.ctx) {
+      layer.gain.gain.setTargetAtTime(0.0001, this.ctx.currentTime, 0.08);
+    }
+    window.setTimeout(() => {
+      for (const item of layer.nodes) {
+        if (typeof item === 'number') {
+          window.clearInterval(item);
+        } else {
+          try {
+            if ('stop' in item && typeof (item as any).stop === 'function') {
+              (item as any).stop();
+            }
+            item.disconnect();
+          } catch { /* ignore */ }
+        }
+      }
+      try { layer.gain.disconnect(); } catch { /* ignore */ }
+    }, 200);
+    if (this.layers.size === 0) {
+      this.isPlaying = false;
+      this.currentType = null;
+    }
+  }
+
+  /** 停止所有音效层（不动闹钟铃声通道） */
+  public stopAllLayers(immediate = false) {
+    for (const type of [...this.layers.keys()]) {
+      if (immediate) {
+        const layer = this.layers.get(type)!;
+        this.layers.delete(type);
+        for (const item of layer.nodes) {
+          if (typeof item === 'number') {
+            window.clearInterval(item);
+          } else {
+            try {
+              if ('stop' in item && typeof (item as any).stop === 'function') {
+                (item as any).stop();
+              }
+              item.disconnect();
+            } catch { /* ignore */ }
+          }
+          try { layer.gain.disconnect(); } catch { /* ignore */ }
+        }
+      } else {
+        this.stopLayer(type);
+      }
+    }
+    if (this.layers.size === 0) {
+      this.isPlaying = false;
+      this.currentType = null;
+    }
+  }
+
+  /** 当前活跃层 */
+  public getActiveLayers(): string[] {
+    return [...this.layers.keys()];
+  }
+
+  /** 调整某层音量 */
+  public setLayerVolume(type: LayerKey, vol: number) {
+    const layer = this.layers.get(type);
+    if (!layer || !this.ctx) return;
+    layer.gain.gain.setTargetAtTime(Math.max(0, Math.min(1, vol)), this.ctx.currentTime, 0.05);
   }
 
   // Ringing alarm tone for custom wakeup alarms
@@ -208,7 +294,7 @@ class SleepAudioSynthesizer {
   }
 
   // 1. Rain Sound Synthesis
-  private startRain(dest: AudioNode) {
+  private startRain(dest: AudioNode, collect: (...n: (AudioNode | number)[]) => void) {
     if (!this.ctx) return;
     const bufferSize = 2 * this.ctx.sampleRate;
     const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
@@ -239,7 +325,7 @@ class SleepAudioSynthesizer {
     filter.connect(dest);
     whiteNoise.start();
 
-    this.activeNodes.push(whiteNoise, filter, highpass);
+    collect(whiteNoise, filter, highpass);
 
     // Random raindrops
     const dropInterval = window.setInterval(() => {
@@ -259,11 +345,11 @@ class SleepAudioSynthesizer {
       osc.stop(this.ctx.currentTime + 0.07);
     }, 180);
 
-    this.activeNodes.push(dropInterval);
+    collect(dropInterval);
   }
 
   // 2. Ocean Waves Synthesis
-  private startOcean(dest: AudioNode) {
+  private startOcean(dest: AudioNode, collect: (...n: (AudioNode | number)[]) => void) {
     if (!this.ctx) return;
     const bufferSize = 2 * this.ctx.sampleRate;
     const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
@@ -318,11 +404,11 @@ class SleepAudioSynthesizer {
     lfo.start();
     lfoAmp.start();
 
-    this.activeNodes.push(noise, filter, lfo, lfoGain, waveGain, lfoAmp, lfoAmpGain);
+    collect(noise, filter, lfo, lfoGain, waveGain, lfoAmp, lfoAmpGain);
   }
 
   // 3. Night Forest & Subtle Crickets
-  private startForest(dest: AudioNode) {
+  private startForest(dest: AudioNode, collect: (...n: (AudioNode | number)[]) => void) {
     if (!this.ctx) return;
 
     // Gentle night wind floor
@@ -344,7 +430,7 @@ class SleepAudioSynthesizer {
     wind.connect(windFilter);
     windFilter.connect(dest);
     wind.start();
-    this.activeNodes.push(wind, windFilter);
+    collect(wind, windFilter);
 
     // Cricket chirps generator
     const chirpTimer = window.setInterval(() => {
@@ -367,11 +453,11 @@ class SleepAudioSynthesizer {
       osc.stop(this.ctx.currentTime + 0.09);
     }, 320);
 
-    this.activeNodes.push(chirpTimer);
+    collect(chirpTimer);
   }
 
   // 4. Pink / Deep White Noise
-  private startPinkNoise(dest: AudioNode) {
+  private startPinkNoise(dest: AudioNode, collect: (...n: (AudioNode | number)[]) => void) {
     if (!this.ctx) return;
     const bufferSize = 2 * this.ctx.sampleRate;
     const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
@@ -403,11 +489,11 @@ class SleepAudioSynthesizer {
     filter.connect(dest);
     noise.start();
 
-    this.activeNodes.push(noise, filter);
+    collect(noise, filter);
   }
 
   // 5. Tibetan Singing Bowl / Binaural Alpha Waves
-  private startTibetanBowl(dest: AudioNode) {
+  private startTibetanBowl(dest: AudioNode, collect: (...n: (AudioNode | number)[]) => void) {
     if (!this.ctx) return;
 
     // Resonant fundamental + harmonics
@@ -435,7 +521,7 @@ class SleepAudioSynthesizer {
 
       osc.start();
       lfo.start();
-      this.activeNodes.push(osc, gain, lfo, lfoG);
+      collect(osc, gain, lfo, lfoG);
     });
   }
 }

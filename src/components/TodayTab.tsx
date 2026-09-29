@@ -11,6 +11,8 @@ import {
 import { SleepRecord, UserProfile } from '../types/sleep';
 import { formatDurationChinese } from '../utils/sleepScore';
 import { OneTapSleepTracker } from './OneTapSleepTracker';
+import { SoundscapePlayer } from './SoundscapePlayer';
+import { Music2 } from 'lucide-react';
 import { ThemeConfig } from '../utils/themeStyles';
 
 interface TodayTabProps {
@@ -49,6 +51,7 @@ export const TodayTab: React.FC<TodayTabProps> = ({
 }) => {
   const latestRecord = records[0] || null;
   const [goalOpen, setGoalOpen] = useState(false);
+  const [mixerOpen, setMixerOpen] = useState(false);
 
   // 得分环 + 数字 count-up（进入页面时 0 → 目标值，800ms 缓出）
   const [displayScore, setDisplayScore] = useState(0);
@@ -244,6 +247,28 @@ export const TodayTab: React.FC<TodayTabProps> = ({
           <span className="text-sm font-bold text-white block">床头夜钟伴眠</span>
         </button>
       </div>
+
+      {/* 4.5 助眠音景混音器（BetterSleep 式多层叠加） */}
+      <button
+        type="button"
+        onClick={() => setMixerOpen(true)}
+        className={`w-full p-4 rounded-2xl ${theme.cardBg} border ${theme.cardBorder} flex items-center justify-between cursor-pointer hover:border-white/20 transition-all active:scale-[0.99] shadow-md group`}
+      >
+        <div className="flex items-center gap-3">
+          <div className={`w-9 h-9 rounded-xl ${theme.cardInnerBg} ${theme.accentText} flex items-center justify-center border ${theme.cardBorder}`}>
+            <Music2 className="w-4 h-4" />
+          </div>
+          <div className="text-left">
+            <h4 className="text-sm font-black text-white">助眠音景</h4>
+            <p className="text-[11px] text-slate-400">多层混音 · 呼吸放松 · 定时关闭</p>
+          </div>
+        </div>
+        <ChevronRight className={`w-4 h-4 ${theme.accentText} group-hover:translate-x-0.5 transition-transform`} />
+      </button>
+
+      {mixerOpen && (
+        <SoundscapePlayer theme={theme} onClose={() => setMixerOpen(false)} />
+      )}
 
       {/* 5. 作息目标（默认折叠；编辑器内详尽） */}
       <div className={`${theme.cardBg} rounded-3xl p-5 border ${theme.cardBorder} shadow-xl space-y-4`}>

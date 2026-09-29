@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Volume2, VolumeX, Play, Pause, Timer, Music2, Sparkles } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Volume2, VolumeX, Play, Pause, Timer, Music2, Wind, X } from 'lucide-react';
 import { sleepAudio } from '../utils/audioSynth';
 import { SoundscapeTrack } from '../types/sleep';
+import { ThemeConfig } from '../utils/themeStyles';
+import { BreathingExercise } from './BreathingExercise';
 
 const TRACKS: SoundscapeTrack[] = [
   {
@@ -46,12 +49,19 @@ const TRACKS: SoundscapeTrack[] = [
   },
 ];
 
-export const SoundscapePlayer: React.FC = () => {
-  const [activeTrackId, setActiveTrackId] = useState<string | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [volume, setVolume] = useState(0.5);
+// 预设混音（BetterSleep 式多层叠加）：[音效, 音量]
+const PRESET_MIXES: { name: string; desc: string; layers: Array<[SoundscapeTrack['soundType'], number]> }[] = [
+  { name: '轻雨伴眠', desc: '细雨 + 粉噪掩蔽', layers: [['rain', 0.6], ['whitenoise', 0.25]] },
+  { name: '海浪夜林', desc: '潮汐 + 竹林夜风', layers: [['ocean', 0.55], ['forest', 0.3]] },
+  { name: '颂钵冥想', desc: '432Hz 单层沉浸', layers: [['bowl', 0.7]] },
+];
+
+const SoundscapePlayerInner: React.FC<{ theme: ThemeConfig; onClose: () => void }> = ({ theme, onClose }) => {
+  const [active, setActive] = useState<Record<string, number>>({});
+  const [showBreath, setShowBreath] = useState(false);
   const [timerMinutes, setTimerMinutes] = useState<number | null>(30);
   const [timerRemainingSeconds, setTimerRemainingSeconds] = useState<number | null>(null);
+  const isPlaying = Object.keys(active).length > 0;
 
   useEffect(() => {
     let interval: number;
@@ -62,9 +72,8 @@ export const SoundscapePlayer: React.FC = () => {
             return prev - 1;
           }
           // Timer finished
-          sleepAudio.stop();
-          setIsPlaying(false);
-          setActiveTrackId(null);
+          sleepAudio.stopAllLayers(true);
+          setActive({});
           return null;
         });
       }, 1000);
@@ -72,25 +81,37 @@ export const SoundscapePlayer: React.FC = () => {
     return () => clearInterval(interval);
   }, [isPlaying, timerRemainingSeconds]);
 
-  const handleTrackClick = (track: SoundscapeTrack) => {
-    if (activeTrackId === track.id && isPlaying) {
-      sleepAudio.stop();
-      setIsPlaying(false);
-      setActiveTrackId(null);
-      setTimerRemainingSeconds(null);
+  const toggleLayer = (track: SoundscapeTrack) => {
+    if (active[track.soundType] !== undefined) {
+      sleepAudio.stopLayer(track.soundType);
+      setActive((prev) => {
+        const next = { ...prev };
+        delete next[track.soundType];
+        return next;
+      });
     } else {
-      sleepAudio.play(track.soundType);
-      setActiveTrackId(track.id);
-      setIsPlaying(true);
-      if (timerMinutes) {
+      sleepAudio.startLayer(track.soundType, 0.6);
+      setActive((prev) => ({ ...prev, [track.soundType]: 0.6 }));
+      if (timerMinutes && timerRemainingSeconds === null) {
         setTimerRemainingSeconds(timerMinutes * 60);
       }
     }
   };
 
-  const handleVolumeChange = (newVol: number) => {
-    setVolume(newVol);
-    sleepAudio.setVolume(newVol);
+  const setLayerVol = (type: string, v: number) => {
+    sleepAudio.setLayerVolume(type as SoundscapeTrack['soundType'], v);
+    setActive((prev) => ({ ...prev, [type]: v }));
+  };
+
+  const applyMix = (mix: typeof PRESET_MIXES[number]) => {
+    sleepAudio.stopAllLayers(true);
+    const next: Record<string, number> = {};
+    for (const [type, vol] of mix.layers) {
+      sleepAudio.startLayer(type, vol);
+      next[type] = vol;
+    }
+    setActive(next);
+    if (timerMinutes) setTimerRemainingSeconds(timerMinutes * 60);
   };
 
   const handleSetTimer = (mins: number | null) => {
@@ -102,127 +123,193 @@ export const SoundscapePlayer: React.FC = () => {
     }
   };
 
-  return (
-    <div className="w-full bg-slate-900/80 rounded-2xl p-4 border border-slate-800/80">
+  return createPortal(
+    <>
+    <div className="fixed inset-0 z-[150] bg-black/60" onClick={onClose}>
+    <div
+      data-no-swipe
+      className="absolute bottom-0 left-0 right-0 max-w-lg mx-auto rounded-t-3xl p-5 pb-9 max-h-[88vh] overflow-y-auto no-scrollbar space-y-4"
+      style={{ background: '#0c1220' }}
+      onClick={(e) => e.stopPropagation()}
+    >
       {/* Header */}
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center">
+          <div className={`w-8 h-8 rounded-xl ${theme.cardInnerBg} ${theme.accentText} flex items-center justify-center border ${theme.cardBorder}`}>
             <Music2 className="w-4 h-4" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-slate-100">助眠声景与自然白噪音</h3>
-            <p className="text-[11px] text-slate-400">实时 Web Audio 声学引擎合成，纯净无损循环</p>
+            <h3 className="text-sm font-black text-white">助眠音景混音器</h3>
+            <p className="text-[10px] text-slate-400">多层叠加 · 各自调音量 · Web Audio 实时合成</p>
           </div>
         </div>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setShowBreath(true)}
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-teal-500/15 border border-teal-500/40 text-teal-300 text-[10px] font-bold cursor-pointer"
+          >
+            <Wind className="w-3 h-3" />
+            呼吸放松
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="关闭"
+            className="w-8 h-8 rounded-lg bg-white/5 text-slate-300 flex items-center justify-center cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
 
-        {isPlaying && (
-          <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-950/60 border border-emerald-800/40 text-[10px] text-emerald-400 font-medium animate-pulse">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-            播放中
-          </span>
-        )}
+      {/* 预设混音 */}
+      <div className="grid grid-cols-3 gap-2">
+        {PRESET_MIXES.map((m) => (
+          <button
+            key={m.name}
+            type="button"
+            onClick={() => applyMix(m)}
+            className={`${theme.cardInnerBg} border ${theme.cardInnerBorder} rounded-2xl p-2.5 text-left cursor-pointer active:scale-[0.97] transition-transform`}
+          >
+            <span className="text-[11px] font-bold text-white block">{m.name}</span>
+            <span className="text-[9px] text-slate-400 leading-tight block mt-0.5">{m.desc}</span>
+          </button>
+        ))}
       </div>
 
       {/* Soundscape Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mb-4">
         {TRACKS.map((t) => {
-          const isThisPlaying = activeTrackId === t.id && isPlaying;
+          const layerVol = active[t.soundType];
+          const isOn = layerVol !== undefined;
           return (
-            <button
+            <div
               key={t.id}
-              onClick={() => handleTrackClick(t)}
-              className={`text-left p-3 rounded-xl border transition-all flex items-center justify-between relative overflow-hidden group ${
-                isThisPlaying
-                  ? 'bg-gradient-to-r ' + t.accentColor + ' border-indigo-500/60 shadow-md shadow-indigo-950'
-                  : 'bg-slate-950/50 border-slate-800/80 hover:border-slate-700 hover:bg-slate-950/80'
+              className={`rounded-2xl border transition-all p-3 ${
+                isOn
+                  ? 'bg-gradient-to-r ' + t.accentColor + ' ' + theme.accentBorder
+                  : `${theme.cardInnerBg} ${theme.cardInnerBorder}`
               }`}
             >
-              <div className="relative z-10 flex-1 pr-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold text-slate-100">{t.name}</span>
-                  {t.category === 'meditation' && (
-                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono">
-                      脑波
+              <div className="flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => toggleLayer(t)}
+                  className="flex items-center gap-2.5 flex-1 text-left cursor-pointer min-w-0"
+                >
+                  <div
+                    className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-transform ${
+                      isOn ? theme.accentBg.split(' ')[0] + ' text-white' : 'bg-white/5 text-slate-300'
+                    }`}
+                  >
+                    {isOn ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 fill-current ml-0.5" />}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-bold text-white">{t.name}</span>
+                      {t.category === 'meditation' && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono">脑波</span>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-slate-400 line-clamp-1">{t.description}</p>
+                  </div>
+                </button>
+                {isOn && (
+                  <div className="flex items-center gap-2 shrink-0 ml-2" data-no-swipe>
+                    <Volume2 className="w-3.5 h-3.5 text-slate-400" />
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.05}
+                      value={layerVol}
+                      onChange={(e) => setLayerVol(t.soundType, Number(e.target.value))}
+                      className="w-20 accent-white h-1.5 bg-white/10 rounded-lg cursor-pointer"
+                      aria-label={`${t.name}音量`}
+                    />
+                    <span className="text-[10px] font-mono text-slate-300 w-8 text-right tabular-nums">
+                      {Math.round(layerVol * 100)}%
                     </span>
-                  )}
-                </div>
-                <p className="text-[11px] text-slate-400 mt-0.5 line-clamp-1">{t.description}</p>
+                  </div>
+                )}
               </div>
-
-              {/* Play / Pause button */}
-              <div
-                className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-transform ${
-                  isThisPlaying
-                    ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-900/60'
-                    : 'bg-slate-800 text-slate-300 group-hover:scale-105'
-                }`}
-              >
-                {isThisPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 fill-current ml-0.5" />}
-              </div>
-
-              {/* Sound waves animation if playing */}
-              {isThisPlaying && (
-                <div className="absolute right-12 bottom-2 flex items-end gap-0.5 opacity-60">
-                  <span className="w-1 h-3 bg-indigo-400 rounded-full animate-bounce" />
-                  <span className="w-1 h-5 bg-indigo-300 rounded-full animate-bounce [animation-delay:0.15s]" />
-                  <span className="w-1 h-2 bg-indigo-400 rounded-full animate-bounce [animation-delay:0.3s]" />
-                </div>
-              )}
-            </button>
+            </div>
           );
         })}
       </div>
 
-      {/* Playback Controls (Volume & Timer) */}
-      <div className="bg-slate-950/60 rounded-xl p-3 border border-slate-800/60 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-300">
-        {/* Volume Slider */}
-        <div className="flex items-center gap-2 w-full sm:w-1/2">
-          {volume === 0 ? (
-            <VolumeX className="w-4 h-4 text-slate-500 shrink-0" />
-          ) : (
-            <Volume2 className="w-4 h-4 text-indigo-400 shrink-0" />
+      {/* 定时关闭 */}
+      <div className={`${theme.cardInnerBg} rounded-xl p-3 border ${theme.cardInnerBorder} flex items-center justify-between text-xs text-slate-300`}>
+        <div className="flex items-center gap-1.5">
+          <Timer className={`w-3.5 h-3.5 ${theme.accentText}`} />
+          <span className="text-[11px] font-bold text-slate-200">定时关闭</span>
+          {timerRemainingSeconds !== null && (
+            <span className="text-[11px] font-mono text-slate-400 ml-1 tabular-nums">
+              {Math.floor(timerRemainingSeconds / 60)}:{String(timerRemainingSeconds % 60).padStart(2, '0')}
+            </span>
           )}
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.05}
-            value={volume}
-            onChange={(e) => handleVolumeChange(Number(e.target.value))}
-            className="w-full accent-indigo-500 h-1.5 bg-slate-800 rounded-lg cursor-pointer"
-          />
-          <span className="text-[11px] font-mono text-slate-400 w-8 text-right tabular-nums">
-            {Math.round(volume * 100)}%
-          </span>
         </div>
-
-        {/* Timer selector */}
-        <div className="flex items-center justify-end gap-1.5 w-full sm:w-auto">
-          <div className="flex items-center gap-1 text-[11px] text-slate-400 mr-1">
-            <Timer className="w-3.5 h-3.5 text-indigo-400" />
-            <span>定时关</span>
-          </div>
+        <div className="flex items-center gap-1.5">
           {[15, 30, 45, 60].map((mins) => (
             <button
               key={mins}
+              type="button"
               onClick={() => handleSetTimer(timerMinutes === mins ? null : mins)}
-              className={`px-2 py-1 rounded text-[11px] font-medium transition-colors ${
+              className={`px-2 py-1 rounded-lg text-[11px] font-bold transition-colors cursor-pointer ${
                 timerMinutes === mins
-                  ? 'bg-indigo-600 text-white font-semibold'
-                  : 'bg-slate-800/80 text-slate-400 hover:text-slate-200'
+                  ? theme.accentBg.split(' ')[0] + ' text-white'
+                  : 'bg-white/5 text-slate-400'
               }`}
             >
               {mins}m
             </button>
           ))}
-          {timerRemainingSeconds !== null && (
-            <span className="text-[11px] font-mono text-indigo-400 ml-1 font-semibold tabular-nums">
-              ({Math.floor(timerRemainingSeconds / 60)}:{String(timerRemainingSeconds % 60).padStart(2, '0')})
-            </span>
-          )}
         </div>
       </div>
+
+      {isPlaying && (
+        <button
+          type="button"
+          onClick={() => {
+            sleepAudio.stopAllLayers(true);
+            setActive({});
+          }}
+          className={`w-full py-2.5 rounded-2xl ${theme.accentBg} text-white text-xs font-black cursor-pointer active:scale-[0.98] transition-transform`}
+        >
+          全部停止
+        </button>
+      )}
     </div>
+    </div>,
+    {showBreath ? (
+      <div key="breath" className="fixed inset-0 z-[160] bg-black/70 flex items-center justify-center p-5" onClick={() => setShowBreath(false)}>
+        <div
+          data-no-swipe
+          className="w-full max-w-sm rounded-3xl p-5"
+          style={{ background: '#0c1220' }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-black text-white">4-7-8 呼吸放松</h3>
+            <button
+              type="button"
+              onClick={() => setShowBreath(false)}
+              aria-label="关闭呼吸练习"
+              className="w-8 h-8 rounded-lg bg-white/5 text-slate-300 flex items-center justify-center cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <BreathingExercise />
+        </div>
+      </div>
+    ) : null}
+    </>,
+    document.body
   );
 };
+
+// portal 包装：渲染到 body（祖先链带 transform，fixed 会退化）
+export const SoundscapePlayer: React.FC<{ theme: ThemeConfig; onClose: () => void }> = ({ theme, onClose }) =>
+  createPortal(<SoundscapePlayerInner theme={theme} onClose={onClose} />, document.body);
