@@ -29,10 +29,10 @@ public class WhaleGirlView extends View {
     private static final long TICK_MS = 33; // ~30fps 重绘节拍
     private static final long BLINK_CYCLE_MS = 3400;
     // 小动作节奏：待机歇 25-60s 才来一段，一段播 6-12s——切换太频繁会显得怪异不流畅
-    private static final long IDLE_PAUSE_MIN = 25000;
-    private static final long IDLE_PAUSE_VAR = 35000;
-    private static final long AMBIENT_MIN = 6000;
-    private static final long AMBIENT_VAR = 6000;
+    private static final int IDLE_PAUSE_MIN = 25000;
+    private static final int IDLE_PAUSE_VAR = 35000;
+    private static final int AMBIENT_MIN = 6000;
+    private static final int AMBIENT_VAR = 6000;
 
     /** 一个状态的素材与播放参数（参数抄自上游 manifest.json）。 */
     private static final class Anim {

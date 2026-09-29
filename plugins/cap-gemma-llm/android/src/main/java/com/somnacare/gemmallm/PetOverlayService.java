@@ -62,7 +62,7 @@ public class PetOverlayService extends Service {
     private FrameLayout petRoot;
     private FrameLayout fanRoot;
     private WindowManager.LayoutParams fanLp;
-    private TextView eyeBtn;
+    private FrameLayout eyeBtn;
     private WhaleGirlView whale;
     private WindowManager.LayoutParams petParams;
     private final android.os.Handler main = new android.os.Handler(android.os.Looper.getMainLooper());
@@ -346,7 +346,7 @@ public class PetOverlayService extends Service {
         return wrap;
     }
 
-    private TextView fanButton(String glyph, int color, View.OnClickListener click) {
+    private FrameLayout fanButton(String glyph, int color, View.OnClickListener click) {
         FrameLayout btn = new FrameLayout(this);
         GradientDrawable g = new GradientDrawable();
         g.setShape(GradientDrawable.OVAL);
