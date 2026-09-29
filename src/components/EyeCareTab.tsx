@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Eye, MoonStar, BookOpen, Gamepad2, BedDouble, Pipette, Clock, CheckCircle2 } from 'lucide-react';
 import { UserProfile, EyeCareConfig, DEFAULT_EYE_CARE } from '../types/sleep';
 import { ThemeConfig } from '../utils/themeStyles';
+import { useModalA11y } from '../utils/modalA11y';
 import {
   isEyeCareNative,
   eyeCarePermissionGranted,
@@ -76,6 +77,7 @@ export const EyeCareTab: React.FC<EyeCareTabProps> = ({ userProfile, onUpdatePro
   const [now, setNow] = useState<Date>(new Date());
   const [hue, setHue] = useState<number>(() => hexToHue(cfg.warmColor));
   const [pickerOpen, setPickerOpen] = useState(false);
+  const pickerA11y = useModalA11y(pickerOpen, () => setPickerOpen(false), '护眼滤镜颜色选择');
 
   const patch = (p: Partial<EyeCareConfig>) => onUpdateProfile({ eyeCare: { ...cfg, ...p } });
 
@@ -261,7 +263,7 @@ export const EyeCareTab: React.FC<EyeCareTabProps> = ({ userProfile, onUpdatePro
 
       {/* 颜色盘弹层：portal 到 body（祖先链上有 transform，fixed 会失效） */}
       {pickerOpen && createPortal(
-        <div className="fixed inset-0 z-[150] bg-black/60" onClick={() => setPickerOpen(false)}>
+        <div ref={pickerA11y.ref} {...pickerA11y.dialogProps} className="fixed inset-0 z-[150] bg-black/60" onClick={() => setPickerOpen(false)}>
           <div
             data-no-swipe
             className="absolute bottom-0 left-0 right-0 rounded-t-3xl p-6 pb-9 space-y-5"
@@ -330,7 +332,7 @@ export const EyeCareTab: React.FC<EyeCareTabProps> = ({ userProfile, onUpdatePro
             <button
               type="button"
               onClick={() => setPickerOpen(false)}
-              className={`w-full py-3 rounded-2xl ${theme.accentBg} text-white text-sm font-black cursor-pointer active:scale-[0.98] transition-transform`}
+              className={`w-full py-3 rounded-2xl ${theme.accentBg} ${theme.accentFg} text-sm font-black cursor-pointer active:scale-[0.98] transition-transform`}
             >
               使用此颜色
             </button>

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ThemeConfig } from '../utils/themeStyles';
 import { SplashScene } from './LaunchSplash';
+import { useModalA11y } from '../utils/modalA11y';
 
 export type BedtimeReminderPhase = 'ask' | 'good' | 'ignore';
 
@@ -26,6 +27,7 @@ export const BedtimeReminder: React.FC<BedtimeReminderProps> = ({
   onIgnore,
   onDone,
 }) => {
+  const bedtimeA11y = useModalA11y(true, onIgnore, '到点就寝提醒');
   const [leaving, setLeaving] = useState(false);
 
   useEffect(() => {
@@ -45,6 +47,8 @@ export const BedtimeReminder: React.FC<BedtimeReminderProps> = ({
 
   return (
     <div
+      {...bedtimeA11y.dialogProps}
+      ref={bedtimeA11y.ref}
       className={`fixed inset-0 z-[300] overflow-hidden transition-opacity duration-300 ${
         leaving ? 'opacity-0' : 'opacity-100'
       }`}

@@ -22,6 +22,8 @@ export interface ThemeConfig {
   // Highlights & accents
   accentColor: string;
   accentBg: string;
+  /** accentBg 上的前景色：深底配浅字、浅底配深字。调用处禁止硬编码 text-white */
+  accentFg: string;
   accentText: string;
   accentRing: string;
   /** 原始十六进制强调色：供 SVG 描边、图表与氛围光等内联样式使用 */
@@ -51,7 +53,8 @@ export const APP_THEMES: Record<ThemeMode, ThemeConfig> = {
     cardInnerBg: 'bg-[#0c1222]',
     cardInnerBorder: 'border-slate-850',
     accentColor: 'indigo-500',
-    accentBg: 'bg-indigo-600 hover:bg-indigo-500',
+    accentBg: 'bg-indigo-600 hover:bg-indigo-700',
+    accentFg: 'text-white',
     accentText: 'text-indigo-400',
     accentRing: 'ring-indigo-400',
     accentHex: '#818cf8',
@@ -79,6 +82,7 @@ export const APP_THEMES: Record<ThemeMode, ThemeConfig> = {
     cardInnerBorder: 'border-zinc-850',
     accentColor: 'indigo-500',
     accentBg: 'bg-zinc-800 hover:bg-zinc-700',
+    accentFg: 'text-white',
     accentText: 'text-zinc-200',
     accentRing: 'ring-zinc-500',
     accentHex: '#d4d4d8',
@@ -106,6 +110,7 @@ export const APP_THEMES: Record<ThemeMode, ThemeConfig> = {
     cardInnerBorder: 'border-amber-900/70',
     accentColor: 'amber-500',
     accentBg: 'bg-amber-600 hover:bg-amber-500',
+    accentFg: 'text-slate-950',
     accentText: 'text-amber-300',
     accentRing: 'ring-amber-400',
     accentHex: '#fcd34d',
@@ -133,6 +138,7 @@ export const APP_THEMES: Record<ThemeMode, ThemeConfig> = {
     cardInnerBorder: 'border-cyan-900/70',
     accentColor: 'cyan-400',
     accentBg: 'bg-cyan-600 hover:bg-cyan-500',
+    accentFg: 'text-slate-950',
     accentText: 'text-cyan-300',
     accentRing: 'ring-cyan-400',
     accentHex: '#67e8f9',

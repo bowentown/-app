@@ -3,6 +3,7 @@ import { Moon, Sun, AlertTriangle } from 'lucide-react';
 import { SleepRecord } from '../types/sleep';
 import { calculateSleepScore, generateSleepStages, formatDurationChinese } from '../utils/sleepScore';
 import { ThemeConfig } from '../utils/themeStyles';
+import { useModalA11y } from '../utils/modalA11y';
 
 interface OneTapSleepTrackerProps {
   /** 到点提醒'好的'后的开始监测信号（时间戳 ms，变化即开始记录） */
@@ -21,6 +22,7 @@ export const OneTapSleepTracker: React.FC<OneTapSleepTrackerProps> = ({ onSaveRe
   const [elapsedMinutes, setElapsedMinutes] = useState(0);
   const [showSummaryModal, setShowSummaryModal] = useState(false);
   const [completedRecord, setCompletedRecord] = useState<SleepRecord | null>(null);
+  const summaryModalA11y = useModalA11y(!!showSummaryModal, () => setShowSummaryModal(false), '睡眠完成小结');
   const [sessionTruncated, setSessionTruncated] = useState(false);
 
   useEffect(() => {
@@ -183,7 +185,7 @@ export const OneTapSleepTracker: React.FC<OneTapSleepTrackerProps> = ({ onSaveRe
             <button
               type="button"
               onClick={handleStartSleep}
-              className={`w-full py-3.5 px-5 rounded-2xl ${theme.accentBg} text-white font-black text-xs tracking-wider flex items-center justify-center gap-2 active:scale-[0.99] transition-all cursor-pointer shadow-lg animate-cta-breathe`}
+              className={`w-full py-3.5 px-5 rounded-2xl ${theme.accentBg} ${theme.accentFg} font-black text-xs tracking-wider flex items-center justify-center gap-2 active:scale-[0.99] transition-all cursor-pointer shadow-lg animate-cta-breathe`}
             >
               <span>开始夜间监测</span>
               <span className="text-sm">→</span>
@@ -233,7 +235,7 @@ export const OneTapSleepTracker: React.FC<OneTapSleepTrackerProps> = ({ onSaveRe
 
       {/* Completion Modal - 100% Solid & Strict Duration Display */}
       {showSummaryModal && completedRecord && (
-        <div className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4">
+        <div ref={summaryModalA11y.ref} {...summaryModalA11y.dialogProps} className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4">
           <div className={`${theme.cardBg} border-2 ${theme.accentBorder} rounded-3xl w-full max-w-sm p-6 text-white shadow-2xl text-center`}>
             <div className={`text-sm font-bold ${theme.accentText} mb-1`}>
               {completedRecord.durationMinutes < 30 ? '记录完毕 · 微睡眠/短时记录' : '晨安！恭喜完成睡眠'}
@@ -283,7 +285,7 @@ export const OneTapSleepTracker: React.FC<OneTapSleepTrackerProps> = ({ onSaveRe
             <button
               type="button"
               onClick={() => setShowSummaryModal(false)}
-              className={`w-full py-3 rounded-xl ${theme.accentBg} text-white font-black text-sm transition-colors cursor-pointer shadow-lg`}
+              className={`w-full py-3 rounded-xl ${theme.accentBg} ${theme.accentFg} font-black text-sm transition-colors cursor-pointer shadow-lg`}
             >
               确定并查看详情
             </button>

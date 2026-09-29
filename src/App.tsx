@@ -119,12 +119,42 @@ export const App: React.FC = () => {
     };
   });
 
+  // 本地存储写入：配额是按 origin 共享的，越界会抛 QuotaExceededError——
+  // 不捕获的话 useEffect 冒泡到 ErrorBoundary，整个应用变错误页，
+  // 而用户手里的"记录已保存"提示早就弹过了，实际一条都没存上
+  const MAX_RECORDS = 2000; // ~3.5MB（单条约 1.7KB），给同源其他数据留余量
+
+  const persistRecords = (list: SleepRecord[]): boolean => {
+    try {
+      localStorage.setItem('somnacare_sleep_records', JSON.stringify(list));
+      return true;
+    } catch (e) {
+      console.warn('[storage] 记录写入失败，裁剪后重试', e);
+      const trimmed = list.slice(0, Math.floor(MAX_RECORDS / 2));
+      try {
+        localStorage.setItem('somnacare_sleep_records', JSON.stringify(trimmed));
+        setToastMessage('本地存储已满，已保留最近的记录，建议在【偏好】中导出备份');
+        window.setTimeout(() => setToastMessage(null), 6000);
+        return true;
+      } catch (e2) {
+        console.warn('[storage] 裁剪后仍写入失败', e2);
+        setToastMessage('本地存储写入失败，请导出备份后清理空间');
+        window.setTimeout(() => setToastMessage(null), 6000);
+        return false;
+      }
+    }
+  };
+
   useEffect(() => {
-    localStorage.setItem('somnacare_sleep_records', JSON.stringify(records));
+    persistRecords(records.length > MAX_RECORDS ? records.slice(0, MAX_RECORDS) : records);
   }, [records]);
 
   useEffect(() => {
-    localStorage.setItem('somnacare_user_profile', JSON.stringify(userProfile));
+    try {
+      localStorage.setItem('somnacare_user_profile', JSON.stringify(userProfile));
+    } catch (e) {
+      console.warn('[storage] 用户档案写入失败', e);
+    }
   }, [userProfile]);
 
   // APK 启动时无条件同步一次闹钟到原生 AlarmManager（重启/重装后打开即恢复调度）
@@ -478,7 +508,7 @@ export const App: React.FC = () => {
 
       {/* Toast Notification */}
       {toastMessage && (
-        <div className={`fixed top-5 left-1/2 -translate-x-1/2 z-[90] px-5 py-3 rounded-2xl ${currentTheme.accentBg.split(' ')[0]} text-white text-xs font-black shadow-2xl flex items-center gap-2.5 animate-bounce border border-white/10`}>
+        <div className={`fixed top-5 left-1/2 -translate-x-1/2 z-[90] px-5 py-3 rounded-2xl ${currentTheme.accentBg.split(' ')[0]} ${currentTheme.accentFg} text-xs font-black shadow-2xl flex items-center gap-2.5 animate-bounce border border-white/10`}>
           <CheckCircle2 className="w-5 h-5 text-white/90" />
           <span>{toastMessage}</span>
         </div>

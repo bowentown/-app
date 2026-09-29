@@ -1,4 +1,5 @@
 import { SleepRecord, SleepStageSegment, WakingMood } from '../types/sleep';
+import { localDateOffset } from './dateUtils';
 
 /**
  * Calculates a 0-100 scientific sleep score based on:
@@ -262,7 +263,8 @@ export function formatDurationChinese(minutes: number): string {
  */
 const DEMO_SPEC: Array<{
   id: string;
-  date: string;
+  /** 相对今天的偏移天数（0=今天）；写死日期会随时间推移变成"一周前的过期演示" */
+  daysAgo: number;
   bedtime: string;
   wakeTime: string;
   latencyMinutes: number;
@@ -272,7 +274,7 @@ const DEMO_SPEC: Array<{
 }> = [
   {
     id: 'log-7',
-    date: '2026-09-22', // Last night
+    daysAgo: 0, // Last night
     bedtime: '23:15',
     wakeTime: '07:10',
     latencyMinutes: 14,
@@ -280,16 +282,17 @@ const DEMO_SPEC: Array<{
     preSleepHabits: ['reading', 'hot_bath', 'meditation'],
     dreamNotes: '梦见在海边森林散步，微风徐徐，很舒服。',
   },
-  { id: 'log-6', date: '2026-09-21', bedtime: '23:45', wakeTime: '07:00', latencyMinutes: 22, wakingMood: 'neutral', preSleepHabits: ['screen_time'] },
-  { id: 'log-5', date: '2026-09-20', bedtime: '00:20', wakeTime: '07:30', latencyMinutes: 28, wakingMood: 'tired', preSleepHabits: ['screen_time', 'caffeine'], dreamNotes: '赶公交车迟到的紧张梦境。' },
-  { id: 'log-4', date: '2026-09-19', bedtime: '23:30', wakeTime: '08:00', latencyMinutes: 12, wakingMood: 'refreshed', preSleepHabits: ['meditation', 'reading'] },
-  { id: 'log-3', date: '2026-09-18', bedtime: '23:10', wakeTime: '06:55', latencyMinutes: 16, wakingMood: 'neutral', preSleepHabits: ['hot_bath'] },
-  { id: 'log-2', date: '2026-09-17', bedtime: '01:05', wakeTime: '07:15', latencyMinutes: 35, wakingMood: 'groggy', preSleepHabits: ['screen_time', 'alcohol'] },
-  { id: 'log-1', date: '2026-09-16', bedtime: '23:00', wakeTime: '07:05', latencyMinutes: 15, wakingMood: 'refreshed', preSleepHabits: ['meditation'] },
+  { id: 'log-6', daysAgo: 1, bedtime: '23:45', wakeTime: '07:00', latencyMinutes: 22, wakingMood: 'neutral', preSleepHabits: ['screen_time'] },
+  { id: 'log-5', daysAgo: 2, bedtime: '00:20', wakeTime: '07:30', latencyMinutes: 28, wakingMood: 'tired', preSleepHabits: ['screen_time', 'caffeine'], dreamNotes: '赶公交车迟到的紧张梦境。' },
+  { id: 'log-4', daysAgo: 3, bedtime: '23:30', wakeTime: '08:00', latencyMinutes: 12, wakingMood: 'refreshed', preSleepHabits: ['meditation', 'reading'] },
+  { id: 'log-3', daysAgo: 4, bedtime: '23:10', wakeTime: '06:55', latencyMinutes: 16, wakingMood: 'neutral', preSleepHabits: ['hot_bath'] },
+  { id: 'log-2', daysAgo: 5, bedtime: '01:05', wakeTime: '07:15', latencyMinutes: 35, wakingMood: 'groggy', preSleepHabits: ['screen_time', 'alcohol'] },
+  { id: 'log-1', daysAgo: 6, bedtime: '23:00', wakeTime: '07:05', latencyMinutes: 15, wakingMood: 'refreshed', preSleepHabits: ['meditation'] },
 ];
 
 export function getInitialSleepLogs(): SleepRecord[] {
   return DEMO_SPEC.map((spec) => {
+    const date = localDateOffset(-spec.daysAgo);
     const gen = generateSleepStages(spec.bedtime, spec.wakeTime, spec.latencyMinutes);
     const durationMinutes = gen.deepMinutes + gen.lightMinutes + gen.remMinutes; // 总窗 - 清醒
     // 夜醒次数 = 除入睡潜伏期外的清醒段数
@@ -304,7 +307,7 @@ export function getInitialSleepLogs(): SleepRecord[] {
     );
     return {
       id: spec.id,
-      date: spec.date,
+      date,
       bedtime: spec.bedtime,
       wakeTime: spec.wakeTime,
       durationMinutes,

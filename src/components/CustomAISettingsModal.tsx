@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { CustomAIConfig, AIProvider } from '../types/sleep';
 import { ThemeConfig } from '../utils/themeStyles';
+import { useModalA11y } from '../utils/modalA11y';
 import {
   LOCAL_LLM_MODEL,
   NATIVE_LLM_MODEL,
@@ -133,6 +134,7 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
     setLlmCache(c);
   };
 
+  const { ref: a11yRef, dialogProps } = useModalA11y(isOpen, onClose, 'AI 顾问模型设置');
   if (!isOpen) return null;
 
   // Real-time API Endpoint Model Query Function
@@ -202,8 +204,8 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
 
   return (
     <div
-      role="dialog"
-      aria-modal="true"
+      ref={a11yRef}
+      {...dialogProps}
       className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/95 overflow-y-auto"
     >
       <div className={`${theme.cardBg} border border-slate-700 rounded-3xl w-full max-w-md p-5 text-white shadow-2xl relative my-auto max-h-[92vh] overflow-y-auto no-scrollbar`}>
@@ -231,7 +233,7 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
               onClick={() => setProvider('deepseek')}
               className={`py-2 px-1 rounded-xl border text-center font-bold transition-all cursor-pointer ${
                 provider === 'deepseek'
-                  ? `${theme.accentBg.split(' ')[0]} border-white text-white`
+                  ? `${theme.accentBg.split(' ')[0]} border-white ${theme.accentFg}`
                   : `${theme.cardInnerBg} border-slate-700 text-slate-300`
               }`}
             >
@@ -243,7 +245,7 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
               onClick={() => setProvider('local_rules')}
               className={`py-2 px-1 rounded-xl border text-center font-bold transition-all cursor-pointer ${
                 provider === 'local_rules'
-                  ? `${theme.accentBg.split(' ')[0]} border-white text-white`
+                  ? `${theme.accentBg.split(' ')[0]} border-white ${theme.accentFg}`
                   : `${theme.cardInnerBg} border-slate-700 text-slate-300`
               }`}
             >
@@ -255,7 +257,7 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
               onClick={() => setProvider('local_llm')}
               className={`py-2 px-1 rounded-xl border text-center font-bold transition-all cursor-pointer ${
                 provider === 'local_llm'
-                  ? `${theme.accentBg.split(' ')[0]} border-white text-white`
+                  ? `${theme.accentBg.split(' ')[0]} border-white ${theme.accentFg}`
                   : `${theme.cardInnerBg} border-slate-700 text-slate-300`
               }`}
             >
@@ -267,7 +269,7 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
               onClick={() => setProvider('custom_openai')}
               className={`py-2 px-1 rounded-xl border text-center font-bold transition-all cursor-pointer ${
                 provider === 'custom_openai'
-                  ? `${theme.accentBg.split(' ')[0]} border-white text-white`
+                  ? `${theme.accentBg.split(' ')[0]} border-white ${theme.accentFg}`
                   : `${theme.cardInnerBg} border-slate-700 text-slate-300`
               }`}
             >
@@ -426,7 +428,7 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
                     type="button"
                     onClick={handleDownloadLlm}
                     disabled={llmSupport !== null && !llmSupport.supported}
-                    className={`w-full py-2.5 rounded-xl ${theme.accentBg} disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold flex items-center justify-center gap-1.5 shadow cursor-pointer`}
+                    className={`w-full py-2.5 rounded-xl ${theme.accentBg} disabled:opacity-40 disabled:cursor-not-allowed ${theme.accentFg} font-bold flex items-center justify-center gap-1.5 shadow cursor-pointer`}
                   >
                     <Download className="w-4 h-4" />
                     <span>下载端侧模型（约 462 MB）</span>
@@ -484,7 +486,7 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
                     onClick={() => setDeepseekModel('deepseek-flash')}
                     className={`py-1.5 px-2 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
                       deepseekModel === 'deepseek-flash'
-                        ? `${theme.accentBg.split(' ')[0]} border-white text-white`
+                        ? `${theme.accentBg.split(' ')[0]} border-white ${theme.accentFg}`
                         : 'bg-[#0a0f1d] border-slate-700 text-slate-300'
                     }`}
                   >
@@ -496,7 +498,7 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
                     onClick={() => setDeepseekModel('deepseek-pro')}
                     className={`py-1.5 px-2 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
                       deepseekModel === 'deepseek-pro'
-                        ? `${theme.accentBg.split(' ')[0]} border-white text-white`
+                        ? `${theme.accentBg.split(' ')[0]} border-white ${theme.accentFg}`
                         : 'bg-[#0a0f1d] border-slate-700 text-slate-300'
                     }`}
                   >
@@ -630,7 +632,7 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
             <button
               type="button"
               onClick={handleSave}
-              className={`px-4 py-1.5 rounded-xl ${theme.accentBg} text-white text-xs font-bold cursor-pointer shadow`}
+              className={`px-4 py-1.5 rounded-xl ${theme.accentBg} ${theme.accentFg} text-xs font-bold cursor-pointer shadow`}
             >
               保存
             </button>

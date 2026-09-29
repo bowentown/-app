@@ -1,0 +1,78 @@
+/**
+ * 护栏：主题对比度（WCAG AA ≥ 4.5:1）。
+ * 覆盖两类已知缺陷：accentBg + 硬编码白字（warm_amber/serene_blue 曾 3.2/3.6:1）、
+ * 选中 chip 的 accentText 叠在 accentHex 半透明底上（midnight 曾 4.44:1）。
+ *
+ * 颜色来源：Tailwind 官方 hex 回退表。注意 oklch 主题色与 hex 有 ≤0.2 的
+ * 实测偏差（第三轮报告），因此 chip 断言的阈值留了余量。
+ * 方法论约束：颜色映射缺失必须报错，禁止 if(!x) return 静默跳过。
+ */
+import { APP_THEMES } from '../src/utils/themeStyles.ts';
+
+const TAILWIND: Record<string, string> = {
+  'indigo-600': '#4f46e5', 'indigo-500': '#6366f1', 'indigo-400': '#818cf8',
+  'zinc-800': '#27272a', 'zinc-700': '#3f3f46', 'zinc-200': '#e4e4e7',
+  'amber-600': '#d97706', 'amber-500': '#f59e0b',
+  'cyan-600': '#0891b2', 'cyan-500': '#06b6d4', 'cyan-300': '#67e8f9',
+  'indigo-700': '#4338ca', 'amber-300': '#fcd34d',
+  'white': '#ffffff', 'slate-950': '#020617',
+};
+
+const hex = (cls: string): string => {
+  // bg-[#xxx] 形式直接取；text-/bg- 前缀类查表
+  const custom = cls.match(/\[#([0-9a-fA-F]{6})\]/);
+  if (custom) return '#' + custom[1];
+  const name = cls.replace(/^(hover:|active:|focus:)+/, '').replace(/^(bg|text|border)-/, '').split(' ')[0].split('/')[0];
+  const hit = TAILWIND[name];
+  if (!hit) throw new Error(`对比度护栏缺少 Tailwind 颜色映射: ${cls}（补表，不要跳过）`);
+  return hit;
+};
+
+const lum = (hexStr: string): number => {
+  const n = hexStr.replace('#', '');
+  const [r, g, b] = [0, 2, 4].map((i) => {
+    const c = parseInt(n.slice(i, i + 2), 16) / 255;
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+
+const contrast = (fgHex: string, bgHex: string): number => {
+  const [l1, l2] = [lum(fgHex), lum(bgHex)].sort((a, b) => b - a);
+  return (l1 + 0.05) / (l2 + 0.05);
+};
+
+/** 前景 hex 以 alpha 叠在底色上后的有效色 */
+const over = (fgHex: string, alpha: number, bgHex: string): string => {
+  const p = (h: string) => [0, 2, 4].map((i) => parseInt(h.replace('#', '').slice(i, i + 2), 16));
+  const [f, b] = [p(fgHex), p(bgHex)];
+  const mix = f.map((c, i) => Math.round(c * alpha + b[i] * (1 - alpha)));
+  return '#' + mix.map((c) => c.toString(16).padStart(2, '0')).join('');
+};
+
+const problems: string[] = [];
+for (const [name, theme] of Object.entries(APP_THEMES)) {
+  const bg = hex(theme.accentBg.split(' ')[0]);
+  const hover = hex(theme.accentBg.split(' ')[1] ?? theme.accentBg.split(' ')[0]);
+  const fg = hex(theme.accentFg);
+  const c1 = contrast(fg, bg);
+  const c2 = contrast(fg, hover);
+  console.log(`  ${name}: accentFg/accentBg=${c1.toFixed(2)}:1  /hover=${c2.toFixed(2)}:1`);
+  if (c1 < 4.5) problems.push(`${name}: accentFg 在 accentBg 上 ${c1.toFixed(2)}:1 < 4.5`);
+  if (c2 < 4.5) problems.push(`${name}: accentFg 在 hover 底上 ${c2.toFixed(2)}:1 < 4.5`);
+
+  // 选中 chip 模式：accentText 叠在 accentHex@15% over pageBg
+  const pageBg = hex(theme.pageBg);
+  const chipBg = over(theme.accentHex, 0.15, pageBg);
+  const chipFg = hex(theme.accentText);
+  const c3 = contrast(chipFg, chipBg);
+  console.log(`  ${name}: chip(accentText/accentHex@15%)=${c3.toFixed(2)}:1`);
+  // oklch 实测偏差余量（第三轮报告：静态 vs 浏览器差 ~0.2）
+  if (c3 < 4.5) problems.push(`${name}: chip 文字 ${c3.toFixed(2)}:1 < 4.5`);
+}
+if (problems.length > 0) {
+  console.error('✗ 对比度护栏：');
+  for (const p of problems) console.error('  ' + p);
+  process.exit(1);
+}
+console.log('✓ verify-contrast：全部主题对比度达标（AA 4.5:1）');

@@ -443,7 +443,7 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
                 type="button"
                 onClick={fetchAIAnalysis}
                 disabled={isLoadingAnalysis}
-                className={`px-3 py-1.5 rounded-xl ${theme.accentBg} text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow active:scale-95`}
+                className={`px-3 py-1.5 rounded-xl ${theme.accentBg} ${theme.accentFg} text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow active:scale-95`}
               >
                 {isLoadingAnalysis ? (
                   <>
@@ -511,7 +511,7 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
               <div
                 className={`max-w-[88%] rounded-2xl px-3.5 py-2.5 leading-relaxed text-xs ${
                   msg.role === 'user'
-                    ? `${theme.accentBg.split(' ')[0]} text-white font-medium rounded-br-none`
+                    ? `${theme.accentBg.split(' ')[0]} ${theme.accentFg} font-medium rounded-br-none`
                     : `${theme.cardInnerBg} text-white border ${theme.cardInnerBorder} rounded-bl-none`
                 }`}
               >
@@ -581,7 +581,7 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
             type="button"
             onClick={() => handleSendMessage()}
             disabled={!inputText.trim() || isSendingChat}
-            className={`p-2.5 rounded-xl ${theme.accentBg} disabled:opacity-40 text-white transition-all cursor-pointer`}
+            className={`p-2.5 rounded-xl ${theme.accentBg} disabled:opacity-40 ${theme.accentFg} transition-all cursor-pointer`}
           >
             <Send className="w-4 h-4" />
           </button>

@@ -36,6 +36,7 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
   const textMuted = theme?.textMuted || 'text-slate-400';
   const textSecondary = theme?.textSecondary || 'text-slate-300';
   const accentBg = theme.accentBg;
+  const accentFg = theme?.accentFg || 'text-white';
   const [viewMode, setViewMode] = useState<MetricViewMode>('quality');
   const [hoveredRecord, setHoveredRecord] = useState<SleepRecord | null>(null);
   const [isHistoryExpanded, setIsHistoryExpanded] = useState(false);
@@ -74,7 +75,7 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
               onClick={() => setViewMode('quality')}
               className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer ${
                 viewMode === 'quality'
-                  ? accentBg + ' text-white shadow'
+                  ? accentBg + ' ' + accentFg + ' shadow'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
@@ -85,7 +86,7 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
               onClick={() => setViewMode('stages')}
               className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer ${
                 viewMode === 'stages'
-                  ? accentBg + ' text-white shadow'
+                  ? accentBg + ' ' + accentFg + ' shadow'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
@@ -96,7 +97,7 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
               onClick={() => setViewMode('circadian')}
               className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer ${
                 viewMode === 'circadian'
-                  ? accentBg + ' text-white shadow'
+                  ? accentBg + ' ' + accentFg + ' shadow'
                   : 'text-slate-400 hover:text-white'
               }`}
             >

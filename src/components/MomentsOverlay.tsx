@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { X, Heart, MessageCircle, Loader2, RefreshCw } from 'lucide-react';
 import type { SleepRecord, UserProfile } from '../types/sleep';
+import { useModalA11y } from '../utils/modalA11y';
 import {
   ensureTodayMoment,
   likeMoment,
@@ -91,6 +92,7 @@ const CardView: React.FC<{ type: MomentCard; moment: Moment }> = ({ type, moment
  * 每张卡片底部都展示生成时的事实清单——"每句话都有出处"。
  */
 export const MomentsOverlay: React.FC<Props> = ({ records, userProfile, onClose }) => {
+  const momentsA11y = useModalA11y(true, onClose, '大肥鱼的朋友圈');
   const [moments, setMoments] = useState<Moment[]>(() => loadMoments());
   const [busy, setBusy] = useState(false);
   const [commenting, setCommenting] = useState<string | null>(null);
@@ -147,6 +149,8 @@ export const MomentsOverlay: React.FC<Props> = ({ records, userProfile, onClose 
 
   return (
     <div
+      ref={momentsA11y.ref}
+      {...momentsA11y.dialogProps}
       className="fixed inset-0 z-[90] flex flex-col bg-slate-950"
       style={{ backgroundColor: '#020617' }}
     >

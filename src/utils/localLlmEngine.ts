@@ -1,5 +1,16 @@
-import { Wllama, CacheManager } from '@wllama/wllama';
-import wasmUrl from '@wllama/wllama/esm/wasm/wllama.wasm?url';
+import type { Wllama, CacheManager } from '@wllama/wllama';
+
+// wllama 只在 Web/PWA 路径真正生成时才加载（动态 import）：
+// 静态 import 会把整个 WASM 运行时拖进首屏包（实测 306KB，占首屏 JS 40.3%），
+// 而 Android 上这段代码永远不会执行。类型引用用 import type，编译期擦除。
+
+let wasmUrlCache: string | null = null;
+async function loadWasmUrl(): Promise<string> {
+  if (wasmUrlCache == null) {
+    wasmUrlCache = (await import('@wllama/wllama/esm/wasm/wllama.wasm?url')).default;
+  }
+  return wasmUrlCache;
+}
 
 /**
  * 端侧小模型引擎（双运行时自动路由）：
@@ -96,15 +107,20 @@ export function setHfToken(token: string): void {
 
 // ==== 直通缓存后端（绕过 wllama 对 OPFS 的硬依赖，仅 Web 路径使用） ====
 
-function createBypassCacheManager(): CacheManager {
+async function createBypassCacheManager(): Promise<CacheManager> {
   const bypassBackend = { isSupported: () => true } as any;
+  const { CacheManager } = await import('@wllama/wllama');
   return new CacheManager([bypassBackend]);
 }
 
-function createWllama(): Wllama {
+async function createWllama(): Promise<Wllama> {
+  const [{ Wllama }, wasmUrl] = await Promise.all([
+    import('@wllama/wllama'),
+    loadWasmUrl(),
+  ]);
   return new Wllama(
     { default: wasmUrl },
-    { allowOffline: true, cacheManager: createBypassCacheManager() }
+    { allowOffline: true, cacheManager: await createBypassCacheManager() }
   );
 }
 
@@ -406,7 +422,7 @@ async function generateViaWasm(
   busy = true;
   try {
     if (!instance) {
-      instance = createWllama();
+      instance = await createWllama();
     }
     if (!loadedUrl) {
       handlers.onStage?.('loading');

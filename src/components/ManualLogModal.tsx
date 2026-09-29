@@ -6,6 +6,7 @@ const habitCatalogById: Record<string, { id: string; label: string }> = Object.f
 import { SleepRecord, WakingMood } from '../types/sleep';
 import { calculateSleepScore, generateSleepStages } from '../utils/sleepScore';
 import { ThemeConfig } from '../utils/themeStyles';
+import { useModalA11y } from '../utils/modalA11y';
 
 interface ManualLogModalProps {
   isOpen: boolean;
@@ -56,7 +57,9 @@ export const ManualLogModal: React.FC<ManualLogModalProps> = ({
   const innerBg = theme?.cardInnerBg || 'bg-[#0f172a]';
   const innerBorder = theme?.cardInnerBorder || 'border-slate-700';
   const accentBg = theme?.accentBg || 'bg-indigo-600 hover:bg-indigo-500';
+  const accentFg = theme?.accentFg || 'text-white';
 
+  const { ref: a11yRef, dialogProps } = useModalA11y(isOpen, onClose, '手动补录睡眠记录');
   if (!isOpen) return null;
 
   const toggleHabit = (id: string) => {
@@ -113,8 +116,8 @@ export const ManualLogModal: React.FC<ManualLogModalProps> = ({
 
   return (
     <div
-      role="dialog"
-      aria-modal="true"
+      ref={a11yRef}
+      {...dialogProps}
       className="fixed inset-0 z-[100] bg-black/95 flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto"
     >
       <div className={`w-full max-w-md ${modalBg} border-2 ${theme?.accentBorder} rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl max-h-[90vh] overflow-y-auto no-scrollbar my-auto`}>
@@ -236,7 +239,7 @@ export const ManualLogModal: React.FC<ManualLogModalProps> = ({
                   onClick={() => setSelectedMood(m.key)}
                   className={`p-3 rounded-2xl border flex flex-col items-center gap-1.5 text-xs transition-all cursor-pointer ${
                     selectedMood === m.key
-                      ? `${accentBg} border-white text-white font-black shadow-lg scale-[1.02]`
+                      ? `${accentBg} border-white ${theme?.accentFg ?? "text-white"} font-black shadow-lg scale-[1.02]`
                       : `${innerBg} ${innerBorder} text-slate-200 hover:border-slate-400`
                   }`}
                 >
@@ -260,7 +263,7 @@ export const ManualLogModal: React.FC<ManualLogModalProps> = ({
                     onClick={() => toggleHabit(h.id)}
                     className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
                       active
-                        ? `${accentBg} text-white border border-white shadow-md`
+                        ? `${accentBg} ${accentFg} border border-white shadow-md`
                         : `${innerBg} text-slate-200 border ${innerBorder} hover:border-slate-400`
                     }`}
                   >
@@ -289,7 +292,7 @@ export const ManualLogModal: React.FC<ManualLogModalProps> = ({
         <button
           type="button"
           onClick={handleSave}
-          className={`w-full py-4 rounded-2xl ${accentBg} text-white font-black text-sm flex items-center justify-center gap-2 shadow-xl active:scale-[0.98] transition-all cursor-pointer`}
+          className={`w-full py-4 rounded-2xl ${accentBg} ${accentFg} font-black text-sm flex items-center justify-center gap-2 shadow-xl active:scale-[0.98] transition-all cursor-pointer`}
         >
           <Check className="w-5 h-5 stroke-[3]" />
           <span>保存记录并更新睡眠趋势</span>

@@ -7,6 +7,7 @@ import { calculateSleepScore, generateSleepStages } from '../utils/sleepScore';
 import { SleepRecord, WakingMood } from '../types/sleep';
 import { HABIT_OPTIONS } from '../utils/habitCatalog';
 import { ThemeConfig } from '../utils/themeStyles';
+import { useModalA11y } from '../utils/modalA11y';
 
 interface ActiveSleepModalProps {
   isOpen: boolean;
@@ -313,6 +314,7 @@ export const ActiveSleepModal: React.FC<ActiveSleepModalProps> = ({
     onClose();
   };
 
+  const { ref: a11yRef, dialogProps } = useModalA11y(isOpen, onClose, '整夜睡眠记录');
   if (!isOpen) return null;
 
   const elapsedHours = Math.floor(elapsedSeconds / 3600);
@@ -320,7 +322,7 @@ export const ActiveSleepModal: React.FC<ActiveSleepModalProps> = ({
   const elapsedSecs = elapsedSeconds % 60;
 
   return (
-    <div className={`fixed inset-0 z-50 ${theme.pageBg} ${theme.textPrimary} flex flex-col justify-between p-6 select-none overflow-y-auto`}>
+    <div ref={a11yRef} {...dialogProps} className={`fixed inset-0 z-50 ${theme.pageBg} ${theme.textPrimary} flex flex-col justify-between p-6 select-none overflow-y-auto`}>
       {/* 氛围背景：星点闪烁 + 顶部主题色极光辉光 */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
         {stars.map((s, i) => (
@@ -609,7 +611,7 @@ export const ActiveSleepModal: React.FC<ActiveSleepModalProps> = ({
           {/* Confirm & Save Button */}
           <button
             onClick={handleFinishSleep}
-            className={`w-full py-3.5 px-4 rounded-xl ${theme.accentBg} text-white font-medium text-sm shadow-lg flex items-center justify-center gap-2 active:scale-[0.98] transition-all`}
+            className={`w-full py-3.5 px-4 rounded-xl ${theme.accentBg} ${theme.accentFg} font-medium text-sm shadow-lg flex items-center justify-center gap-2 active:scale-[0.98] transition-all`}
           >
             <Check className="w-4 h-4" />
             <span>生成睡眠质量分析报告</span>
@@ -622,7 +624,7 @@ export const ActiveSleepModal: React.FC<ActiveSleepModalProps> = ({
         <div className="relative z-10 pt-4 flex flex-col gap-2.5 max-w-xs mx-auto w-full">
           <button
             onClick={() => setIsWakingUp(true)}
-            className={`w-full py-3.5 px-4 rounded-2xl ${theme.accentBg} text-white font-semibold text-sm shadow-xl flex items-center justify-center gap-2 active:scale-[0.98] transition-all`}
+            className={`w-full py-3.5 px-4 rounded-2xl ${theme.accentBg} ${theme.accentFg} font-semibold text-sm shadow-xl flex items-center justify-center gap-2 active:scale-[0.98] transition-all`}
           >
             <Sparkles className="w-4 h-4 text-white/80" />
             <span>我醒了 · 结束睡眠</span>

@@ -5,6 +5,7 @@ import { sleepAudio } from '../utils/audioSynth';
 import { SoundscapeTrack } from '../types/sleep';
 import { ThemeConfig } from '../utils/themeStyles';
 import { BreathingExercise } from './BreathingExercise';
+import { useModalA11y } from '../utils/modalA11y';
 
 const TRACKS: SoundscapeTrack[] = [
   {
@@ -92,6 +93,8 @@ const PRESET_MIXES: { name: string; desc: string; layers: Array<[SoundscapeTrack
 const SoundscapePlayerInner: React.FC<{ theme: ThemeConfig; onClose: () => void }> = ({ theme, onClose }) => {
   const [active, setActive] = useState<Record<string, number>>({});
   const [showBreath, setShowBreath] = useState(false);
+  const playerA11y = useModalA11y(true, onClose, '白噪音伴眠');
+  const breathA11y = useModalA11y(showBreath, () => setShowBreath(false), '呼吸练习');
   const [timerMinutes, setTimerMinutes] = useState<number | null>(30);
   const [timerRemainingSeconds, setTimerRemainingSeconds] = useState<number | null>(null);
   const isPlaying = Object.keys(active).length > 0;
@@ -158,7 +161,7 @@ const SoundscapePlayerInner: React.FC<{ theme: ThemeConfig; onClose: () => void 
 
   return createPortal(
     <>
-    <div className="fixed inset-0 z-[150] bg-black/60" onClick={onClose}>
+    <div ref={playerA11y.ref} {...playerA11y.dialogProps} className="fixed inset-0 z-[150] bg-black/60" onClick={onClose}>
     <div
       data-no-swipe
       className="absolute bottom-0 left-0 right-0 max-w-lg mx-auto rounded-t-3xl p-5 pb-9 max-h-[88vh] overflow-y-auto no-scrollbar space-y-4"
@@ -233,7 +236,7 @@ const SoundscapePlayerInner: React.FC<{ theme: ThemeConfig; onClose: () => void 
                 >
                   <div
                     className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-transform ${
-                      isOn ? theme.accentBg.split(' ')[0] + ' text-white' : 'bg-white/5 text-slate-300'
+                      isOn ? theme.accentBg.split(' ')[0] + ' ' + theme.accentFg : 'bg-white/5 text-slate-300'
                     }`}
                   >
                     {isOn ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 fill-current ml-0.5" />}
@@ -291,7 +294,7 @@ const SoundscapePlayerInner: React.FC<{ theme: ThemeConfig; onClose: () => void 
               onClick={() => handleSetTimer(timerMinutes === mins ? null : mins)}
               className={`px-2 py-1 rounded-lg text-[11px] font-bold transition-colors cursor-pointer ${
                 timerMinutes === mins
-                  ? theme.accentBg.split(' ')[0] + ' text-white'
+                  ? theme.accentBg.split(' ')[0] + ' ' + theme.accentFg
                   : 'bg-white/5 text-slate-400'
               }`}
             >
@@ -308,7 +311,7 @@ const SoundscapePlayerInner: React.FC<{ theme: ThemeConfig; onClose: () => void 
             sleepAudio.stopAllLayers(true);
             setActive({});
           }}
-          className={`w-full py-2.5 rounded-2xl ${theme.accentBg} text-white text-xs font-black cursor-pointer active:scale-[0.98] transition-transform`}
+          className={`w-full py-2.5 rounded-2xl ${theme.accentBg} ${theme.accentFg} text-xs font-black cursor-pointer active:scale-[0.98] transition-transform`}
         >
           全部停止
         </button>
@@ -316,7 +319,7 @@ const SoundscapePlayerInner: React.FC<{ theme: ThemeConfig; onClose: () => void 
     </div>
     </div>,
     {showBreath ? (
-      <div key="breath" className="fixed inset-0 z-[160] bg-black/70 flex items-center justify-center p-5" onClick={() => setShowBreath(false)}>
+      <div key="breath" ref={breathA11y.ref} {...breathA11y.dialogProps} className="fixed inset-0 z-[160] bg-black/70 flex items-center justify-center p-5" onClick={() => setShowBreath(false)}>
         <div
           data-no-swipe
           className="w-full max-w-sm rounded-3xl p-5"

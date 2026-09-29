@@ -30,6 +30,7 @@ function switchLauncherIcon(themeId: string) {
   }
 }
 import { getActiveModelLabel } from '../utils/localLlmEngine';
+import { toLocalDateString } from '../utils/dateUtils';
 import {
   buildPetSayLines,
   getBubbleEvery,
@@ -173,7 +174,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(records, null, 2));
     const downloadAnchor = document.createElement('a');
     downloadAnchor.setAttribute('href', dataStr);
-    downloadAnchor.setAttribute('download', `somnacare-sleep-backup-${new Date().toISOString().slice(0, 10)}.json`);
+    downloadAnchor.setAttribute('download', `somnacare-sleep-backup-${toLocalDateString()}.json`);
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
@@ -392,7 +393,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           <button
             type="button"
             onClick={() => setIsAIConfigOpen(true)}
-            className={`px-4 py-2 rounded-xl ${theme.accentBg} text-white font-black text-xs shadow-md active:scale-95 transition-all cursor-pointer whitespace-nowrap`}
+            className={`px-4 py-2 rounded-xl ${theme.accentBg} ${theme.accentFg} font-black text-xs shadow-md active:scale-95 transition-all cursor-pointer whitespace-nowrap`}
           >
             配置与探查
           </button>

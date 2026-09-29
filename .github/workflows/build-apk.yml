@@ -57,6 +57,8 @@ jobs:
           # 使用 --legacy-peer-deps 确保无论任何 npm 版本都能 100% 成功安装
           npm install --legacy-peer-deps
 
+      - name: Run Guardrails (wiring / theme / contrast)
+        run: npm run verify
       - name: Build Local Offline Dist
         run: |
           npm run build

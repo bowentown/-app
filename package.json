@@ -9,7 +9,8 @@
     "start": "NODE_ENV=production tsx server.ts",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "verify": "tsx tools/verify-wiring.mts && tsx tools/verify-theme-classes.mts && tsx tools/verify-contrast.mts"
   },
   "dependencies": {
     "@capacitor/local-notifications": "^8.3.1",
