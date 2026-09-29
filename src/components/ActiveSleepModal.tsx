@@ -269,8 +269,10 @@ export const ActiveSleepModal: React.FC<ActiveSleepModalProps> = ({
     const wakeTimeStr = `${wHour}:${wMin}`;
 
     const stagesData = generateSleepStages(bedtimeStr, wakeTimeStr);
+    // 统一语义：durationMinutes = 纯睡眠（卧床窗 − 觉醒段），与其他记录入口一致
+    const sleepMinutes = Math.max(1, effectiveMinutes - stagesData.awakeMinutes);
     const { score, efficiency } = calculateSleepScore(
-      effectiveMinutes,
+      sleepMinutes,
       stagesData.deepMinutes,
       stagesData.remMinutes,
       stagesData.awakeMinutes,
@@ -287,7 +289,7 @@ export const ActiveSleepModal: React.FC<ActiveSleepModalProps> = ({
       date: dateStr,
       bedtime: bedtimeStr,
       wakeTime: wakeTimeStr,
-      durationMinutes: effectiveMinutes,
+      durationMinutes: sleepMinutes,
       deepSleepMinutes: stagesData.deepMinutes,
       lightSleepMinutes: stagesData.lightMinutes,
       remSleepMinutes: stagesData.remMinutes,

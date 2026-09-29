@@ -88,8 +88,10 @@ export const OneTapSleepTracker: React.FC<OneTapSleepTrackerProps> = ({ onSaveRe
       lightMin = Math.max(1, exactDurationMinutes - deepMin - awakeMin);
     }
 
+    // 统一语义：durationMinutes = 纯睡眠（卧床窗 − 觉醒段），与手动补录/演示数据一致
+    const sleepMinutes = Math.max(1, exactDurationMinutes - awakeMin);
     const { score, efficiency } = calculateSleepScore(
-      exactDurationMinutes,
+      sleepMinutes,
       deepMin,
       remMin,
       awakeMin,
@@ -97,6 +99,21 @@ export const OneTapSleepTracker: React.FC<OneTapSleepTrackerProps> = ({ onSaveRe
       exactDurationMinutes < 15 ? 2 : 12,
       Math.round((targetDurationHours || 8) * 60)
     );
+
+    // 短会话（<90 分钟）构建与字段一致的简单分段（长会话沿用节律推演分段，
+    // 各分段总和 = durationMinutes + awakeMinutes）
+    const fmtClock = (base: Date, min: number) => {
+      const d = new Date(base.getTime() + min * 60000);
+      return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    };
+    const stagesForRecord =
+      exactDurationMinutes < 90
+        ? [
+            { stage: 'awake' as const, startTime: fmtClock(effectiveStart, 0), endTime: fmtClock(effectiveStart, awakeMin), durationMinutes: awakeMin },
+            { stage: 'deep' as const, startTime: fmtClock(effectiveStart, awakeMin), endTime: fmtClock(effectiveStart, awakeMin + deepMin), durationMinutes: deepMin },
+            { stage: 'light' as const, startTime: fmtClock(effectiveStart, awakeMin + deepMin), endTime: fmtClock(effectiveStart, exactDurationMinutes), durationMinutes: lightMin },
+          ]
+        : generated.stages;
 
     // 本地日期（此前 toISOString 是 UTC：早 6-9 点醒来会落到 UTC 前一天，跨夜记录互相覆盖）
     const nowLocal = new Date();
@@ -107,7 +124,7 @@ export const OneTapSleepTracker: React.FC<OneTapSleepTrackerProps> = ({ onSaveRe
       date: recordDate,
       bedtime: bedtimeStr,
       wakeTime: wakeTimeStr,
-      durationMinutes: exactDurationMinutes,
+      durationMinutes: sleepMinutes,
       deepSleepMinutes: deepMin,
       lightSleepMinutes: lightMin,
       remSleepMinutes: remMin,
@@ -118,7 +135,7 @@ export const OneTapSleepTracker: React.FC<OneTapSleepTrackerProps> = ({ onSaveRe
       wakeCount: exactDurationMinutes < 15 ? 0 : 1,
       wakingMood: exactDurationMinutes < 30 ? 'tired' : 'refreshed',
       preSleepHabits: [],
-      stages: generated.stages,
+      stages: stagesForRecord,
     };
 
     localStorage.removeItem('somnacare_bedtime_start');
