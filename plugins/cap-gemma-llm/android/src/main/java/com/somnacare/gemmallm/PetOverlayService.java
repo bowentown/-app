@@ -60,7 +60,7 @@ public class PetOverlayService extends Service {
     private static final int COLLAPSED_W_DP = 104;
     private static final int COLLAPSED_H_DP = 122;
     private static final int PANEL_W_DP = 264;
-    private static final int PANEL_MAX_H_DP = 340;
+    private static final int PANEL_MAX_H_DP = 380;
     private static final int SNAP_MS = 200;
 
     private WindowManager wm;
@@ -285,12 +285,15 @@ public class PetOverlayService extends Service {
         android.content.SharedPreferences sp = getSharedPreferences(PREFS, Context.MODE_PRIVATE);
 
         FrameLayout root = new FrameLayout(this);
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(0xF20B1220);
-        bg.setCornerRadius(dp(22));
-        bg.setStroke(dp(1), 0x2AFFFFFF);
+        // 纯色近黑在壁纸上像一块补丁；改成上浅下深的靛蓝渐变，卡片才有"浮起"的体积感
+        GradientDrawable bg = new GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{0xFF1A2542, 0xFF0A0F1E});
+        bg.setCornerRadius(dp(26));
+        bg.setStroke(dp(1), 0x2EFFFFFF);
         root.setBackground(bg);
-        root.setPadding(dp(16), dp(14), dp(16), dp(12));
+        root.setPadding(dp(15), dp(14), dp(15), dp(14));
+        root.setElevation(dp(12));
         // 点到卡外 → 收起
         root.setOnTouchListener(new View.OnTouchListener() {
             @Override public boolean onTouch(View v, MotionEvent e) {
@@ -304,32 +307,70 @@ public class PetOverlayService extends Service {
         root.addView(col, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT));
 
-        // 标题 + 状态
-        TextView title = text("鲸鱼娘", 14, 0xFFFFFFFF, true);
-        col.addView(title, lpv(0, 4));
-        TextView status = text(sp.getString(K_STATUS, "陪你到入睡"),
-                11.5f, 0xFFA8E6FF, false);
-        status.setTag(K_STATUS);
-        col.addView(status, lpv(0, 0));
+        col.addView(header(sp), lpv(0, 13));
 
-        col.addView(divider());
+        // 三个数据行收进同一张内卡，视觉上与下面的操作区分开
+        LinearLayout card = card();
+        card.addView(row("\u25F4", 0xFF7FD8FF, "今晚", "today",
+                sp.getString(K_ROW_TODAY, "记录与就寝目标")), lpv(0, 0));
+        card.addView(row("\u25F1", 0xFF9BE7C4, "趋势", "trends",
+                sp.getString(K_ROW_TRENDS, "近 7 日概况")), lpv(0, 0));
+        card.addView(row("\u2601", 0xFFFFC978, "顾问", "coach",
+                sp.getString(K_ROW_COACH, "问问 AI 顾问")), lpv(0, 0));
+        col.addView(card, lpv(0, 9));
 
-        // 五个分区速览行
-        col.addView(row("今晚", "today", sp.getString(K_ROW_TODAY, "记录与就寝目标")), lpv(0, 2));
-        col.addView(row("趋势", "trends", sp.getString(K_ROW_TRENDS, "近 7 日概况")), lpv(0, 2));
-        col.addView(row("顾问", "coach", sp.getString(K_ROW_COACH, "问问 AI 顾问")), lpv(0, 2));
-
-        View eyeRow = row("护眼", "eyecare",
-                EyeCareService.isActive() ? "已开启 · 点击关闭" : "已关闭 · 点击开启");
+        // 护眼是就地开关，单独成卡，避免和"跳分区"的三行混为一谈
+        LinearLayout actionCard = card();
+        View eyeRow = row("\u25D1", 0xFFB9A6FF, "护眼滤镜", "eyecare", eyeValue());
         eyeRow.setOnClickListener(v -> {
-            toggleEyeCare((TextView) ((LinearLayout) v).getChildAt(1));
+            toggleEyeCare((TextView) eyeRow.findViewWithTag("eyecare"));
             if (whale != null) whale.cheer();
         });
-        col.addView(eyeRow, lpv(0, 2));
+        actionCard.addView(eyeRow, lpv(0, 0));
+        col.addView(actionCard, lpv(0, 11));
 
-        col.addView(row("设置", "settings", "主题 · 闹钟 · 数据"), lpv(0, 0));
+        TextView open = text("打开极光睡眠  \u203A", 12.5f, 0xFF071426, true);
+        open.setGravity(Gravity.CENTER);
+        open.setBackground(ripple(dp(15), 0xFF7FD8FF));
+        open.setPadding(0, dp(12), 0, dp(12));
+        open.setOnClickListener(v -> openApp("today"));
+        col.addView(open, lpv(0, 0));
 
         return root;
+    }
+
+    /** 顶部：青色竖条 + 标题 + 右侧状态胶囊。 */
+    private View header(android.content.SharedPreferences sp) {
+        LinearLayout h = new LinearLayout(this);
+        h.setOrientation(LinearLayout.HORIZONTAL);
+        h.setGravity(Gravity.CENTER_VERTICAL);
+
+        View bar = new View(this);
+        bar.setBackground(pill(0xFF6FD8FF, dp(2)));
+        h.addView(bar, new LinearLayout.LayoutParams(dp(3), dp(20)));
+
+        TextView title = text("鲸鱼娘速览", 14.5f, 0xFFFFFFFF, true);
+        LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(0, -2, 1f);
+        tp.leftMargin = dp(9);
+        h.addView(title, tp);
+
+        TextView status = text(sp.getString(K_STATUS, "陪你到入睡"), 10.5f, 0xFF8FE3FF, true);
+        status.setTag(K_STATUS);
+        status.setBackground(pill(0x1F6FD8FF, dp(20)));
+        status.setPadding(dp(11), dp(4), dp(11), dp(4));
+        status.setMaxLines(1);
+        h.addView(status, new LinearLayout.LayoutParams(-2, -2));
+
+        return h;
+    }
+
+    /** 内层分组卡：比外卡略浅一点的半透明面，两层叠出层次。 */
+    private LinearLayout card() {
+        LinearLayout c = new LinearLayout(this);
+        c.setOrientation(LinearLayout.VERTICAL);
+        c.setBackground(pill(0x0FFFFFFF, dp(18)));
+        c.setPadding(dp(4), dp(5), dp(4), dp(5));
+        return c;
     }
 
     /** 刷新面板文案（Web 侧推快照后由 ACTION_START 再次进入时调用）。 */
@@ -340,35 +381,51 @@ public class PetOverlayService extends Service {
         setRowValue(panelRoot, "today", sp.getString(K_ROW_TODAY, "记录与就寝目标"));
         setRowValue(panelRoot, "trends", sp.getString(K_ROW_TRENDS, "近 7 日概况"));
         setRowValue(panelRoot, "coach", sp.getString(K_ROW_COACH, "问问 AI 顾问"));
-        setRowValue(panelRoot, "eyecare",
-                EyeCareService.isActive() ? "已开启 · 点击关闭" : "已关闭 · 点击开启");
+        setRowValue(panelRoot, "eyecare", eyeValue());
+    }
+
+    private String eyeValue() {
+        return EyeCareService.isActive() ? "已开启 · 点此关闭" : "已关闭 · 点此开启";
     }
 
     private void setRowValue(View root, String tag, String value) {
         View v = root.findViewWithTag(tag);
-        if (v instanceof TextView) ((TextView) v).setText(value);
+        if (!(v instanceof TextView)) return;
+        TextView tv = (TextView) v;
+        tv.setText(value);
+        if ("eyecare".equals(tag)) {
+            // 开关态用颜色区分，省掉一个真 Switch 的体积
+            boolean on = EyeCareService.isActive();
+            tv.setTextColor(on ? 0xFF9BE7C4 : 0xFF8593A8);
+        }
     }
 
     /**
-     * 一行速览：左标签 + 右值，整行可点。
+     * 一行速览：图标块 + 左标签 + 右值，整行可点。
      * 除护眼是就地开关外，其余四行都是"带着目标分区拉起 App"。
      */
-    private View row(String label, String tab, String value) {
+    private View row(String glyph, int chipColor, String label, String tab, String value) {
         LinearLayout line = new LinearLayout(this);
         line.setOrientation(LinearLayout.HORIZONTAL);
         line.setGravity(Gravity.CENTER_VERTICAL);
-        line.setPadding(0, dp(9), 0, dp(9));
-        line.setBackground(ripple(dp(12), 0x14FFFFFF));
+        line.setPadding(dp(8), dp(8), dp(10), dp(8));
+        line.setBackground(ripple(dp(14), 0x00000000));
 
-        TextView l = text(label, 12.5f, 0xFFCBD5E1, false);
-        l.setTag(label);
-        line.addView(l, new LinearLayout.LayoutParams(0, -2, 0.7f));
+        TextView ic = text(glyph, 11.5f, chipColor, true);
+        ic.setGravity(Gravity.CENTER);
+        ic.setBackground(pill(chipColor & 0x33FFFFFF, dp(8)));
+        line.addView(ic, new LinearLayout.LayoutParams(dp(26), dp(26)));
 
-        TextView v = text(value, 12, 0xFFA8E6FF, false);
+        TextView l = text(label, 12.5f, 0xFF93A2B8, false);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, -2, 0.9f);
+        lp.leftMargin = dp(10);
+        line.addView(l, lp);
+
+        TextView v = text(value, 12f, 0xFFE6F0FA, true);
         v.setTag(tab);
         v.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
         v.setMaxLines(2);
-        line.addView(v, new LinearLayout.LayoutParams(0, -2, 1.6f));
+        line.addView(v, new LinearLayout.LayoutParams(0, -2, 1.45f));
 
         if (!"eyecare".equals(tab)) {
             line.setOnClickListener(click -> openApp(tab));
@@ -481,16 +538,12 @@ public class PetOverlayService extends Service {
         return p;
     }
 
-    private View divider() {
-        View v = new View(this);
+    /** 纯色圆角块：卡片底、状态胶囊、图标块共用，避免每处各写一份 GradientDrawable。 */
+    private android.graphics.drawable.Drawable pill(int color, int radiusDp) {
         GradientDrawable g = new GradientDrawable();
-        g.setColor(0x1FFFFFFF);
-        v.setBackground(g);
-        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, dp(1));
-        p.topMargin = dp(10);
-        p.bottomMargin = dp(8);
-        v.setLayoutParams(p);
-        return v;
+        g.setColor(color);
+        g.setCornerRadius(dp(radiusDp));
+        return g;
     }
 
     /** 可点击行的水波纹背景（API 21+ 用 ripple 近似圆角高亮）。 */
