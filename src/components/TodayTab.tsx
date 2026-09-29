@@ -277,23 +277,29 @@ export const TodayTab: React.FC<TodayTabProps> = ({
             <span className="text-xs font-bold text-slate-200 block">到点提醒我</span>
             <span className="text-[10px] text-slate-500">到点弹出提醒动画，早点睡</span>
           </div>
-          <label
-            htmlFor="bedtime-reminder-toggle"
+          <button
+            type="button"
             data-no-swipe
+            onClick={(e) => {
+              e.stopPropagation();
+              onUpdateProfile({ bedtimeReminderEnabled: !userProfile.bedtimeReminderEnabled });
+            }}
+            aria-pressed={!!userProfile.bedtimeReminderEnabled}
+            aria-label="到点提醒我"
             className="relative inline-flex items-center cursor-pointer shrink-0"
           >
-            <input
-              id="bedtime-reminder-toggle"
-              type="checkbox"
-              checked={!!userProfile.bedtimeReminderEnabled}
-              onChange={(e) => {
-                e.stopPropagation();
-                onUpdateProfile({ bedtimeReminderEnabled: e.target.checked });
-              }}
-              className="sr-only peer"
-            />
-            <div className="w-10 h-5 bg-slate-600 peer-checked:bg-amber-500 rounded-full transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-4 after:h-4 after:bg-white after:rounded-full after:transition-transform peer-checked:after:translate-x-5" />
-          </label>
+            <span
+              className={`block w-10 h-5 rounded-full transition-colors relative ${
+                userProfile.bedtimeReminderEnabled ? 'bg-amber-500' : 'bg-slate-600'
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${
+                  userProfile.bedtimeReminderEnabled ? 'left-[22px]' : 'left-0.5'
+                }`}
+              />
+            </span>
+          </button>
         </div>
 
         {goalOpen && (

@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Eye, MoonStar, BookOpen, Gamepad2, BedDouble, Pipette, Clock, CheckCircle2 } from 'lucide-react';
 import { UserProfile, EyeCareConfig, DEFAULT_EYE_CARE } from '../types/sleep';
 import { ThemeConfig } from '../utils/themeStyles';
@@ -64,46 +65,6 @@ const hexToHue = (hex: string): number => {
   return ((h * 60) % 360 + 360) % 360;
 };
 
-/** 色相条：指针拖动取色（触屏友好） */
-const HueBar: React.FC<{ hue: number; onChange: (h: number) => void }> = ({ hue, onChange }) => {
-  const ref = useRef<HTMLDivElement>(null);
-  const dragging = useRef(false);
-  const pick = (clientX: number) => {
-    const el = ref.current;
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    const t = Math.min(1, Math.max(0, (clientX - r.left) / r.width));
-    onChange(Math.round(t * 359));
-  };
-  return (
-    <div
-      ref={ref}
-      role="slider"
-      aria-label="色相"
-      aria-valuenow={Math.round(hue)}
-      className="relative h-5 rounded-full cursor-pointer touch-none select-none"
-      style={{
-        background:
-          'linear-gradient(90deg,#ff8080,#ffc780,#f5ff80,#96ff80,#80ffe0,#80b3ff,#c280ff,#ff80d5,#ff8080)',
-      }}
-      onPointerDown={(e) => {
-        dragging.current = true;
-        (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
-        pick(e.clientX);
-      }}
-      onPointerMove={(e) => {
-        if (dragging.current) pick(e.clientX);
-      }}
-      onPointerUp={() => { dragging.current = false; }}
-      onPointerCancel={() => { dragging.current = false; }}
-    >
-      <div
-        className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-6 h-6 rounded-full border-2 border-white shadow-md pointer-events-none"
-        style={{ left: `${(Math.min(359, Math.max(0, hue)) / 359) * 100}%`, background: hslToHex(hue, 0.68, 0.6) }}
-      />
-    </div>
-  );
-};
 
 export const EyeCareTab: React.FC<EyeCareTabProps> = ({ userProfile, onUpdateProfile, onToast, theme }) => {
   const rawCfg = userProfile.eyeCare ?? DEFAULT_EYE_CARE;
@@ -114,6 +75,7 @@ export const EyeCareTab: React.FC<EyeCareTabProps> = ({ userProfile, onUpdatePro
   const [granted, setGranted] = useState<boolean>(true);
   const [now, setNow] = useState<Date>(new Date());
   const [hue, setHue] = useState<number>(() => hexToHue(cfg.warmColor));
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const patch = (p: Partial<EyeCareConfig>) => onUpdateProfile({ eyeCare: { ...cfg, ...p } });
 
@@ -286,15 +248,96 @@ export const EyeCareTab: React.FC<EyeCareTabProps> = ({ userProfile, onUpdatePro
           ))}
         </div>
 
-        {/* 色相条 */}
-        <HueBar
-          hue={hue}
-          onChange={(h) => {
-            setHue(h);
-            patch({ preset: 'custom', warmColor: hslToHex(h, 0.68, 0.6) });
-          }}
-        />
+        {/* 打开调色盘（底部弹层，原生滑杆保证可点可拖） */}
+        <button
+          type="button"
+          onClick={() => setPickerOpen(true)}
+          className="w-full py-3 rounded-2xl border border-white/15 text-slate-200 text-xs font-bold cursor-pointer active:scale-[0.98] transition-transform flex items-center justify-center gap-2"
+        >
+          <Pipette className="w-4 h-4" />
+          打开调色盘
+        </button>
       </div>
+
+      {/* 颜色盘弹层：portal 到 body（祖先链上有 transform，fixed 会失效） */}
+      {pickerOpen && createPortal(
+        <div className="fixed inset-0 z-[150] bg-black/60" onClick={() => setPickerOpen(false)}>
+          <div
+            data-no-swipe
+            className="absolute bottom-0 left-0 right-0 rounded-t-3xl p-6 pb-9 space-y-5"
+            style={{ background: '#101828' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-black text-white">调色盘</h3>
+              <button
+                type="button"
+                onClick={() => setPickerOpen(false)}
+                className="text-xs text-slate-400 font-bold cursor-pointer px-2 py-1"
+              >
+                完成
+              </button>
+            </div>
+
+            <div
+              className="w-full h-20 rounded-2xl border border-white/10"
+              style={{ background: `linear-gradient(135deg, ${cfg.warmColor}, ${cfg.warmColor}66)` }}
+            />
+
+            <div className="space-y-1.5">
+              <div className="flex justify-between text-xs font-bold">
+                <span className="text-slate-200">色相</span>
+                <span className="text-orange-400 font-mono">{Math.round(hue)}°</span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={359}
+                step={1}
+                value={Math.round(hue)}
+                onChange={(e) => {
+                  const h = Number(e.target.value);
+                  setHue(h);
+                  patch({ preset: 'custom', warmColor: hslToHex(h, 0.68, 0.6) });
+                }}
+                className="w-full accent-orange-500 cursor-pointer h-3 rounded-lg"
+                style={{
+                  background:
+                    'linear-gradient(90deg,#ff8080,#ffc780,#f5ff80,#96ff80,#80ffe0,#80b3ff,#c280ff,#ff80d5,#ff8080)',
+                }}
+                aria-label="色相"
+              />
+            </div>
+
+            <div className="grid grid-cols-8 gap-2">
+              {PALETTE_DOTS.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  aria-label={`选择颜色 ${c}`}
+                  onClick={() => {
+                    setHue(hexToHue(c));
+                    patch({ preset: 'custom', warmColor: c });
+                  }}
+                  className={`w-8 h-8 rounded-xl cursor-pointer transition-transform active:scale-90 border mx-auto ${
+                    cfg.warmColor.toUpperCase() === c ? 'border-white scale-105 shadow-md' : 'border-white/10'
+                  }`}
+                  style={{ background: c }}
+                />
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setPickerOpen(false)}
+              className={`w-full py-3 rounded-2xl ${theme.accentBg} text-white text-sm font-black cursor-pointer active:scale-[0.98] transition-transform`}
+            >
+              使用此颜色
+            </button>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* 4. 强度调节 */}
       <div className={`${theme.cardBg} rounded-3xl p-5 border ${theme.cardBorder} shadow-xl space-y-3.5`}>
