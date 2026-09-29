@@ -128,7 +128,7 @@ export const MomentsOverlay: React.FC<Props> = ({ records, userProfile, onClose 
     setBusy(true);
     setNote(null);
     try {
-      const res = await ensureTodayMoment(records, userProfile);
+      const res = await ensureTodayMoment(records, userProfile, new Date(), true);
       setMoments(res.moments);
       setNote(res.generated ? '大肥鱼发新动态了！' : '今天她已经发过了～');
     } finally {
@@ -136,7 +136,7 @@ export const MomentsOverlay: React.FC<Props> = ({ records, userProfile, onClose 
     }
   };
 
-  const toggleLike = (id: string) => setMoments(likeMoment(id, userProfile?.aiConfig));
+  const toggleLike = (id: string) => setMoments(likeMoment(id));
 
   const sendComment = async (id: string) => {
     const text = draft.trim();

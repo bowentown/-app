@@ -238,16 +238,19 @@ function upsert(list: Moment[], m: Moment): Moment[] {
 
 /**
  * 确保今天有动态：有就返回现有；没有就生成（LLM 优先，本地兜底，永不失败）。
+ * force=true 时丢弃现有重生成——"生成今日动态"按钮此前永远 no-op：
+ * 幂等返回让配了 API 的用户换不出新文案，按钮承诺与行为不符。
  */
 export async function ensureTodayMoment(
   records: SleepRecord[],
   profile: UserProfile,
   now: Date = new Date(),
+  force = false,
 ): Promise<{ moments: Moment[]; generated: boolean }> {
   const list = loadMoments();
   const date = todayStr(now);
   const existing = list.find((m) => m.date === date);
-  if (existing) return { moments: list, generated: false };
+  if (existing && !force) return { moments: list, generated: false };
 
   const facts = buildSleepFacts(records, profile, now);
   const cfg = profile?.aiConfig;
@@ -301,7 +304,7 @@ export async function ensureTodayMoment(
 }
 
 /** 用户点赞：大肥鱼会回一句（只回一次）。 */
-export function likeMoment(id: string, cfg?: any): Moment[] {
+export function likeMoment(id: string): Moment[] {
   const list = loadMoments();
   const m = list.find((x) => x.id === id);
   if (!m) return list;
