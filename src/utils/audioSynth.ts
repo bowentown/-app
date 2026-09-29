@@ -278,7 +278,9 @@ class SleepAudioSynthesizer {
       g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
       src.connect(lp2); lp2.connect(g); g.connect(dest);
       src.start(t);
-      collect(src, lp2, g);
+      // 一次性事件链：用 onended 自清，不进 layer.nodes——此前每个滚雷的
+      // 422-845KB AudioBuffer 被永久持有（约 107-215MB/小时）
+      src.onended = () => { try { src.disconnect(); lp2.disconnect(); g.disconnect(); } catch { /* ignore */ } };
     };
     const thunderTimer = window.setInterval(() => {
       if (Math.random() < 0.6) thunder();
@@ -327,7 +329,8 @@ class SleepAudioSynthesizer {
       g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
       src.connect(hp); hp.connect(g); g.connect(dest);
       src.start(t);
-      collect(src, hp, g);
+      // 同上：篝火噼啪每次约 8.6KB × 约 36000 次/小时 ≈ 311MB/小时
+      src.onended = () => { try { src.disconnect(); hp.disconnect(); g.disconnect(); } catch { /* ignore */ } };
     };
     const crackleTimer = window.setInterval(() => {
       if (Math.random() < 0.85) crackle();

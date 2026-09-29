@@ -69,6 +69,16 @@ export const ManualLogModal: React.FC<ManualLogModalProps> = ({
   };
 
   const handleSave = () => {
+    // 清空的 <input type="time"> 会让 setHours 产出 NaN（落库成 null、
+    // 首页渲染「NaN小时」）；清空的日期会被清洗丢弃——先挡住并提示
+    if (!bedtime || !wakeTime) {
+      alert('请填写就寝和起床时间');
+      return;
+    }
+    if (bedtime === wakeTime) {
+      alert('就寝与起床时间不能相同');
+      return;
+    }
     const stagesData = generateSleepStages(bedtime, wakeTime, latencyMinutes, wakeCount);
     const [bH, bM] = bedtime.split(':').map(Number);
     const [wH, wM] = wakeTime.split(':').map(Number);
@@ -154,7 +164,7 @@ export const ManualLogModal: React.FC<ManualLogModalProps> = ({
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className={`w-full ${innerBg} border ${innerBorder} rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:${theme?.accentBorder} font-mono shadow-inner cursor-pointer`}
+              className={`w-full ${innerBg} border ${innerBorder} rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none ${theme?.focusRing} font-mono shadow-inner cursor-pointer`}
             />
           </div>
 
@@ -201,7 +211,8 @@ export const ManualLogModal: React.FC<ManualLogModalProps> = ({
                 step={5}
                 value={latencyMinutes}
                 onChange={(e) => setLatencyMinutes(Number(e.target.value))}
-                className={`w-full ${theme?.accentBg.split(' ')[0].replace('bg-', 'accent-')} cursor-pointer h-2 bg-slate-700 rounded-lg`}
+                className="w-full cursor-pointer h-2 bg-slate-700 rounded-lg"
+                style={{ accentColor: theme?.accentHex }}
               />
             </div>
 
@@ -216,7 +227,8 @@ export const ManualLogModal: React.FC<ManualLogModalProps> = ({
                 max={6}
                 value={wakeCount}
                 onChange={(e) => setWakeCount(Number(e.target.value))}
-                className="w-full accent-amber-400 cursor-pointer h-2 bg-slate-700 rounded-lg"
+                className="w-full cursor-pointer h-2 bg-slate-700 rounded-lg"
+                style={{ accentColor: theme?.accentHex }}
               />
             </div>
           </div>
@@ -283,7 +295,7 @@ export const ManualLogModal: React.FC<ManualLogModalProps> = ({
               onChange={(e) => setDreamNotes(e.target.value)}
               placeholder="记录昨晚梦境场景、心情或特别的细节..."
               rows={2}
-              className={`w-full ${innerBg} border ${innerBorder} rounded-xl p-3 text-xs text-white placeholder-slate-400 focus:outline-none focus:${theme?.accentBorder} shadow-inner font-medium`}
+              className={`w-full ${innerBg} border ${innerBorder} rounded-xl p-3 text-xs text-white placeholder-slate-400 focus:outline-none ${theme?.focusRing} shadow-inner font-medium`}
             />
           </div>
         </div>

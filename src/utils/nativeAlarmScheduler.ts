@@ -184,7 +184,10 @@ export async function getExactAlarmStatus(): Promise<ExactAlarmStatus> {
     const plugin = cap.Plugins.LocalNotifications as CapacitorLocalNotificationsPlugin;
     if (typeof plugin.checkExactNotificationSetting !== 'function') return 'unknown';
     const res = await plugin.checkExactNotificationSetting();
-    return res?.exactAlarm === 'granted' ? 'granted' : res?.exactAlarm === 'denied' ? 'denied' : 'unknown';
+    // 原生插件返回的键是 snake_case（LocalNotificationsPlugin.kt: exact_alarm），
+    // 此前手写接口按 camelCase 读 → 恒为 unknown，徽章与"去授权"入口从未生效
+    const v = (res as any)?.exact_alarm ?? (res as any)?.exactAlarm;
+    return v === 'granted' ? 'granted' : v === 'denied' ? 'denied' : 'unknown';
   } catch {
     return 'unknown';
   }

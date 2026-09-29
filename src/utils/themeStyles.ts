@@ -28,6 +28,8 @@ export interface ThemeConfig {
   accentRing: string;
   /** 原始十六进制强调色：供 SVG 描边、图表与氛围光等内联样式使用 */
   accentHex: string;
+  /** 键盘焦点样式（完整字面量）：拼接的 focus:${accentBorder} 不会被 Tailwind 生成 */
+  focusRing: string;
   // Nav bar
   navBg: string;
   navBorder: string;
@@ -51,13 +53,14 @@ export const APP_THEMES: Record<ThemeMode, ThemeConfig> = {
     cardBg: 'bg-gradient-to-b from-[#1a2338] to-[#121a2c]',
     cardBorder: 'border-slate-700/80',
     cardInnerBg: 'bg-[#0c1222]',
-    cardInnerBorder: 'border-slate-850',
+    cardInnerBorder: 'border-slate-800',
     accentColor: 'indigo-500',
     accentBg: 'bg-indigo-600 hover:bg-indigo-700',
     accentFg: 'text-white',
     accentText: 'text-indigo-400',
     accentRing: 'ring-indigo-400',
     accentHex: '#818cf8',
+    focusRing: 'focus-visible:ring-2 focus-visible:ring-indigo-400',
     selectionBg: 'selection:bg-indigo-500/30',
     accentBorder: 'border-indigo-400',
     navBg: 'bg-[#0f172a]',
@@ -79,13 +82,14 @@ export const APP_THEMES: Record<ThemeMode, ThemeConfig> = {
     cardBg: 'bg-gradient-to-b from-[#19191d] to-[#101012]',
     cardBorder: 'border-zinc-800',
     cardInnerBg: 'bg-[#08080a]',
-    cardInnerBorder: 'border-zinc-850',
+    cardInnerBorder: 'border-zinc-800',
     accentColor: 'indigo-500',
     accentBg: 'bg-zinc-800 hover:bg-zinc-700',
     accentFg: 'text-white',
     accentText: 'text-zinc-200',
     accentRing: 'ring-zinc-500',
     accentHex: '#d4d4d8',
+    focusRing: 'focus-visible:ring-2 focus-visible:ring-zinc-500',
     selectionBg: 'selection:bg-zinc-500/30',
     accentBorder: 'border-zinc-500',
     navBg: 'bg-[#000000]',
@@ -114,6 +118,7 @@ export const APP_THEMES: Record<ThemeMode, ThemeConfig> = {
     accentText: 'text-amber-300',
     accentRing: 'ring-amber-400',
     accentHex: '#fcd34d',
+    focusRing: 'focus-visible:ring-2 focus-visible:ring-amber-400',
     selectionBg: 'selection:bg-amber-500/30',
     accentBorder: 'border-amber-400',
     navBg: 'bg-[#1f1610]',
@@ -142,6 +147,7 @@ export const APP_THEMES: Record<ThemeMode, ThemeConfig> = {
     accentText: 'text-cyan-300',
     accentRing: 'ring-cyan-400',
     accentHex: '#67e8f9',
+    focusRing: 'focus-visible:ring-2 focus-visible:ring-cyan-400',
     selectionBg: 'selection:bg-cyan-500/30',
     accentBorder: 'border-cyan-400',
     navBg: 'bg-[#07192b]',

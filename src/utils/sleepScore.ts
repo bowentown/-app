@@ -124,7 +124,8 @@ export function generateSleepStages(
   let awakeMin = 0;
 
   // 入睡潜伏期：清醒段（时长由调用方给定，演示数据用各家真实值保持一致）
-  const latency = Math.max(1, Math.min(120, Math.round(latencyMinutes)));
+  // 潜伏期不得长于在床窗口：30 分钟小睡 + 45 分钟潜伏期曾产出总和超窗 60 分钟的分期
+  const latency = Math.min(Math.max(1, Math.min(120, Math.round(latencyMinutes))), Math.max(1, totalMin - 1));
   stages.push({
     stage: 'awake',
     startTime: formatTimeOffset(bedDate, currentMin),

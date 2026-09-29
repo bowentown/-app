@@ -16,7 +16,11 @@ const clampMin = (v: unknown, max: number): number => Math.max(0, Math.min(max, 
 export function sanitizeRecord(raw: unknown): SleepRecord | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const r = raw as Record<string, unknown>;
-  const date = typeof r.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.date) ? r.date : null;
+  const date = typeof r.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.date)
+    // 形状合法之外再校验日历合法：2025-02-30 会被 JS 静默当 03-02、
+    // 2025-99-99 的 getTime() 是 NaN——一条坏日期就能打乱整个降序契约
+    && Number.isFinite(new Date(r.date + 'T00:00:00').getTime())
+    ? r.date : null;
   if (!date) return null;
   const duration = clampMin(r.durationMinutes, 1440);
   const stages = Array.isArray(r.stages)
@@ -51,6 +55,9 @@ export function sanitizeRecord(raw: unknown): SleepRecord | null {
     sleepScore: Math.max(0, Math.min(100, numOr(r.sleepScore, 60))),
     sleepEfficiency: Math.max(0, Math.min(100, numOr(r.sleepEfficiency, 80))),
     latencyMinutes: clampMin(r.latencyMinutes, 480),
+    // 白名单漏字段 = 挂载写回时静默丢数据：latencyEstimated 曾被这里抹掉，
+    // AI 把按时作息推算的潜伏期当成实测值讲（第七轮§3①）
+    latencyEstimated: typeof r.latencyEstimated === 'boolean' ? r.latencyEstimated : undefined,
     wakeCount: Math.max(0, Math.round(numOr(r.wakeCount, 0))),
     wakingMood: (['refreshed', 'neutral', 'tired', 'groggy'].includes(r.wakingMood as string)
       ? r.wakingMood

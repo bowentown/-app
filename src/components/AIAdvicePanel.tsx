@@ -436,7 +436,7 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
         </button>
 
         {showAssessment && (
-          <div className="px-4 pb-4 space-y-3 animate-in fade-in duration-200">
+          <div className="px-4 pb-4 space-y-3 animate-tab-fade-in">
             <div className="flex items-center justify-between">
               <p className="text-[10px] text-slate-400">模型：{activeProviderName} · 估算非诊断</p>
               <button
@@ -575,7 +575,7 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
               if (e.key === 'Enter') handleSendMessage();
             }}
             placeholder="输入睡眠疑问..."
-            className={`flex-1 ${theme.cardInnerBg} border ${theme.cardInnerBorder} rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:${theme.accentBorder} font-medium`}
+            className={`flex-1 ${theme.cardInnerBg} border ${theme.cardInnerBorder} rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none ${theme.focusRing} font-medium`}
           />
           <button
             type="button"

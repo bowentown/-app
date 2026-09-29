@@ -41,6 +41,9 @@ export const App: React.FC = () => {
   const [records, setRecords] = useState<SleepRecord[]>(() => {
     const saved = localStorage.getItem('somnacare_sleep_records');
     if (saved) {
+      // 备份放在 parse 成功之后、任何 return 之前：合法 JSON 但结构不对
+      // （null / 非数组 / 全部清洗失败）此前会静默清空日记并被挂载写回覆盖
+      try { localStorage.setItem('somnacare_sleep_records_backup_corrupted', saved); } catch { /* ignore */ }
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
@@ -49,10 +52,11 @@ export const App: React.FC = () => {
           return parsed.map(sanitizeRecord).filter((r): r is SleepRecord => r !== null);
         }
       } catch (e) {
-        console.error('Failed to parse saved records, backing up corrupted key:', e);
-        localStorage.setItem('somnacare_sleep_records_backup_corrupted', saved);
+        console.error('Failed to parse saved records, backed up corrupted key:', e);
         return [];
       }
+      console.warn('[storage] 记录结构异常，已备份后清空');
+      return [];
     }
     // New user starts with empty clean diary by default (can explicitly load demo data in Settings)
     return [];
@@ -71,9 +75,9 @@ export const App: React.FC = () => {
           );
         }
         // 老配置补齐护眼分区默认值
-        if (!parsedProfile.eyeCare) {
-          parsedProfile.eyeCare = DEFAULT_EYE_CARE;
-        }
+        // 逐字段合并：eyeCare 存在但缺内部字段（如 warmColor）时，
+        // 此前会把 undefined 一直带到渲染层打崩页面
+        parsedProfile.eyeCare = { ...DEFAULT_EYE_CARE, ...(parsedProfile.eyeCare || {}) };
         return parsedProfile;
       } catch (e) {
         console.error('Failed to parse profile', e);
@@ -130,12 +134,16 @@ export const App: React.FC = () => {
   const MAX_RECORDS = 2000; // ~3.5MB（单条约 1.7KB），给同源其他数据留余量
 
   const persistRecords = (list: SleepRecord[]): boolean => {
+    // 按日期降序后再裁剪：按下标裁剪此前会留下最老的、丢掉最近的
+    const sortedList = [...list].sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
     try {
-      localStorage.setItem('somnacare_sleep_records', JSON.stringify(list));
+      localStorage.setItem('somnacare_sleep_records', JSON.stringify(sortedList));
       return true;
     } catch (e) {
       console.warn('[storage] 记录写入失败，裁剪后重试', e);
-      const trimmed = list.slice(0, Math.floor(MAX_RECORDS / 2));
+      const trimmed = sortedList.slice(0, Math.floor(MAX_RECORDS / 2));
       try {
         localStorage.setItem('somnacare_sleep_records', JSON.stringify(trimmed));
         setToastMessage('本地存储已满，已保留最近的记录，建议在【偏好】中导出备份');
@@ -598,7 +606,15 @@ export const App: React.FC = () => {
                       onUpdateProfile={(updated) => setUserProfile((prev) => ({ ...prev, ...updated }))}
                       onResetDemoData={handleResetDemoData}
                       onImportRecords={(imported) => {
-                        setRecords(imported);
+            // 与"最近一晚 = records[0]"的契约对齐：导入升序备份此前会让首页/
+            // AI/趋势全部指向最老一条，且按下标裁剪时丢的恰好是最近的记录
+            const sorted = [...imported].sort(
+              (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+            );
+            if (!window.confirm(`导入将替换当前的 ${records.length} 条记录（共导入 ${sorted.length} 条），继续？`)) {
+              return;
+            }
+                        setRecords(sorted);
                         showToast(`已成功导入 ${imported.length} 条睡眠记录`);
                       }}
                       theme={currentTheme}

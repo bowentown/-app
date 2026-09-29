@@ -314,7 +314,10 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
                   <Cpu className={`w-4 h-4 ${theme.accentText}`} />
                   <span className="font-bold text-white">端侧小模型 · {getActiveModelLabel()}</span>
                 </div>
-                <span className={`text-[10px] ${theme.accentText} ${theme.accentBg.split(' ')[0]}/20 px-2 py-0.5 rounded border ${theme.accentBorder}`}>
+                <span
+                  className={`text-[10px] ${theme.accentText} px-2 py-0.5 rounded border ${theme.accentBorder}`}
+                  style={{ backgroundColor: `${theme.accentHex}33` }}
+                >
                   离线可用 · 隐私不上传
                 </span>
               </div>
@@ -377,7 +380,7 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
                       setHfToken(e.target.value);
                     }}
                     placeholder="hf_xxxxxxxxxxxx"
-                    className={`w-full bg-[#0a0f1d] border border-slate-600 rounded-xl px-2.5 py-2 text-xs text-white font-mono placeholder-slate-500 focus:outline-none focus:${theme.accentBorder}`}
+                    className={`w-full bg-[#0a0f1d] border border-slate-600 rounded-xl px-2.5 py-2 text-xs text-white font-mono placeholder-slate-500 focus:outline-none ${theme.focusRing}`}
                   />
                   <p className="text-[10px] text-slate-500 leading-relaxed">
                     Gemma 为门控模型：在 huggingface.co 登录 → 打开 litert-community/gemma-3-1b-it →
@@ -455,7 +458,7 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
                     value={deepseekApiKey}
                     onChange={(e) => setDeepseekApiKey(e.target.value)}
                     placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxx"
-                    className={`w-full bg-[#0a0f1d] border border-slate-600 rounded-xl px-3 py-2 text-xs text-white font-mono pr-8 focus:outline-none focus:${theme.accentBorder}`}
+                    className={`w-full bg-[#0a0f1d] border border-slate-600 rounded-xl px-3 py-2 text-xs text-white font-mono pr-8 focus:outline-none ${theme.focusRing}`}
                   />
                   <button
                     type="button"
@@ -475,7 +478,8 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
                     type="button"
                     onClick={handleQueryRemoteModels}
                     disabled={isQueryingModels}
-                    className={`text-[10px] ${theme.accentText} hover:text-white flex items-center gap-1 font-bold ${theme.accentBg.split(' ')[0]}/20 px-2 py-0.5 rounded border ${theme.accentBorder} cursor-pointer`}
+                    className={`text-[10px] ${theme.accentText} hover:text-white flex items-center gap-1 font-bold px-2 py-0.5 rounded border ${theme.accentBorder} cursor-pointer`}
+                    style={{ backgroundColor: `${theme.accentHex}33` }}
                   >
                     {isQueryingModels ? <Loader2 className="w-3 h-3 animate-spin" /> : <Search className="w-3 h-3" />}
                     <span>查询可用模型</span>
@@ -517,7 +521,8 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
                           key={m}
                           type="button"
                           onClick={() => setDeepseekModel(m)}
-                          className={`px-2 py-0.5 rounded text-[10px] font-mono ${theme.accentBg.split(' ')[0]}/20 ${theme.accentText} border border-indigo-700`}
+                          className={`px-2 py-0.5 rounded text-[10px] font-mono ${theme.accentText} border border-indigo-700`}
+                          style={{ backgroundColor: `${theme.accentHex}33` }}
                         >
                           {m}
                         </button>
@@ -603,7 +608,7 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
               value={systemPersona}
               onChange={(e) => setSystemPersona(e.target.value)}
               placeholder="设定顾问身份与风格..."
-              className={`w-full bg-[#0a0f1d] border border-slate-600 rounded-xl p-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:${theme.accentBorder} leading-relaxed`}
+              className={`w-full bg-[#0a0f1d] border border-slate-600 rounded-xl p-2.5 text-xs text-white placeholder-slate-500 focus:outline-none ${theme.focusRing} leading-relaxed`}
             />
           </div>
 

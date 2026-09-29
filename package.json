@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "verify": "tsx tools/verify-wiring.mts && tsx tools/verify-theme-classes.mts && tsx tools/verify-contrast.mts && tsx tools/verify-a11y.mts"
+    "verify": "tsx tools/verify-wiring.mts && tsx tools/verify-theme-classes.mts && tsx tools/verify-contrast.mts && tsx tools/verify-a11y.mts",
+    "verify:css": "tsx tools/verify-class-gen.mts"
   },
   "dependencies": {
     "@capacitor/local-notifications": "^8.3.1",

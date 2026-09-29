@@ -151,8 +151,8 @@ public class WhaleGirlView extends View {
     }
 
     private static Anim load(Context c, String name, int frames, int fps, String playback, String motion) {
-        try {
-            Bitmap b = BitmapFactory.decodeStream(c.getAssets().open(DIR + name + ".png"));
+        try (java.io.InputStream in = c.getAssets().open(DIR + name + ".png")) {
+            Bitmap b = BitmapFactory.decodeStream(in);
             if (b == null) return null;
             return new Anim(b, frames, fps, playback, motion);
         } catch (Exception e) {

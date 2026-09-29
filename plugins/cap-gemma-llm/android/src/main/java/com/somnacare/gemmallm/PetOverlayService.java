@@ -104,6 +104,21 @@ public class PetOverlayService extends Service {
         }
     };
 
+    // 屏幕常亮时转屏（视频/阅读）：SCREEN_ON 收不到、onStartCommand 也不会来，
+    // 必须监听显示变化——模板来自 EyeCareService 的同名实现
+    private final android.hardware.display.DisplayManager.DisplayListener displayListener =
+            new android.hardware.display.DisplayManager.DisplayListener() {
+                @Override public void onDisplayAdded(int displayId) { }
+                @Override public void onDisplayRemoved(int displayId) { }
+                @Override public void onDisplayChanged(int displayId) {
+                    if (petRoot == null || petParams == null) return;
+                    if (fanShown) hideFan();       // 按钮按旧屏宽摆位，先收避免错位
+                    if (bubbleShown) hideBubble();
+                    clampToScreen(petParams);
+                    safeUpdate(petRoot, petParams);
+                }
+            };
+
     @Override
     public IBinder onBind(Intent intent) {
         return null;
@@ -116,6 +131,12 @@ public class PetOverlayService extends Service {
         touchSlop = ViewConfiguration.get(this).getScaledTouchSlop();
         ensureChannel();
         startForegroundCompat("点大肥鱼看消息 · 开护眼");
+        try {
+            android.hardware.display.DisplayManager dm =
+                    (android.hardware.display.DisplayManager) getSystemService(DISPLAY_SERVICE);
+            if (dm != null) dm.registerDisplayListener(displayListener, null);
+        } catch (Exception ignored) {
+        }
         IntentFilter f = new IntentFilter();
         f.addAction(Intent.ACTION_SCREEN_OFF);
         f.addAction(Intent.ACTION_SCREEN_ON);
@@ -785,10 +806,15 @@ public class PetOverlayService extends Service {
             Notification.Builder b = Build.VERSION.SDK_INT >= 26
                     ? new Notification.Builder(this, CHANNEL_ID)
                     : new Notification.Builder(this);
+            Intent stop = new Intent(this, PetOverlayService.class).setAction(ACTION_STOP);
+            PendingIntent stopPi = PendingIntent.getService(this, 5, stop,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
             Notification n = b.setSmallIcon(android.R.drawable.ic_menu_compass)
                     .setContentTitle("大肥鱼陪着你")
                     .setContentText(text)
                     .setContentIntent(pi)
+                    .addAction(new Notification.Action.Builder(
+                            null, "关闭桌宠", stopPi).build())
                     .setOngoing(true)
                     .setOnlyAlertOnce(true)
                     .build();
@@ -807,6 +833,12 @@ public class PetOverlayService extends Service {
     @Override
     public void onDestroy() {
         main.removeCallbacks(drowsyTick);
+        try {
+            android.hardware.display.DisplayManager dm =
+                    (android.hardware.display.DisplayManager) getSystemService(DISPLAY_SERVICE);
+            if (dm != null) dm.unregisterDisplayListener(displayListener);
+        } catch (Exception ignored) {
+        }
         try { unregisterReceiver(screenReceiver); } catch (Exception ignored) { }
         if (whale != null) whale.stop();
         hideBubble();
@@ -816,6 +848,8 @@ public class PetOverlayService extends Service {
             petRoot = null;
         }
         whale = null;
+        getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                .remove("pet_minimized").apply();
         super.onDestroy();
     }
 }

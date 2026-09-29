@@ -33,6 +33,7 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({ activeTab, onChangeT
             <button
               key={t.key}
               type="button"
+              aria-current={isActive ? 'page' : undefined}
               onClick={() => onChangeTab(t.key)}
               className="flex flex-col items-center justify-center min-h-[50px] py-1 px-2 rounded-xl transition-all group focus:outline-none cursor-pointer"
             >

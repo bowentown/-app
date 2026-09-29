@@ -146,6 +146,7 @@ export const EyeCareTab: React.FC<EyeCareTabProps> = ({ userProfile, onUpdatePro
           <label className="relative inline-flex items-center cursor-pointer shrink-0">
             <input
               type="checkbox"
+              aria-label="开启或关闭护眼滤镜"
               checked={cfg.enabled}
               onChange={(e) => void handleToggle(e.target.checked)}
               className="sr-only peer"
@@ -188,7 +189,10 @@ export const EyeCareTab: React.FC<EyeCareTabProps> = ({ userProfile, onUpdatePro
               <button
                 key={s.id}
                 type="button"
-                onClick={() => patch({ preset: s.id, warmColor: s.color, warmStrength: s.strength, dimStrength: s.dim })}
+                onClick={() => {
+                  patch({ preset: s.id, warmColor: s.color, warmStrength: s.strength, dimStrength: s.dim });
+                  setHue(hexToHue(s.color));   // 调色盘滑块同步色相：此前选预设后滑块显示过时的角度
+                }}
                 className={`flex flex-col items-center gap-1.5 rounded-2xl py-3 px-1 border transition-all cursor-pointer active:scale-[0.96] ${
                   selected
                     ? 'border-orange-400/80 bg-orange-500/10 shadow-lg shadow-orange-900/20'
@@ -417,6 +421,7 @@ export const EyeCareTab: React.FC<EyeCareTabProps> = ({ userProfile, onUpdatePro
           <label className="relative inline-flex items-center cursor-pointer shrink-0">
             <input
               type="checkbox"
+              aria-label="定时开启或关闭护眼滤镜"
               checked={cfg.scheduleEnabled}
               onChange={(e) => patch({ scheduleEnabled: e.target.checked })}
               className="sr-only peer"

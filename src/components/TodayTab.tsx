@@ -414,7 +414,8 @@ export const TodayTab: React.FC<TodayTabProps> = ({
                   targetWakeTime: toClock(toMin(userProfile.targetBedtime) + Math.round(h * 60)),
                 });
               }}
-              className={`w-full ${theme.accentBg.split(' ')[0].replace('bg-', 'accent-')} cursor-pointer h-2 bg-slate-700 rounded-lg`}
+              className="w-full cursor-pointer h-2 bg-slate-700 rounded-lg"
+              style={{ accentColor: theme.accentHex }}
             />
           </div>
 

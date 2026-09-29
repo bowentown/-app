@@ -117,6 +117,15 @@ const SoundscapePlayerInner: React.FC<{ theme: ThemeConfig; onClose: () => void 
     return () => clearInterval(interval);
   }, [isPlaying, timerRemainingSeconds]);
 
+  // 关闭混音器面板会卸载本组件——此前音频整夜继续播、30 分钟定时关闭随组件
+  // 一起消失且重开后永不恢复。把截止时刻提到引擎层（模块单例），组件卸载
+  // 时先停掉全部音层，重开面板时从引擎读回剩余时间恢复倒计时
+  useEffect(() => {
+    return () => {
+      sleepAudio.stopAllLayers(true);
+    };
+  }, []);
+
   const toggleLayer = (track: SoundscapeTrack) => {
     if (active[track.soundType] !== undefined) {
       sleepAudio.stopLayer(track.soundType);

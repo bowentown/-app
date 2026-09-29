@@ -358,6 +358,9 @@ public class GemmaLLMPlugin extends Plugin {
     @PluginMethod
     public void petStop(PluginCall call) {
         try {
+            // 关闭桌宠即回到完整形态：下次开启不再是最小化的小鲸鱼
+            getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                    .edit().remove("pet_minimized").apply();
             android.content.Intent intent = new android.content.Intent(getContext(), PetOverlayService.class)
                     .setAction(PetOverlayService.ACTION_STOP);
             getContext().startService(intent);
@@ -444,6 +447,8 @@ public class GemmaLLMPlugin extends Plugin {
                         new Intent(getContext(), BedtimeAlarmReceiver.class),
                         android.app.PendingIntent.FLAG_UPDATE_CURRENT | android.app.PendingIntent.FLAG_IMMUTABLE);
                 am.cancel(pi);
+                getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                        .edit().putBoolean("bedtime_reminder_on", false).apply();
             }
             JSObject ret = new JSObject();
             ret.put("ok", true);

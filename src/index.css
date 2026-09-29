@@ -149,6 +149,11 @@ html {
 }
 
 /* 无障碍：系统开启减弱动效时全部静止 */
+/* 安全区留白：viewport-fit=cover 已开启，此前 pb-safe 写了却从未有定义 */
+@utility pb-safe {
+  padding-bottom: max(env(safe-area-inset-bottom), 0.5rem);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-moon-breathe,
   .animate-star-twinkle,

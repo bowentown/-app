@@ -114,13 +114,22 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   };
 
   const handleExportJSON = () => {
-    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(records, null, 2));
-    const downloadAnchor = document.createElement('a');
-    downloadAnchor.setAttribute('href', dataStr);
-    downloadAnchor.setAttribute('download', `somnacare-sleep-backup-${toLocalDateString()}.json`);
-    document.body.appendChild(downloadAnchor);
-    downloadAnchor.click();
-    downloadAnchor.remove();
+    // Blob + objectURL：data: URL 在 2000 条记录（约 10MB）时会被 Android
+    // WebView 截断或不触发下载，而备份的静默失败是最糟的失败方式
+    try {
+      const blob = new Blob([JSON.stringify(records, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute('href', url);
+      downloadAnchor.setAttribute('download', `somnacare-sleep-backup-${toLocalDateString()}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 4000);
+    } catch (e) {
+      console.warn('[export] 备份导出失败', e);
+      alert('备份导出失败，请重试');
+    }
   };
 
   const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -189,9 +198,10 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 }}
                 className={`p-3.5 rounded-2xl border text-left transition-all relative cursor-pointer ${
                   isSelected
-                    ? `${theme.accentBorder} ${theme.cardInnerBg} shadow-lg ring-1 ${theme.accentRing}/50`
+                    ? `${theme.accentBorder} ${theme.cardInnerBg} shadow-lg`
                     : `${theme.cardInnerBg} border-slate-700/70 hover:border-slate-500`
                 }`}
+                style={isSelected ? { boxShadow: `0 0 0 1px ${theme.accentHex}80` } : undefined}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
@@ -237,6 +247,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             <label className="relative inline-flex items-center cursor-pointer shrink-0">
               <input
                 type="checkbox"
+                aria-label="开启或关闭大肥鱼桌宠"
                 checked={petOn}
                 disabled={petBusy}
                 onChange={(e) => void handlePetToggle(e.target.checked)}

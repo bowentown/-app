@@ -308,7 +308,7 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
       {isOpen && (<>
       {/* Add New Alarm Form */}
       {isAdding && (
-        <div className={`p-4 rounded-2xl ${innerBg} border-2 ${theme?.accentBorder} space-y-4 animate-in fade-in duration-200 shadow-xl`}>
+        <div className={`p-4 rounded-2xl ${innerBg} border-2 ${theme?.accentBorder} space-y-4 animate-tab-fade-in shadow-xl`}>
           <div className="flex items-center justify-between">
             <span className={`text-xs font-black ${theme?.accentText}`}>新建自定义闹钟</span>
             <input
@@ -316,7 +316,7 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
               value={newLabel}
               onChange={(e) => setNewLabel(e.target.value)}
               placeholder="闹钟备注（如：工作日晨读）"
-              className={`${innerBg} border border-slate-600 rounded-xl px-3 py-1.5 text-xs text-white placeholder-slate-400 focus:outline-none focus:${theme?.accentBorder} w-44 text-right font-bold`}
+              className={`${innerBg} border border-slate-600 rounded-xl px-3 py-1.5 text-xs text-white placeholder-slate-400 focus:outline-none ${theme?.focusRing} w-44 text-right font-bold`}
             />
           </div>
 
@@ -387,9 +387,10 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
                   onClick={() => setNewTone(t.key as any)}
                   className={`p-2.5 rounded-xl border text-left cursor-pointer transition-all ${
                     newTone === t.key
-                      ? `${theme?.accentBg.split(' ')[0]}/40 ${theme?.accentBorder} ${accentFg} shadow-md`
+                      ? ''
                       : `${innerBg} ${innerBorder} text-slate-200 hover:border-slate-400`
                   }`}
+                  style={newTone === t.key ? { backgroundColor: `${theme?.accentHex ?? '#818cf8'}66`, borderColor: theme?.accentHex ?? '#818cf8' } : undefined}
                 >
                   <div className="flex items-center justify-between text-xs font-black">
                     <span>{t.label}</span>
@@ -426,7 +427,7 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
                 type="checkbox"
                 checked={newSmartWake}
                 onChange={(e) => setNewSmartWake(e.target.checked)}
-                className={`${theme?.accentBg.split(' ')[0].replace('bg-', 'accent-')} w-5 h-5 rounded cursor-pointer`}
+                className={`w-5 h-5 rounded cursor-pointer`}
               />
             </div>
             {newSmartWake && (
@@ -438,7 +439,8 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
                   max={30}
                   value={newSmartWindow}
                   onChange={(e) => setNewSmartWindow(Number(e.target.value))}
-                  className={`flex-1 ${theme?.accentBg.split(' ')[0].replace('bg-', 'accent-')} cursor-pointer`}
+                  className="flex-1 cursor-pointer"
+                  style={{ accentColor: theme?.accentHex }}
                 />
                 <span className="text-[10px] text-slate-400 font-mono">30m</span>
                 <span className={`text-[11px] ${theme?.accentText} font-mono font-bold w-9 text-right tabular-nums`}>
@@ -511,7 +513,10 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
                     <div className="text-xs text-slate-300 mt-0.5 flex items-center flex-wrap gap-x-2 gap-y-1 font-medium">
                       <span className="whitespace-nowrap">{dayText}</span>
                       {alarm.smartWakeEnabled && (
-                        <span className={`inline-flex items-center ${theme?.accentText} ${theme?.accentBg.split(' ')[0]}/20 border ${theme?.accentBorder} px-1 py-0.5 rounded text-[11px] font-bold`}>
+                        <span
+                          className={`inline-flex items-center ${theme?.accentText} border ${theme?.accentBorder} px-1 py-0.5 rounded text-[11px] font-bold`}
+                          style={{ backgroundColor: `${theme?.accentHex ?? '#818cf8'}33` }}
+                        >
                           <button
                             type="button"
                             title="减小唤醒窗口"

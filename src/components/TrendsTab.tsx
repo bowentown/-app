@@ -40,6 +40,7 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
   const [viewMode, setViewMode] = useState<MetricViewMode>('quality');
   const [hoveredRecord, setHoveredRecord] = useState<SleepRecord | null>(null);
   const [isHistoryExpanded, setIsHistoryExpanded] = useState(false);
+  const [historyLimit, setHistoryLimit] = useState(50);
 
 
   // Use up to last 7 days sorted chronologically
@@ -108,7 +109,7 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
 
         {/* View Mode 1: Quality Score Trend */}
         {viewMode === 'quality' && (
-          <div className="space-y-2 animate-in fade-in">
+          <div className="space-y-2 animate-tab-fade-in">
             <div className={`relative h-40 ${theme.cardInnerBg} rounded-2xl p-3 border ${theme.cardInnerBorder} flex flex-col justify-between`}>
               <div className="absolute inset-x-3 top-4 border-b border-dashed border-emerald-500/30 flex justify-between text-[10px] text-emerald-400 font-mono">
                 <span>90分 达标线</span>
@@ -199,7 +200,7 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
 
         {/* View Mode 2: Sleep Stages */}
         {viewMode === 'stages' && (
-          <div className="space-y-2 animate-in fade-in">
+          <div className="space-y-2 animate-tab-fade-in">
             <div className={`h-40 ${theme.cardInnerBg} rounded-2xl p-3 border ${theme.cardInnerBorder} flex flex-col justify-between`}>
               <div className="flex items-end justify-between gap-2 h-28 px-1">
                 {last7Records.map((r) => {
@@ -268,7 +269,7 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
 
         {/* View Mode 3: Circadian Gantt */}
         {viewMode === 'circadian' && (
-          <div className="space-y-2 animate-in fade-in">
+          <div className="space-y-2 animate-tab-fade-in">
             <div className={`${theme.cardInnerBg} rounded-2xl p-3 border ${theme.cardInnerBorder} space-y-2`}>
               <div className={`flex justify-between text-[10px] ${textMuted} font-mono pb-1 border-b ${innerBorder}`}>
                 <span>21:00</span>
@@ -352,11 +353,12 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
 
         {/* Collapsible Content */}
         {isHistoryExpanded && (
-          <div className="mt-3 pt-3 border-t border-slate-700/60 divide-y divide-slate-800 text-xs animate-in fade-in duration-150">
+          <div className="mt-3 pt-3 border-t border-slate-700/60 divide-y divide-slate-800 text-xs animate-tab-fade-in">
             {records.length === 0 ? (
               <div className={`py-4 text-center ${textMuted}`}>暂无数据记录</div>
             ) : (
-              records.map((r) => (
+              // 单帧渲染 2000 条 ≈ 2 万 DOM 节点会卡顿：分页展示
+              records.slice(0, historyLimit).map((r) => (
                 <div
                   key={r.id}
                   className="py-3 flex items-center justify-between hover:bg-slate-800/30 px-2 rounded-xl transition-colors group"
@@ -394,6 +396,15 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
                   )}
                 </div>
               ))
+            )}
+            {records.length > historyLimit && (
+              <button
+                type="button"
+                onClick={() => setHistoryLimit((v) => v + 50)}
+                className={`w-full py-2 text-center text-[10px] font-bold ${textMuted} hover:text-white cursor-pointer`}
+              >
+                加载更多（已显示 {historyLimit} / {records.length} 条）
+              </button>
             )}
           </div>
         )}

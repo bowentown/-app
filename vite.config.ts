@@ -15,6 +15,7 @@ export default defineConfig(() => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
+        injectRegister: null,   // main.tsx 手动注册：APK 原生环境不注册 + controllerchange 重载
         includeAssets: ['icon.svg'],
         manifest: {
           id: '/',

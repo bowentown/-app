@@ -175,7 +175,7 @@ export function generateLocalClinicalAnalysis(
       : 88;
   const avgLatency =
     count > 0
-      ? Math.round(recentLogs.reduce((acc, r) => acc + (r.latencyMinutes || 15), 0) / count)
+      ? Math.round(recentLogs.reduce((acc, r) => acc + (r.latencyMinutes ?? 15), 0) / count)
       : 16;
   const avgWake =
     count > 0
@@ -196,7 +196,7 @@ export function generateLocalClinicalAnalysis(
       chronotype = '晨型云雀型 (Lark Chronotype)';
       chronotypeDesc =
         '天生具备早睡早起节律，清晨皮质醇迅速攀升，前一日深度睡眠启动早，适宜早间高专注度工作。';
-    } else if (h >= 0 || (h >= 23 && Number(recentLogs[0].bedtime.split(':')[1]) >= 45)) {
+    } else if (h >= 23 || h < 6) {
       chronotype = '夜型猫头鹰型 (Owl Chronotype)';
       chronotypeDesc =
         '褪黑素分泌峰值较常规推迟1-2小时，晚间思维活跃。建议睡前调暗卧室照度，避免强光抑制入眠。';
@@ -241,17 +241,34 @@ export function generateLocalClinicalAnalysis(
     chronotype,
     chronotypeDescription: chronotypeDesc,
     overallHealthGrade: healthGrade,
-    scoreSummary: `近${count || 7}天平均睡眠${hours}小时，深睡率${deepPct}%，总体处于${healthGrade}水平。`,
+    scoreSummary:
+      count > 0
+        ? `近${count}天平均睡眠${hours}小时，深睡率${deepPct}%，总体处于${healthGrade}水平。`
+        : '您还没有睡眠记录——以下为演示口径的示例报告，记录一晚后将自动换成真实数据。',
     clinicalMetricsAnalysis: {
       durationAssessment: `周期平均睡眠时长为 ${hours} 小时（目标 ${targetH} 小时），睡眠债务差额约 ${debt} 小时。总体时长${
         Math.abs(Number(debt)) <= 0.5
           ? '充足合理，利于神经元代谢更新与体力修复'
-          : '稍显不足，建议周末避免报复性补觉以免打乱时相'
+          : Number(debt) > 0
+          ? '低于目标，建议逐步提前就寝、周末避免报复性补觉以免打乱时相'
+          : '长于目标——过长与过短同样关联更差结局，可适度压缩卧床窗口以提升睡眠密度'
       }。`,
       deepSleepAssessment: `深睡眠（慢波期N3）平均达 ${avgDeep} 分钟，占总睡眠比 ${deepPct}%（临床推荐健康值为 15%-25%）。脑脊液在此阶段高效冲洗代谢废物，对体力与免疫力恢复至关重要。`,
       remSleepAssessment: `快速眼动期(REM)平均 ${avgRem} 分钟，占比 ${remPct}%（参考健康值为 20%-25%）。此阶段脑电活跃，主导白天情绪消磁、记忆长时存储与神经回路重塑。`,
-      efficiencyAssessment: `睡眠效率评分为 ${avgEfficiency}%（临床优良阈值 >85%），卧床实际入睡时间占比良好，夜间偶有 ${avgWake} 次微觉醒，均在良性生理范围内。`,
-      sleepLatencyAssessment: `平均入睡潜伏期为 ${avgLatency} 分钟（健康参考 10-20 分钟），反映睡前神经松弛机制运行顺畅。`,
+      efficiencyAssessment: `睡眠效率为 ${avgEfficiency}%（临床优良阈值 >85%）${
+        avgEfficiency >= 85
+          ? `，处于优良区间，夜间平均 ${avgWake} 次微觉醒在良性生理范围内。`
+          : avgEfficiency >= 75
+          ? `，还有提升空间，夜间平均 ${avgWake} 次微觉醒偏多，可试着压缩卧床总窗。`
+          : `，明显偏低。在床时间远超实际睡眠，建议按睡眠限制疗法压缩卧床窗口，夜间 ${avgWake} 次微觉醒也需关注。`
+      }`,
+      sleepLatencyAssessment: `平均入睡潜伏期为 ${avgLatency} 分钟（健康参考 10-20 分钟）${
+        avgLatency <= 20
+          ? '，反映睡前神经松弛机制运行顺畅。'
+          : avgLatency <= 30
+          ? '，略长于健康区间，可尝试刺激控制法（困了再上床）。'
+          : '，明显偏长。这是失眠的核心信号之一，建议严格执行 20 分钟刺激控制。'
+      }`,
     },
     identifiedIssues: issues,
     personalizedRecommendations: [
@@ -346,7 +363,7 @@ export function generatePersonalInsights(records: SleepRecord[] = []): PersonalI
         const late = drift > 0;
         const scoreDelta = Math.round(avgOf(recent, (r) => r.sleepScore) - avgOf(earlier, (r) => r.sleepScore));
         const scoreTxt =
-          scoreDelta >= 2 ? `平均评分随之下降 ${Math.abs(scoreDelta)} 分` : scoreDelta <= -2 ? `平均评分反而回升 ${Math.abs(scoreDelta)} 分` : '平均评分基本持平';
+          scoreDelta >= 2 ? `平均评分随之回升 ${Math.abs(scoreDelta)} 分` : scoreDelta <= -2 ? `平均评分反而下降 ${Math.abs(scoreDelta)} 分` : '平均评分基本持平';
         list.push({
           id: 'drift',
           severity: late ? 'warn' : 'good',
@@ -488,7 +505,7 @@ export function generateLocalChatReply(
       return `🌅 **针对清晨过早醒来（凌晨 3–5 点）的调理策略**：\n\n早醒通常与深睡周期提前结束、皮质醇提前过早飙升有关：\n\n1. **卧床时间是否过长**：如果晚上 22:00 入睡，早上 4:30 醒来已经睡足 6.5 小时，这是睡眠压力自然释放的结果。可尝试将就寝时间推迟 30–45 分钟（至 22:45–23:00），以压实睡眠密度；\n2. **卧室严格遮光**：清晨微弱的晨光透过窗帘缝隙就会被视网膜感知，抑制褪黑素。换用全遮光窗帘或佩戴丝绸眼罩；\n3. **早醒后勿赖床补觉**：醒来若无法再次入睡，建议在固定时间起床拉开窗帘接受光照，把睡眠动力储蓄留给今晚。`;
 
     case 'caffeine_lifestyle':
-      return `☕ **生活习惯与腺苷代谢机制解析**：\n\n您在最近的生活标签中记录了日常起居习惯：\n\n1. **咖啡因半衰期规律**：咖啡因在健康人体内的半衰期约为 5–7 小时，清除 75% 需耗时近 10 小时。下午 14:00 后摄入咖啡、浓茶或奶茶，即使晚上能睡着，脑电波里的慢波振幅也会显著衰减；\n2. **晚间剧烈运动时间窗口**：运动会使核心体温与内啡肽升高持续 2–3 小时，因此高强度心肺锻炼请安排在睡前 3 小时以前完成；\n3. **睡前 2 小时禁夜宵饱食**：胃肠剧烈蠕动会引起夜间胃食管反流和交感神经过载，导致深睡比例断崖式下跌。`;
+      return `☕ **生活习惯与腺苷代谢机制解析**：\n\n以下为不依赖个人记录的通用科普${latestRecord ? '（结合您记录的习惯标签）' : ''}：\n\n1. **咖啡因半衰期规律**：咖啡因在健康人体内的半衰期约为 5–7 小时，清除 75% 需耗时近 10 小时。下午 14:00 后摄入咖啡、浓茶或奶茶，即使晚上能睡着，脑电波里的慢波振幅也会显著衰减；\n2. **晚间剧烈运动时间窗口**：运动会使核心体温与内啡肽升高持续 2–3 小时，因此高强度心肺锻炼请安排在睡前 3 小时以前完成；\n3. **睡前 2 小时禁夜宵饱食**：胃肠剧烈蠕动会引起夜间胃食管反流和交感神经过载，导致深睡比例断崖式下跌。`;
 
     case 'dreams_anxiety':
       return `💭 **关于梦境与睡前思绪杂乱的心理疏导**：\n\n多梦并非睡眠质量差的标志！快速眼动期（REM）每晚都会周期性出现 4–5 次，做梦是大脑在整理记忆碎片与情绪消磁：\n\n1. **睡前“担忧便签本”**：睡前半小时拿纸笔写下明天待办事项与心中忧虑，写完合上本子，心理学上称为“认知卸载”，告诉大脑今晚任务已存盘；\n2. **432Hz / 528Hz 脑波引导**：在极光睡眠的助眠音频中，音波振动能协助大脑脑电从高频 Beta 波平缓滑落至 Alpha 和 Theta 波；\n3. **噩梦惊醒时的接地法**：深吸一口气，用双手摸摸被褥的触感，确认自己身处安全的卧室，梦境已完全消散。`;

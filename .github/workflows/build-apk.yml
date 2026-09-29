@@ -64,6 +64,8 @@ jobs:
           npm run build
           ls -la dist/
 
+      - name: Verify Generated CSS Classes
+        run: npm run verify:css
       - name: Install Capacitor Core & Android & Local Notifications Plugin
         run: |
           npm install --save-dev @capacitor/cli @capacitor/core @capacitor/android @capacitor/local-notifications
@@ -112,7 +114,7 @@ jobs:
           <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />' android/app/src/main/AndroidManifest.xml
 
           # 护眼滤镜前台服务 + 作息到点提醒 + 鲸鱼娘桌宠悬浮窗（服务/接收器，specialUse 类型 API 34+ 需属性）
-          sed -i 's|</application>|<service android:name="com.somnacare.gemmallm.EyeCareService" android:exported="false" android:foregroundServiceType="specialUse"><property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="eye_care_overlay_filter"/></service><service android:name="com.somnacare.gemmallm.BedtimeOverlayService" android:exported="false" android:foregroundServiceType="specialUse"><property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="bedtime_reminder_overlay"/></service><service android:name="com.somnacare.gemmallm.PetOverlayService" android:exported="false" android:foregroundServiceType="specialUse"><property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="desktop_pet_overlay"/></service><receiver android:name="com.somnacare.gemmallm.BedtimeAlarmReceiver" android:exported="false" /><service android:name="com.somnacare.gemmallm.EyeCareTileService" android:label="护眼滤镜" android:permission="android.permission.BIND_QUICK_SETTINGS_TILE" android:exported="true"><intent-filter><action android:name="android.service.quicksettings.action.QS_TILE" /></intent-filter></service></application>|' android/app/src/main/AndroidManifest.xml
+          sed -i 's|</application>|<service android:name="com.somnacare.gemmallm.EyeCareService" android:exported="false" android:foregroundServiceType="specialUse"><property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="eye_care_overlay_filter"/></service><service android:name="com.somnacare.gemmallm.BedtimeOverlayService" android:exported="false" android:foregroundServiceType="specialUse"><property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="bedtime_reminder_overlay"/></service><service android:name="com.somnacare.gemmallm.PetOverlayService" android:exported="false" android:foregroundServiceType="specialUse"><property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="desktop_pet_overlay"/></service><receiver android:name="com.somnacare.gemmallm.BedtimeAlarmReceiver" android:exported="false" /><receiver android:name="com.somnacare.gemmallm.BootReceiver" android:exported="false"><intent-filter><action android:name="android.intent.action.BOOT_COMPLETED" /></intent-filter></receiver><service android:name="com.somnacare.gemmallm.EyeCareTileService" android:label="护眼滤镜" android:permission="android.permission.BIND_QUICK_SETTINGS_TILE" android:exported="true"><intent-filter><action android:name="android.service.quicksettings.action.QS_TILE" /></intent-filter></service></application>|' android/app/src/main/AndroidManifest.xml
 
 
           # MediaPipe 要求 minSdk ≥ 24（Capacitor 模板默认 23）
