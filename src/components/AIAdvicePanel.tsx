@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Moon,
   Sparkles,
@@ -24,6 +24,7 @@ import {
   getLocalLlmCacheState,
 } from '../utils/localLlmEngine';
 import { ThemeConfig } from '../utils/themeStyles';
+import { attachHScroll } from '../utils/hscroll';
 
 interface AIAdvicePanelProps {
   records: SleepRecord[];
@@ -75,6 +76,14 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
     }
     return merged.slice(0, 4);
   }, [insights]);
+
+  // 快捷提示词行：挂 JS 横滑（祖先 pane 的 touch-action: pan-y 会禁掉原生横滑）
+  const promptRowRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = promptRowRef.current;
+    if (!el) return;
+    return attachHScroll(el);
+  }, []);
 
   const severityIcon = (sev: PersonalInsight['severity']) =>
     sev === 'good' ? <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
@@ -508,8 +517,14 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
           )}
         </div>
 
-        {/* Quick prompt suggestions */}
-        <div className="py-2 flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
+        {/* 快捷提问：横向可滑动的胶囊行。
+            data-native-hscroll 告知分区轨道"这块自己处理手势"，轨道不会抢走横滑；
+            横滑本身由 hscroll.ts 直接驱动 scrollLeft（见该文件顶部说明）。 */}
+        <div
+          ref={promptRowRef}
+          data-native-hscroll
+          className="py-2 flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0 -mx-1 px-1"
+        >
           {quickPrompts.map((prompt: string, i: number) => (
             <button
               key={i}

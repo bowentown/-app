@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import {
   Moon,
   CheckCircle2,
@@ -29,9 +29,10 @@ export const App: React.FC = () => {
   const TAB_ORDER: NavTab[] = ['today', 'trends', 'coach', 'eyecare', 'settings'];
   const trackRef = useRef<HTMLDivElement>(null);
   const idxRef = useRef(0);
+  const snapMsRef = useRef(300);
   const dragRef = useRef<{
-    x0: number; y0: number; base: number; locked: 'h' | 'y' | null; skip: boolean; aborted: boolean;
-    w: number; lastX: number; lastT: number; v: number;
+    id: number; x0: number; y0: number; base: number; w: number; idx: number;
+    locked: 'h' | 'y' | null; skip: boolean; samples: { t: number; x: number }[];
   } | null>(null);
 
   // Persistence for user logs: Empty by default for new users, prevents overwriting corrupt data
@@ -205,93 +206,145 @@ export const App: React.FC = () => {
     return () => clearInterval(t);
   }, [eyeCareCfg]);
 
-  // 分区滑动轨道：跟手拖拽 + 方向锁 + 边缘橡皮筋，松手按位移/速度吸附
-  const paneW = () => trackRef.current?.parentElement?.clientWidth || window.innerWidth;
-  const setTrack = (px: number, animate: boolean) => {
+  // ===== 分区滑动轨道：跟手拖拽（Pointer Events 统一鼠标/触摸）=====
+  // 关键决策：不用 touch-action 限制浏览器滚动——那会连带禁掉子元素（AI 提示词行）
+  // 的原生横滑。改为在"锁定横向"的瞬间 preventDefault 夺权，纵向手势原样交还浏览器。
+  const paneWRef = useRef(0);
+  const trackPosRef = useRef(0);
+  const SNAP_MS = 300;
+  const SWIPE_START = 8;      // 起拖阈值：够跟手，又不至于把点按误判成滑动
+  const DIR_BIAS = 1.1;      // 横向需比纵向大 10% 才锁定，抵消拇指自然斜度
+  const COMMIT_RATIO = 0.18; // 翻页所需位移（占屏宽）
+  const FLICK_V = 0.32;      // 甩动判定速度 px/ms
+  const VEL_WINDOW = 90;     // 速度采样窗口：只取最近 90ms，避免停顿后抬手误判
+  const EDGE_DAMP = 0.3;     // 首/末页橡皮筋阻尼
+
+  const applyTrack = (px: number, animate: boolean, ms = SNAP_MS) => {
     const el = trackRef.current;
     if (!el) return;
-    el.style.transition = animate ? 'transform 300ms cubic-bezier(0.22,1,0.36,1)' : 'none';
-    el.style.transform = `translateX(${px}px)`;
+    trackPosRef.current = px;
+    el.style.transition = animate ? `transform ${ms}ms cubic-bezier(0.22,1,0.36,1)` : 'none';
+    el.style.transform = `translate3d(${px}px,0,0)`;
   };
-  const setTrackIdx = (idx: number) => setTrack(-idx * paneW(), true);
 
-  const handleTouchStart = (e: React.TouchEvent) => {
-    const t = e.touches[0];
-    const el = e.target as HTMLElement;
-    const skip = !!el.closest('input, textarea, [data-no-swipe]');
-    dragRef.current = {
-      x0: t.clientX, y0: t.clientY,
-      base: -idxRef.current * paneW(),
-      locked: null, skip, aborted: false, w: paneW(),
-      lastX: t.clientX, lastT: performance.now(), v: 0,
-    };
-    if (!skip && trackRef.current) trackRef.current.style.transition = 'none';
-  };
-  const handleTouchMove = (e: React.TouchEvent) => {
-    const d = dragRef.current;
-    if (!d || d.skip) return;
-    const t = e.touches[0];
-    const dx = t.clientX - d.x0;
-    const dy = t.clientY - d.y0;
-    if (d.locked === 'y' || d.aborted) return;
-    if (!d.locked) {
-      // 起拖阈值 14px：轻微抖动的点按绝不误判为拖拽（保证开关等点按可点）
-      if (Math.abs(dx) < 14 && Math.abs(dy) < 14) return;
-      d.locked = Math.abs(dx) > Math.abs(dy) ? 'h' : 'y';
-    }
-    // 手指移入免滑区（滑杆/色相条等）→ 放弃本次拖拽，把触摸还给控件
-    const under = document.elementFromPoint(t.clientX, t.clientY) as HTMLElement | null;
-    if (under && under.closest('input, textarea, [data-no-swipe]')) {
-      d.aborted = true;
-      setTrackIdx(idxRef.current);
-      return;
-    }
-    if (Math.abs(dx) < 14) return;
-    let offset = d.base + dx;
-    const min = -(TAB_ORDER.length - 1) * d.w;
-    if (offset > 0) offset = offset * 0.3;
-    if (offset < min) offset = min + (offset - min) * 0.3;
+  useEffect(() => {
     const el = trackRef.current;
-    if (el) {
-      el.style.transition = 'none';
-      el.style.transform = `translateX(${offset}px)`;
-    }
-    const now = performance.now();
-    d.v = (t.clientX - d.lastX) / Math.max(1, now - d.lastT);
-    d.lastX = t.clientX;
-    d.lastT = now;
-  };
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    const d = dragRef.current;
-    dragRef.current = null;
-    if (!d || d.skip) return;
-    const t = e.changedTouches[0];
-    const dx = t.clientX - d.x0;
-    const dy = t.clientY - d.y0;
-    // 短距点按/被免滑区中止：不做任何切换（点按事件正常派发给控件）
-    if (d.aborted || d.locked !== 'h' || Math.abs(dx) < 24) {
-      setTrackIdx(idxRef.current);
-      return;
-    }
-    let idx = idxRef.current;
-    if (Math.abs(dx) > d.w * 0.22 || Math.abs(d.v) > 0.45) {
-      idx = Math.max(0, Math.min(TAB_ORDER.length - 1, idxRef.current + (dx < 0 ? 1 : -1)));
-    }
-    if (idx !== idxRef.current) {
-      setActiveTab(TAB_ORDER[idx]); // effect 吸附
-    } else {
-      setTrackIdx(idx); // 回弹
-    }
-  };
+    if (!el) return;
+    const measure = () => {
+      paneWRef.current = el.parentElement?.clientWidth || window.innerWidth;
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    if (el.parentElement) ro.observe(el.parentElement);
+    window.addEventListener('resize', measure);
+
+    const onDown = (e: PointerEvent) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      if (e.pointerType === 'mouse' && !e.isPrimary) return;
+      const w = paneWRef.current || el.parentElement?.clientWidth || window.innerWidth;
+      if (!w) return;
+      // 免滑区：滑杆、开关、色盘、横滑条等自己处理手势的控件
+      const skip = !!(e.target as HTMLElement)?.closest?.(
+        'input, textarea, select, [data-no-swipe], [data-native-hscroll]'
+      );
+      dragRef.current = {
+        id: e.pointerId, x0: e.clientX, y0: e.clientY,
+        base: -idxRef.current * w, w, idx: idxRef.current,
+        locked: null, skip, samples: [{ t: performance.now(), x: e.clientX }],
+      };
+      if (!skip) el.style.transition = 'none';
+    };
+
+    const onMove = (e: PointerEvent) => {
+      const d = dragRef.current;
+      if (!d || d.skip || d.id !== e.pointerId) return;
+      const dx = e.clientX - d.x0;
+      const dy = e.clientY - d.y0;
+
+      if (!d.locked) {
+        if (Math.abs(dx) < SWIPE_START && Math.abs(dy) < SWIPE_START) return;
+        if (Math.abs(dx) < Math.abs(dy) * DIR_BIAS) { d.locked = 'y'; return; }
+        d.locked = 'h';
+      }
+      if (d.locked === 'y') return; // 纵向：交还浏览器原生滚动，全程不 preventDefault
+
+      // 夺权：阻止浏览器接管（这一段手势完全由我们驱动，才能 1:1 跟手）
+      if (e.cancelable) e.preventDefault();
+
+      let offset = d.base + dx;
+      const min = -(TAB_ORDER.length - 1) * d.w;
+      if (offset > 0) offset *= EDGE_DAMP;
+      else if (offset < min) offset = min + (offset - min) * EDGE_DAMP;
+      applyTrack(offset, false);
+      d.samples.push({ t: performance.now(), x: e.clientX });
+      if (d.samples.length > 12) d.samples.shift();
+    };
+
+    const swallowClick = (e: MouseEvent) => {
+      e.stopPropagation();
+      e.preventDefault();
+    };
+
+    const finish = (e: PointerEvent) => {
+      const d = dragRef.current;
+      if (!d) return;
+      dragRef.current = null;
+      if (d.skip || d.id !== e.pointerId || d.locked !== 'h') return;
+
+      const now = performance.now();
+      const recent = d.samples.filter((s) => now - s.t <= VEL_WINDOW);
+      let v = 0;
+      if (recent.length >= 2) {
+        const a = recent[0];
+        const b = recent[recent.length - 1];
+        const dt = b.t - a.t;
+        if (dt > 0) v = (b.x - a.x) / dt;
+      }
+      // 实际渲染位移（橡皮筋压缩后的），比原始 dx 更贴近视觉
+      const moved = trackPosRef.current - d.base;
+      let idx = d.idx;
+      if (Math.abs(moved) > d.w * COMMIT_RATIO || Math.abs(v) > FLICK_V) {
+        idx = d.idx + (moved < 0 ? 1 : -1);
+      }
+      idx = Math.max(0, Math.min(TAB_ORDER.length - 1, idx));
+      // 快甩用更短的动画，避免"已经松手了还在慢慢飘"
+      const ms = Math.max(150, Math.min(SNAP_MS, SNAP_MS - Math.abs(v) * 120));
+      snapMsRef.current = ms;
+
+      // 划动会派发合成 click：吞掉这一次，避免顺带触发卡片上的展开/按钮
+      if (Math.abs(moved) > 10) {
+        window.addEventListener('click', swallowClick, { capture: true, once: true });
+      }
+
+      if (idx !== d.idx) {
+        setActiveTab(TAB_ORDER[idx]); // 由下方 layout effect 吸附
+      } else {
+        applyTrack(-d.idx * d.w, true, ms);
+      }
+    };
+
+    el.addEventListener('pointerdown', onDown);
+    // 非 passive：必须能 preventDefault 夺走横向手势，否则浏览器会与拖拽同时滚动
+    el.addEventListener('pointermove', onMove, { passive: false });
+    el.addEventListener('pointerup', finish);
+    el.addEventListener('pointercancel', finish);
+    return () => {
+      el.removeEventListener('pointerdown', onDown);
+      el.removeEventListener('pointermove', onMove);
+      el.removeEventListener('pointerup', finish);
+      el.removeEventListener('pointercancel', finish);
+      window.removeEventListener('resize', measure);
+      ro.disconnect();
+    };
+  }, []);
 
   // activeTab 变化（含底栏点击与滑动吸附）→ 轨道带缓动滑到目标页
-  useEffect(() => {
-    idxRef.current = TAB_ORDER.indexOf(activeTab);
-    const el = trackRef.current;
-    if (el) {
-      el.style.transition = 'transform 300ms cubic-bezier(0.22,1,0.36,1)';
-      el.style.transform = `translateX(${-idxRef.current * (100 / TAB_ORDER.length)}%)`;
-    }
+  // 用 useLayoutEffect：随同浏览器绘制执行，消除"切页先停一帧再动"的顿挫
+  useLayoutEffect(() => {
+    const idx = TAB_ORDER.indexOf(activeTab);
+    idxRef.current = idx;
+    if (dragRef.current) return; // 拖拽中由手势层自行控制轨道，勿争抢
+    applyTrack(-idx * (paneWRef.current || window.innerWidth), true, snapMsRef.current);
   }, [activeTab]);
 
   const showToast = (msg: string) => {
@@ -424,17 +477,13 @@ export const App: React.FC = () => {
         <main className="flex-1 min-h-0 overflow-hidden">
           <div
             ref={trackRef}
-            className="flex h-full"
+            className="flex h-full swipe-track"
             style={{ width: `${TAB_ORDER.length * 100}%` }}
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
-            onTouchCancel={handleTouchEnd}
           >
             {TAB_ORDER.map((id) => (
               <div
                 key={id}
-                className="h-full overflow-y-auto no-scrollbar"
+                className="h-full overflow-y-auto no-scrollbar swipe-pane"
                 style={{ width: `${100 / TAB_ORDER.length}%` }}
               >
                 <div className="p-4 space-y-4 pb-32">

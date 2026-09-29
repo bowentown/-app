@@ -193,3 +193,33 @@ html {
 }
 .animate-tab-from-right { animation: tab-slide-from-right 220ms ease-out; }
 .animate-tab-from-left { animation: tab-slide-from-left 220ms ease-out; }
+
+/* ===== 分区滑动轨道 =====
+   轨道上刻意不设 touch-action。设 pan-y 会沿祖先链禁掉子元素的横向滚动
+   （AI 顾问的提示词行就滑不动了），设 pan-x 则页面无法纵向滚动。
+   横纵分流完全交给 App.tsx 的 Pointer Events 手势层：锁定横向时 preventDefault
+   夺权，纵向则全程不干预，原生滚动照常。 */
+.swipe-track {
+  /* 划动时禁用文本选中与长按菜单，否则手指滑动会选中一片文字 */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+  /* 轨道必须独立成合成层，translate3d 拖拽才不会带动五分区一起重绘 */
+  will-change: transform;
+}
+.swipe-pane {
+  /* pan-y 是"分区横滑不卡顿"的根本：它让浏览器把横向手势完整让给 JS。
+     规范规定 touch-action 取自身与所有祖先的交集，因此副作用是本 pane 内
+     元素的原生横滑（如 AI 提示词行）也会失效——那些行改由 hscroll.ts 用
+     JS 直接驱动 scrollLeft 补偿，行为一致且不受浏览器滚动仲裁影响。 */
+  touch-action: pan-y;
+  /* 滚动到分区内容边界时不再向祖先冒泡，避免连带触发轨道手势 */
+  overscroll-behavior: contain;
+}
+/* 免滑区内的滑杆/开关恢复自身的文本选择（不影响其手势） */
+.swipe-track input,
+.swipe-track [data-no-swipe] {
+  -webkit-user-select: auto;
+  user-select: auto;
+}
