@@ -63,7 +63,7 @@ public class WhaleGirlView extends View {
     private final RectF dst = new RectF();
 
     private final Anim idle, joy, celebrate, sleep, drag, welcome;
-    private final Anim headtilt, wait, think, reading, tea, pillow, eat, play, walk, party, working;
+    private final Anim headtilt, wait, think, reading, tea, pillow, eat, play, walk, party, working, nap;
     private final Anim[] ambient;   // 待机小动作池
     private final Anim[] cheers;    // 庆祝池
 
@@ -131,8 +131,9 @@ public class WhaleGirlView extends View {
         walk      = load(c, "walk", 3, 6, "pingpong", null);
         party     = load(c, "party", 3, 4, "loop", null);
         working   = load(c, "working", 3, 3, "loop", null);
+        nap       = load(c, "nap", 2, 1, "loop", null);
 
-        ambient = buildPool(headtilt, wait, think, reading, tea, pillow, eat, play, walk, working);
+        ambient = buildPool(headtilt, wait, think, reading, tea, pillow, eat, play, walk, working, nap);
         cheers = buildPool(celebrate, party, joy);
 
         current = welcome != null ? welcome : idle;

@@ -131,7 +131,9 @@ export const OneTapSleepTracker: React.FC<OneTapSleepTrackerProps> = ({ onSaveRe
       awakeMinutes: awakeMin,
       sleepScore: score,
       sleepEfficiency: efficiency,
+      // 一键就寝没有输入入口，这个潜伏期是按总时长的启发式估算，如实标注
       latencyMinutes: exactDurationMinutes < 15 ? 2 : 12,
+      latencyEstimated: true,
       wakeCount: exactDurationMinutes < 15 ? 0 : 1,
       wakingMood: exactDurationMinutes < 30 ? 'tired' : 'refreshed',
       preSleepHabits: [],

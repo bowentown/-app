@@ -15,6 +15,18 @@ interface ActiveSleepModalProps {
   targetDurationHours?: number;
 }
 
+// 与 ManualLogModal.HABIT_OPTIONS 同一份清单（那边带图标，这里只需要 id/label）
+const HABIT_OPTIONS: { id: string; label: string }[] = [
+  { id: 'screen_time', label: '睡前玩手机' },
+  { id: 'caffeine', label: '下午喝咖啡/茶' },
+  { id: 'hot_bath', label: '睡前温水澡' },
+  { id: 'meditation', label: '冥想/腹式呼吸' },
+  { id: 'reading', label: '纸质书阅读' },
+  { id: 'workout', label: '晚间运动' },
+  { id: 'alcohol', label: '睡前饮酒' },
+  { id: 'heavy_meal', label: '夜宵饱腹' },
+];
+
 export const ActiveSleepModal: React.FC<ActiveSleepModalProps> = ({
   isOpen,
   onClose,
@@ -38,7 +50,8 @@ export const ActiveSleepModal: React.FC<ActiveSleepModalProps> = ({
   const [selectedMood, setSelectedMood] = useState<WakingMood>('refreshed');
   const [dreamNotes, setDreamNotes] = useState('');
   const [wakeCount, setWakeCount] = useState(1);
-  const [selectedHabits, setSelectedHabits] = useState<string[]>(['hot_bath', 'reading']);
+  const [latencyMinutes, setLatencyMinutes] = useState(15);
+  const [selectedHabits, setSelectedHabits] = useState<string[]>([]);
 
   const audioStreamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -296,7 +309,8 @@ export const ActiveSleepModal: React.FC<ActiveSleepModalProps> = ({
       awakeMinutes: stagesData.awakeMinutes,
       sleepScore: score,
       sleepEfficiency: efficiency,
-      latencyMinutes: 14,
+      latencyMinutes,
+      latencyEstimated: false,
       wakeCount,
       wakingMood: selectedMood,
       preSleepHabits: selectedHabits,
@@ -548,6 +562,44 @@ export const ActiveSleepModal: React.FC<ActiveSleepModalProps> = ({
               className="w-full"
               style={{ accentColor: theme.accentHex }}
             />
+          </div>
+
+          {/* Sleep latency slider：此前硬编码 14 分钟冒充实测值 */}
+          <div className={`mb-4 ${theme.cardInnerBg} border ${theme.cardInnerBorder} rounded-xl p-3`}>
+            <div className={`flex justify-between text-xs ${theme.textSecondary} mb-1.5`}>
+              <span>昨晚躺下后大约多久睡着</span>
+              <span className={`font-semibold ${theme.accentText}`}>{latencyMinutes} 分钟</span>
+            </div>
+            <input
+              type="range"
+              min={5}
+              max={60}
+              step={5}
+              value={latencyMinutes}
+              onChange={(e) => setLatencyMinutes(Number(e.target.value))}
+              className="w-full"
+              style={{ accentColor: theme.accentHex }}
+            />
+          </div>
+
+          {/* 睡前习惯多选：此前状态从未接线，硬编码"热水澡+阅读"入库 */}
+          <div className={`mb-4 ${theme.cardInnerBg} border ${theme.cardInnerBorder} rounded-xl p-3`}>
+            <div className={`text-xs ${theme.textSecondary} mb-2`}>昨晚睡前做了什么（可多选）</div>
+            <div className="flex flex-wrap gap-1.5">
+              {HABIT_OPTIONS.map((h) => {
+                const on = selectedHabits.includes(h.id);
+                return (
+                  <button
+                    key={h.id}
+                    type="button"
+                    onClick={() => setSelectedHabits((prev) => prev.includes(h.id) ? prev.filter((x) => x !== h.id) : [...prev, h.id])}
+                    className={`px-2.5 py-1 rounded-full text-[10px] font-bold border transition-all cursor-pointer active:scale-95 ${on ? `${theme.accentBg} text-white border-transparent` : `${theme.textSecondary} ${theme.cardBg} border-slate-600`}`}
+                  >
+                    {h.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* Dream diary input */}

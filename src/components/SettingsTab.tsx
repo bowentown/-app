@@ -43,15 +43,6 @@ import {
   stopPet,
 } from '../utils/petOverlay';
 
-// 作息目标联动工具：HH:MM ↔ 当日分钟数（跨午夜安全）
-const toMin = (t: string): number => {
-  const [h, m] = t.split(':').map(Number);
-  return h * 60 + m;
-};
-const toClock = (min: number): string => {
-  const norm = ((min % 1440) + 1440) % 1440;
-  return `${String(Math.floor(norm / 60)).padStart(2, '0')}:${String(norm % 60).padStart(2, '0')}`;
-};
 
 // 导入备份的逐条清洗：任何非对象/缺日期/字段异常的条目都会被安全跳过或兜底
 const numOr = (v: unknown, fallback: number): number =>
@@ -86,8 +77,10 @@ function sanitizeRecord(raw: unknown): SleepRecord | null {
   return {
     id: strOr(r.id, `import-${Date.now()}-${Math.round(Math.random() * 1e6)}`),
     date,
-    bedtime: strOr(r.bedtime, '23:30'),
-    wakeTime: strOr(r.wakeTime, '07:30'),
+    // 与 date 同等强度的时间格式校验："abc" 这类坏值会让下游 .split(':') 产出 NaN，
+    // 界面直接显示「早于目标 NaN 分钟」
+    bedtime: typeof r.bedtime === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(r.bedtime) ? r.bedtime : '23:30',
+    wakeTime: typeof r.wakeTime === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(r.wakeTime) ? r.wakeTime : '07:30',
     durationMinutes: duration || 1,
     deepSleepMinutes: clampMin(r.deepSleepMinutes, duration),
     lightSleepMinutes: clampMin(r.lightSleepMinutes, duration),

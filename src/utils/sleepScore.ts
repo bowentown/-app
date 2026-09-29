@@ -4,8 +4,8 @@ import { SleepRecord, SleepStageSegment, WakingMood } from '../types/sleep';
  * Calculates a 0-100 scientific sleep score based on:
  * - Total duration (40 pts) - scored against the user's own target (CBT-I sleep diary
  *   convention: compare against the prescribed window, not a population constant)
- * - Deep sleep ratio (20 pts) - optimal 15%-25%
- * - REM sleep ratio (20 pts) - optimal 20%-25%
+ * - Deep sleep ratio (20 pts) - optimal 15%-30% (short nights skew higher)
+ * - REM sleep ratio (20 pts) - optimal 20%-28%
  * - Sleep efficiency & awakenings (20 pts) - awakenings penalty, latency
  */
 export function calculateSleepScore(
@@ -40,11 +40,11 @@ export function calculateSleepScore(
   // 2. Deep sleep ratio score (max 20)
   const deepRatio = durationMinutes > 0 ? deepSleepMinutes / durationMinutes : 0;
   let deepScore = 0;
-  if (deepRatio >= 0.16 && deepRatio <= 0.25) {
+  if (deepRatio >= 0.15 && deepRatio <= 0.30) {
     deepScore = 20;
-  } else if (deepRatio >= 0.12) {
+  } else if (deepRatio >= 0.11) {
     deepScore = 16;
-  } else if (deepRatio >= 0.08) {
+  } else if (deepRatio >= 0.07) {
     deepScore = 12;
   } else {
     deepScore = 8;
@@ -53,7 +53,7 @@ export function calculateSleepScore(
   // 3. REM sleep ratio score (max 20)
   const remRatio = durationMinutes > 0 ? remSleepMinutes / durationMinutes : 0;
   let remScore = 0;
-  if (remRatio >= 0.20 && remRatio <= 0.26) {
+  if (remRatio >= 0.20 && remRatio <= 0.28) {
     remScore = 20;
   } else if (remRatio >= 0.15) {
     remScore = 16;
@@ -74,12 +74,12 @@ export function calculateSleepScore(
   restScore = Math.max(0, restScore);
 
   // 低分不托底：短睡/零深睡就该拿低分（此前 Math.max(25,…) 会让差记录虚高 15-20 分）
-  const finalScore = Math.min(99, Math.max(5, durationScore + deepScore + remScore + restScore));
+  const finalScore = Math.min(100, Math.max(5, durationScore + deepScore + remScore + restScore));
 
   return {
     score: finalScore,
     // 如实报告效率：此前 Math.max(50,…) 会把真实 25% 的效率显示成 50%
-    efficiency: Math.min(99, Math.max(0, efficiency)),
+    efficiency: Math.min(100, Math.max(0, efficiency)),
   };
 }
 
@@ -137,9 +137,9 @@ export function generateSleepStages(
     const remaining = totalMin - currentMin;
 
     // Earlier cycles have more deep sleep, later cycles have more REM
-    const deepDuration = cycleNum <= 2 ? Math.min(35, Math.floor(remaining * 0.35)) : Math.min(15, Math.floor(remaining * 0.15));
+    const deepDuration = cycleNum <= 2 ? Math.min(30, Math.floor(remaining * 0.30)) : Math.min(13, Math.floor(remaining * 0.12));
     const lightDuration = Math.min(30, Math.floor(remaining * 0.4));
-    const remDuration = cycleNum >= 2 ? Math.min(25, Math.floor(remaining * 0.28)) : Math.min(14, Math.floor(remaining * 0.15));
+    const remDuration = cycleNum >= 2 ? Math.min(21, Math.floor(remaining * 0.23)) : Math.min(11, Math.floor(remaining * 0.13));
 
     if (deepDuration > 5) {
       stages.push({

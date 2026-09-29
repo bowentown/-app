@@ -40,7 +40,6 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
   const [hoveredRecord, setHoveredRecord] = useState<SleepRecord | null>(null);
   const [isHistoryExpanded, setIsHistoryExpanded] = useState(false);
 
-  const count = records.length;
 
   // Use up to last 7 days sorted chronologically
   const last7Records = records.slice(0, 7).reverse();

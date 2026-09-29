@@ -281,17 +281,21 @@ public class PetOverlayService extends Service {
             v.measure(View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
                     View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
             placeBeside(v.getMeasuredWidth(), v.getMeasuredHeight());
-            wm.addView(v, fanLp);
-            fanRoot = v;
-            fanShown = true;
-
-            // 逐个带回弹弹出，比面板的整卡滑入轻快
+            // 首帧透明：初始 alpha/scale 在 addView 之前设好，避免闪一帧
             LinearLayout row = (LinearLayout) v.getChildAt(0);
             for (int i = 0; i < row.getChildCount(); i++) {
                 View b = row.getChildAt(i);
                 b.setAlpha(0f);
                 b.setScaleX(0.2f);
                 b.setScaleY(0.2f);
+            }
+            wm.addView(v, fanLp);
+            fanRoot = v;
+            fanShown = true;
+
+            // 逐个带回弹弹出，比面板的整卡滑入轻快
+            for (int i = 0; i < row.getChildCount(); i++) {
+                View b = row.getChildAt(i);
                 b.animate().alpha(1f).scaleX(1f).scaleY(1f).setStartDelay(i * 55L)
                         .setDuration(210)
                         .setInterpolator(new android.view.animation.OvershootInterpolator(1.8f))
@@ -321,7 +325,7 @@ public class PetOverlayService extends Service {
         FrameLayout wrap = new FrameLayout(this);
         wrap.setPadding(dp(4), dp(4), dp(4), dp(4));   // 给回弹缩放留出窗口内的余量
         LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setOrientation(LinearLayout.VERTICAL);   // 上下排列，贴在角色身侧
         row.setGravity(Gravity.CENTER_VERTICAL);
 
         LinearLayout.LayoutParams p1 = new LinearLayout.LayoutParams(dp(44), dp(44));
@@ -333,7 +337,7 @@ public class PetOverlayService extends Service {
         }), p1);
 
         LinearLayout.LayoutParams p2 = new LinearLayout.LayoutParams(dp(44), dp(44));
-        p2.leftMargin = dp(10);
+        p2.topMargin = dp(10);
         eyeBtn = fanButton(false, "护眼滤镜", new View.OnClickListener() {
             @Override public void onClick(View v) {
                 toggleEyeCare();
@@ -407,7 +411,7 @@ public class PetOverlayService extends Service {
         DisplayInfo di = displayInfo();
         int wx = petParams.x, wy = petParams.y;
         int ww = dp(COLLAPSED_W_DP), wh = dp(COLLAPSED_H_DP);
-        int gap = dp(8), m = dp(4);
+        int gap = dp(2), m = dp(4);   // 尽量贴身
         int leftRoom = wx - gap - m;
         int rightRoom = di.width - (wx + ww) - gap - m;
         int px, py;
@@ -478,16 +482,18 @@ public class PetOverlayService extends Service {
                 tailCx = tlp.leftMargin + dp(8);
             }
 
-            wm.addView(v, bubbleLp);
-            bubbleRoot = v;
-            bubbleShown = true;
-            if (whale != null) whale.setTalking(true);
-            // 播报动画：从尾巴处带回弹放大弹出
+            // 首帧必须是透明的：alpha/scale 必须在 addView 之前设好，
+            // 否则窗口先以不透明态上屏一帧（用户看到的"白帧"就是这个竞态）
             v.setAlpha(0f);
             v.setPivotX(Math.max(dp(1), tailCx));
             v.setPivotY(above ? bh - dp(9) : dp(9));
             v.setScaleX(0.55f);
             v.setScaleY(0.55f);
+            wm.addView(v, bubbleLp);
+            bubbleRoot = v;
+            bubbleShown = true;
+            if (whale != null) whale.setTalking(true);
+            // 播报动画：从尾巴处带回弹放大弹出
             v.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(230)
                     .setInterpolator(new android.view.animation.OvershootInterpolator(1.7f))
                     .start();

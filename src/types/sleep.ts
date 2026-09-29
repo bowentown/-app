@@ -21,7 +21,9 @@ export interface SleepRecord {
   awakeMinutes: number;
   sleepScore: number; // 0 - 100
   sleepEfficiency: number; // percentage, e.g. 92%
-  latencyMinutes: number; // time to fall asleep
+  latencyMinutes: number;
+  /** 入睡潜伏期是用户实测（收尾弹窗滑块）还是系统估算（一键就寝的启发式） */
+  latencyEstimated?: boolean; // time to fall asleep
   wakeCount: number;
   wakingMood: WakingMood;
   preSleepHabits: string[]; // e.g. ['reading', 'screen_time', 'caffeine', 'hot_bath', 'meditation']
@@ -122,7 +124,7 @@ export interface UserProfile {
   smartAlarmEnabled: boolean;
   smartWakeWindowMinutes: number;
   soundDetectionSensitivity: 'low' | 'medium' | 'high';
-  themeColor?: 'midnight' | 'pure_dark' | 'warm_amber' | 'serene_blue' | 'light_clean';
+  themeColor?: 'midnight' | 'pure_dark' | 'warm_amber' | 'serene_blue';
   brightnessLevel: number; // 0 - 100% app display brightness / dimming
   warmthFilter: boolean; // eye protection amber warm tint
   eyeCare?: EyeCareConfig;
