@@ -205,10 +205,11 @@ public class GemmaLLMPlugin extends Plugin {
     public void eyeCareSaveParams(PluginCall call) {
         try {
             String color = safe(call, "color", "#FFB26B");
-            Double w = call.getNumber("warm");
-            Double d = call.getNumber("dim");
-            float warm = w == null ? 0.22f : (float) Math.max(0, Math.min(1, w));
-            float dim = d == null ? 0f : (float) Math.max(0, Math.min(1, d));
+            // 这个 Capacitor 版本的 PluginCall 没有 getNumber(String)，走 getData() 取
+            Object wv = call.getData().get("warm");
+            Object dv = call.getData().get("dim");
+            float warm = wv instanceof Number ? (float) Math.max(0, Math.min(1, ((Number) wv).doubleValue())) : 0.22f;
+            float dim = dv instanceof Number ? (float) Math.max(0, Math.min(1, ((Number) dv).doubleValue())) : 0f;
             EyeCareService.persistState(getContext(), EyeCareService.isActive(), color, warm, dim);
         } catch (Exception ignored) {
         }
