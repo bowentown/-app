@@ -20,9 +20,11 @@ interface Props {
 /** "今天 / 昨天 / MM-dd" */
 function dayLabel(date: string): string {
   const now = new Date();
+  const yDate = new Date(now);
+  yDate.setDate(yDate.getDate() - 1);   // 由 Date 归一化跨月/跨年：此前手算在每月 1 号得出 "00" 日
   const pad = (n: number) => String(n).padStart(2, '0');
   const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-  const yest = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate() - 1)}`;
+  const yest = `${yDate.getFullYear()}-${pad(yDate.getMonth() + 1)}-${pad(yDate.getDate())}`;
   if (date === today) return '今天';
   if (date === yest) return '昨天';
   return date.slice(5).replace('-', '/');
@@ -52,10 +54,12 @@ const CardView: React.FC<{ type: MomentCard; moment: Moment }> = ({ type, moment
     );
   }
   if (type === 'week') {
-    const weekLine = moment.facts.find((f) => f.startsWith('近 '));
-    const good = factOf(moment.facts, '近 7 日有 ');
-    const goodDays = parseInt(good, 10);
-    const total = weekLine ? parseInt((weekLine.match(/近 (\d+) 日/) || [])[1] || '7', 10) : 7;
+    // 事实串是「近 ${week.length} 日有 N 天达到 80 分」——记录不足 7 天时
+    // 写死的前缀匹配不上，曾显示 0/7 与出处清单直接矛盾
+    const weekFact = moment.facts.find((f) => f.startsWith('近 ')) ?? '';
+    const m = weekFact.match(/近 (\d+) 日有 (\d+) 天/);
+    const goodDays = m ? Number(m[2]) : 0;
+    const total = m ? Number(m[1]) : 7;
     const pct = Number.isFinite(goodDays) ? Math.min(100, Math.round((goodDays / (total || 7)) * 100)) : 0;
     return (
       <div className="rounded-xl bg-gradient-to-br from-emerald-900/40 to-slate-900 border border-emerald-800/40 aspect-square p-2.5 flex flex-col justify-between">

@@ -57,6 +57,7 @@ public class PetOverlayService extends Service {
 
     private static final int COLLAPSED_W_DP = 104;
     private static final int COLLAPSED_H_DP = 122;
+    private static final int MINI_DP = 40;   // 最小化态：缩成一颗小鲸鱼，点她恢复
     private static final int FAN_BTN_DP = 46;
     private static final int FAN_GAP_DP = 12;
     private static final long BUBBLE_MS = 7000;
@@ -82,6 +83,7 @@ public class PetOverlayService extends Service {
     };
 
     private boolean fanShown;
+    private boolean minimized;
     private int touchSlop;
 
     // ---- 拖拽状态 ----
@@ -91,6 +93,11 @@ public class PetOverlayService extends Service {
     private final BroadcastReceiver screenReceiver = new BroadcastReceiver() {
         @Override public void onReceive(Context c, Intent i) {
             boolean on = !Intent.ACTION_SCREEN_OFF.equals(i.getAction());
+            if (on && petRoot != null && petParams != null) {
+                // 息屏期间可能转了屏/折叠了：亮屏时重夹一次位置
+                clampToScreen(petParams);
+                safeUpdate(petRoot, petParams);
+            }
             if (whale != null) {
                 if (on) whale.start(); else whale.stop();
             }
@@ -131,9 +138,11 @@ public class PetOverlayService extends Service {
         }
         if (petRoot == null) {
             showPet();
-        } else if (fanShown) {
-            // 幂等重启：按钮窗开着就刷新护眼键的颜色状态
-            updateEyeButton();
+        } else {
+            // 幂等重启：屏幕尺寸可能已变（转屏/折叠/改显示尺寸），重夹一次位置
+            clampToScreen(petParams);
+            safeUpdate(petRoot, petParams);
+            if (fanShown) updateEyeButton();
         }
         return START_STICKY;
     }
@@ -162,6 +171,11 @@ public class PetOverlayService extends Service {
                     PixelFormat.TRANSLUCENT);
             petParams.gravity = Gravity.TOP | Gravity.START;
             petParams.setTitle("大肥鱼");
+            minimized = sp.getBoolean("pet_minimized", false);
+            if (minimized) {
+                petParams.width = dp(MINI_DP);
+                petParams.height = dp(MINI_DP);
+            }
             petParams.x = sp.getInt("pet_x", dp(12));
             petParams.y = sp.getInt("pet_y", dp(260));
             clampToScreen(petParams);
@@ -213,6 +227,10 @@ public class PetOverlayService extends Service {
                     if (whale != null) whale.setDragging(false);
                     dockToEdge();
                 } else if (whale != null) {
+                    if (minimized) {
+                        restore();      // 最小化态：点她恢复原尺寸
+                        return true;
+                    }
                     whale.cheer();
                     if (bubbleShown) {
                         hideBubble();   // 播报期间再点：先收气泡
@@ -246,8 +264,8 @@ public class PetOverlayService extends Service {
         final int targetX;
         DisplayInfo di = displayInfo();
         int left = dp(4);
-        int right = di.width - dp(COLLAPSED_W_DP) - dp(4);
-        targetX = (petParams.x + dp(COLLAPSED_W_DP) / 2) < di.width / 2 ? left : right;
+        int right = di.width - petParams.width - dp(4);
+        targetX = (petParams.x + petParams.width / 2) < di.width / 2 ? left : right;
         petParams.x = targetX;
         clampToScreen(petParams);
         safeUpdate(petRoot, petParams);
@@ -353,6 +371,14 @@ public class PetOverlayService extends Service {
         });
         row.addView(eyeBtn, p2);
 
+        LinearLayout.LayoutParams p3 = new LinearLayout.LayoutParams(dp(44), dp(44));
+        p3.topMargin = dp(10);
+        row.addView(fanButton(R.drawable.pet_ic_minimize, "最小化", new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                minimize();
+            }
+        }), p3);
+
         wrap.addView(row, new FrameLayout.LayoutParams(-2, -2));
         return wrap;
     }
@@ -364,6 +390,10 @@ public class PetOverlayService extends Service {
      * wrap-content 会一路量到窗口（=整屏），把整个屏幕都变成按钮。
      */
     private FrameLayout fanButton(boolean chatIcon, String desc, View.OnClickListener click) {
+        return fanButton(chatIcon ? R.drawable.pet_ic_chat : R.drawable.pet_ic_eye, desc, click);
+    }
+
+    private FrameLayout fanButton(int iconRes, String desc, View.OnClickListener click) {
         FrameLayout btn = new FrameLayout(this);
         GradientDrawable g = new GradientDrawable();
         g.setShape(GradientDrawable.OVAL);
@@ -374,7 +404,7 @@ public class PetOverlayService extends Service {
         btn.setContentDescription(desc);
 
         ImageView iv = new ImageView(this);
-        iv.setImageResource(chatIcon ? R.drawable.pet_ic_chat : R.drawable.pet_ic_eye);
+        iv.setImageResource(iconRes);
         int pad = dp(12);
         iv.setPadding(pad, pad, pad, pad);
         btn.addView(iv, new FrameLayout.LayoutParams(-1, -1));
@@ -406,11 +436,41 @@ public class PetOverlayService extends Service {
         dot.setBackground(dg);
     }
 
+    /** 最小化：缩成 40dp 小鲸鱼，动画照常，点她恢复。位置沿用当前点、重新夹取。 */
+    private void minimize() {
+        minimized = true;
+        hideFan();
+        hideBubble();
+        petParams.width = dp(MINI_DP);
+        petParams.height = dp(MINI_DP);
+        clampToScreen(petParams);
+        safeUpdate(petRoot, petParams);
+        getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                .putBoolean("pet_minimized", true)
+                .putInt("pet_x", petParams.x).putInt("pet_y", petParams.y).apply();
+        if (whale != null) whale.cheer();
+    }
+
+    /** 恢复原尺寸。 */
+    private void restore() {
+        minimized = false;
+        hideFan();
+        hideBubble();
+        petParams.width = dp(COLLAPSED_W_DP);
+        petParams.height = dp(COLLAPSED_H_DP);
+        clampToScreen(petParams);
+        safeUpdate(petRoot, petParams);
+        getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                .putBoolean("pet_minimized", false)
+                .putInt("pet_x", petParams.x).putInt("pet_y", petParams.y).apply();
+        if (whale != null) whale.cheer();
+    }
+
     /** 按钮摆位：贴角色左右不遮挡的一侧；放不下挪到角色下/上方。 */
     private void placeBeside(int pw, int ph) {
         DisplayInfo di = displayInfo();
         int wx = petParams.x, wy = petParams.y;
-        int ww = dp(COLLAPSED_W_DP), wh = dp(COLLAPSED_H_DP);
+        int ww = petParams.width, wh = petParams.height;
         int gap = dp(2), m = dp(4);   // 尽量贴身
         int leftRoom = wx - gap - m;
         int rightRoom = di.width - (wx + ww) - gap - m;
@@ -464,12 +524,12 @@ public class PetOverlayService extends Service {
             bw = Math.max(v.getMeasuredWidth(), dp(140));
             int bh = v.getMeasuredHeight();
             int m = dp(4);
-            int cx = petParams.x + dp(COLLAPSED_W_DP) / 2;
+            int cx = petParams.x + petParams.width / 2;
 
             // 气泡底(顶)边直接压在角色窗内 14dp 处：尾巴尖正好点到她头顶/脚边，
             // 之前"卡片悬在半空"就是因为整块气泡被推到了角色窗上方还留了 10dp
             if (above) bubbleLp.y = Math.max(m, petParams.y - bh + dp(14));
-            else bubbleLp.y = Math.min(di.height - bh - m, petParams.y + dp(COLLAPSED_H_DP) - dp(14));
+            else bubbleLp.y = Math.min(di.height - bh - m, petParams.y + petParams.height - dp(14));
             bubbleLp.x = Math.max(m, Math.min(cx - bw / 2, di.width - bw - m));
 
             // 尾巴尖对准角色头顶中心
@@ -678,8 +738,10 @@ public class PetOverlayService extends Service {
 
     private void clampToScreen(WindowManager.LayoutParams lp) {
         DisplayInfo di = displayInfo();
-        lp.x = Math.max(0, Math.min(lp.x, di.width - dp(COLLAPSED_W_DP)));
-        lp.y = Math.max(0, Math.min(lp.y, di.height - dp(COLLAPSED_H_DP)));
+        int w = lp.width > 0 ? lp.width : dp(COLLAPSED_W_DP);
+        int h = lp.height > 0 ? lp.height : dp(COLLAPSED_H_DP);
+        lp.x = Math.max(0, Math.min(lp.x, di.width - w));
+        lp.y = Math.max(0, Math.min(lp.y, di.height - h));
     }
 
     private void safeUpdate(View v, WindowManager.LayoutParams lp) {

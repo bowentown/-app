@@ -10,6 +10,8 @@ import type { SleepRecord, UserProfile } from '../types/sleep';
 export interface MomentComment {
   friend: string;
   text: string;
+  /** 回复类别：like=点赞自动回复。护栏用标记而非文案前缀（文案会改，护栏会静默失效） */
+  kind?: 'like';
 }
 
 export type MomentCard = 'data' | 'selfie' | 'week';
@@ -47,10 +49,16 @@ export function loadMoments(): Moment[] {
     if (!Array.isArray(list)) return [];
     return list
       .filter((m) => m && typeof m.text === 'string' && typeof m.date === 'string')
-      .map((m) => ({
+      .map((m): Moment => ({
         ...m,
+        // 六个字段全部兜底：{date, text} 这样的残缺旧数据此前会在
+        // m.comments.length / m.facts.map / m.replies.some 五处抛错
+        facts: Array.isArray(m.facts) ? (m.facts as unknown[]).filter((x): x is string => typeof x === 'string') : [],
         cards: Array.isArray(m.cards) && m.cards.length ? m.cards : ['data'],
         likes: Array.isArray(m.likes) ? m.likes : [],
+        comments: Array.isArray(m.comments) ? m.comments : [],
+        replies: Array.isArray(m.replies) ? m.replies : [],
+        liked: m.liked === true,
       }));
   } catch {
     return [];
@@ -298,8 +306,9 @@ export function likeMoment(id: string, cfg?: any): Moment[] {
   const m = list.find((x) => x.id === id);
   if (!m) return list;
   m.liked = !m.liked;
-  if (m.liked && !m.replies.some((r) => r.friend === '蓝色大肥鱼' && r.text.startsWith('[赞]'))) {
-    m.replies.push({ friend: '蓝色大肥鱼', text: localLikeReply() });
+  if (m.liked && !m.replies.some((r) => r.kind === 'like')) {
+    m.replies.push({ friend: '蓝色大肥鱼', text: localLikeReply(), kind: 'like' });
+    m.replies = m.replies.slice(-20);   // 与 MAX_MOMENTS 同思路：回复也设上限
   }
   saveMoments(list);
   return list;

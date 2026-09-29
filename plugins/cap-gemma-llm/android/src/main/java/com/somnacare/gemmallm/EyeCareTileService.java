@@ -42,7 +42,14 @@ public class EyeCareTileService extends TileService {
             }
         } catch (Exception ignored) {
         }
-        refresh();
+        // 按意图的新状态乐观更新：startService 是异步的，这里回读必然是旧值，
+        // 磁贴会"滞后一步"让用户以为没点上。onStartListening 的 refresh 保留作兜底校正
+        Tile t = getQsTile();
+        if (t != null) {
+            t.setState(on ? Tile.STATE_INACTIVE : Tile.STATE_ACTIVE);
+            t.setSubtitle(on ? "已关闭" : "已开启");
+            t.updateTile();
+        }
     }
 
     private void refresh() {

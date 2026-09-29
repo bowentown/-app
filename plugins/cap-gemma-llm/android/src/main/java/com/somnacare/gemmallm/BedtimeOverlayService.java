@@ -45,6 +45,8 @@ public class BedtimeOverlayService extends Service {
     private static final int MOON_COLOR_DEEP = 0xFF2563EB;
 
     private static View overlay;
+    private static final long AUTO_DISMISS_MS = 90_000;   // 全屏提醒的自动收场时限
+    private Runnable autoDismiss;                          // 未触发的超时回调引用，dismiss 时取消
     private static WindowManager wmRef;
 
     @Override
@@ -273,6 +275,10 @@ public class BedtimeOverlayService extends Service {
         try {
             wm.addView(root, lp);
             overlay = root;
+            // 全屏窗曾在用户未点击时永久盖屏（无超时、返回键也收不到）。
+            // 90 秒后自动收场：到点人可能已经睡着，提醒的意义只在弹出的那一刻
+            autoDismiss = () -> dismiss(0);
+            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(autoDismiss, AUTO_DISMISS_MS);
         } catch (Exception e) {
             overlay = null;
             fallbackNotification();
@@ -331,6 +337,10 @@ public class BedtimeOverlayService extends Service {
     }
 
     private void dismiss(long delay) {
+        if (autoDismiss != null) {
+            new android.os.Handler(android.os.Looper.getMainLooper()).removeCallbacks(autoDismiss);
+            autoDismiss = null;   // 已进入收场流程，取消未触发的超时回调
+        }
         new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
             try {
                 if (overlay != null && wmRef != null) {
