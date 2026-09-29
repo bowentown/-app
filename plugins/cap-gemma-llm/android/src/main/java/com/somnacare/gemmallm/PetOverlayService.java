@@ -25,6 +25,7 @@ import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -323,13 +324,16 @@ public class PetOverlayService extends Service {
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
 
+        LinearLayout.LayoutParams p1 = new LinearLayout.LayoutParams(dp(44), dp(44));
         row.addView(fanButton(true, "看播报", new View.OnClickListener() {
             @Override public void onClick(View v) {
                 hideFan();
                 showBubble(nextSayLine(), BUBBLE_MS);
             }
-        }));
+        }), p1);
 
+        LinearLayout.LayoutParams p2 = new LinearLayout.LayoutParams(dp(44), dp(44));
+        p2.leftMargin = dp(10);
         eyeBtn = fanButton(false, "护眼滤镜", new View.OnClickListener() {
             @Override public void onClick(View v) {
                 toggleEyeCare();
@@ -343,27 +347,33 @@ public class PetOverlayService extends Service {
                 }, 600);
             }
         });
-        row.addView(eyeBtn);
+        row.addView(eyeBtn, p2);
 
         wrap.addView(row, new FrameLayout.LayoutParams(-2, -2));
         return wrap;
     }
 
     /**
-     * 磨砂深色圆钮 + 自绘白色矢量图标（对话气泡 / 眼睛）。
-     * 之前拿 emoji 当图标，各机型渲染差异大、和整体风格不搭，改成 Paint 手绘。
+     * 磨砂深色圆钮 + Material 官方矢量图标（Apache-2.0，res/drawable/pet_ic_*.xml）。
+     * emoji 各机型渲染差异大，自绘又不够精致；Material 图标所有设备渲染一致。
+     * 尺寸必须显式指定：按钮内容是 MATCH_PARENT 的 ImageView，
+     * wrap-content 会一路量到窗口（=整屏），把整个屏幕都变成按钮。
      */
     private FrameLayout fanButton(boolean chatIcon, String desc, View.OnClickListener click) {
         FrameLayout btn = new FrameLayout(this);
         GradientDrawable g = new GradientDrawable();
         g.setShape(GradientDrawable.OVAL);
-        g.setColor(0xE61A2542);
+        g.setColor(0xF0162036);
         g.setStroke(dp(1), 0x667FD8FF);
         btn.setBackground(g);
         btn.setOnClickListener(click);
         btn.setContentDescription(desc);
 
-        btn.addView(new IconView(this, chatIcon), new FrameLayout.LayoutParams(-1, -1));
+        ImageView iv = new ImageView(this);
+        iv.setImageResource(chatIcon ? R.drawable.pet_ic_chat : R.drawable.pet_ic_eye);
+        int pad = dp(12);
+        iv.setPadding(pad, pad, pad, pad);
+        btn.addView(iv, new FrameLayout.LayoutParams(-1, -1));
 
         // 护眼钮右上角一个状态点：绿=可开、琥珀=已开
         if (!chatIcon) {
@@ -390,80 +400,6 @@ public class PetOverlayService extends Service {
         dg.setShape(GradientDrawable.OVAL);
         dg.setColor(EyeCareService.isActive() ? 0xFFB9822B : 0xFF37B87B);
         dot.setBackground(dg);
-    }
-
-    /** 自绘矢量图标：对话气泡（带尖角 + 三个点）与眼睛。 */
-    private static final class IconView extends View {
-        private final boolean chat;
-        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final Path path = new Path();
-
-        IconView(Context c, boolean chat) {
-            super(c);
-            this.chat = chat;
-        }
-
-        @Override protected void onDraw(Canvas cv) {
-            float w = getWidth(), h = getHeight();
-            if (w == 0 || h == 0) return;
-            float cx = w / 2f, cy = h / 2f, s = Math.min(w, h);
-            path.reset();
-            paint.setColor(0xFFFFFFFF);
-            paint.setStyle(Paint.Style.FILL);
-            if (chat) {
-                // 圆角气泡 + 左下尖角
-                float bw = s * 0.60f, bh = s * 0.42f;
-                float left = cx - bw / 2, top = cy - bh / 2 - s * 0.05f;
-                path.addRoundRect(left, top, left + bw, top + bh,
-                        bh * 0.42f, bh * 0.42f, Path.Direction.CW);
-                path.moveTo(left + bw * 0.16f, top + bh - 1f);
-                path.lineTo(left + bw * 0.30f, top + bh + s * 0.14f);
-                path.lineTo(left + bw * 0.44f, top + bh - 1f);
-                path.close();
-                cv.drawPath(path, paint);
-                // 气泡里三个点（用底色镂空）
-                paint.setColor(0xFF1A2542);
-                float dy = top + bh / 2f;
-                for (int i = -1; i <= 1; i++) {
-                    cv.drawCircle(cx + i * s * 0.13f, dy, s * 0.045f, paint);
-                }
-            } else {
-                // 眼睛：上下两段弧线勾轮廓 + 实心瞳孔
-                float ew = s * 0.62f, eh = s * 0.40f;
-                paint.setStyle(Paint.Style.STROKE);
-                paint.setStrokeWidth(s * 0.08f);
-                paint.setStrokeCap(Paint.Cap.ROUND);
-                path.moveTo(cx - ew / 2, cy);
-                path.quadTo(cx, cy - eh, cx + ew / 2, cy);
-                path.quadTo(cx, cy + eh, cx - ew / 2, cy);
-                path.close();
-                cv.drawPath(path, paint);
-                paint.setStyle(Paint.Style.FILL);
-                cv.drawCircle(cx, cy, s * 0.105f, paint);
-            }
-        }
-    }
-
-    /** 按钮摆位：贴角色左右不遮挡的一侧；放不下挪到角色下/上方。 */
-    private void placeBeside(int pw, int ph) {
-        DisplayInfo di = displayInfo();
-        int wx = petParams.x, wy = petParams.y;
-        int ww = dp(COLLAPSED_W_DP), wh = dp(COLLAPSED_H_DP);
-        int gap = dp(8), m = dp(4);
-        int leftRoom = wx - gap - m;
-        int rightRoom = di.width - (wx + ww) - gap - m;
-        int px, py;
-        if (leftRoom >= pw || rightRoom >= pw) {
-            boolean goLeft = leftRoom >= pw && (rightRoom < pw || leftRoom >= rightRoom);
-            px = goLeft ? wx - pw - gap : wx + ww + gap;
-            py = wy + wh / 2 - ph / 2;
-        } else {
-            px = wx + ww / 2 - pw / 2;
-            boolean belowOk = wy + wh + gap + ph <= di.height - m;
-            py = belowOk ? wy + wh + gap : wy - ph - gap;
-        }
-        fanLp.x = Math.max(m, Math.min(px, di.width - pw - m));
-        fanLp.y = Math.max(m, Math.min(py, di.height - ph - m));
     }
 
     // ================= 大肥鱼播报气泡 =================

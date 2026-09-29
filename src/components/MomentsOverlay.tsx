@@ -146,49 +146,50 @@ export const MomentsOverlay: React.FC<Props> = ({ records, userProfile, onClose 
   };
 
   return (
-    <div className="fixed inset-0 z-[90] bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center">
-      <div className="w-full sm:max-w-md h-[88vh] sm:h-[80vh] bg-slate-950 rounded-t-3xl sm:rounded-3xl border border-slate-700/60 overflow-hidden flex flex-col">
-        {/* 顶部封面：她的人设卡 */}
-        <div className="relative shrink-0">
-          <div className="h-28 bg-gradient-to-br from-sky-700 via-blue-800 to-slate-900" />
-          <button
-            type="button"
-            onClick={onClose}
-            className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/40 text-white flex items-center justify-center cursor-pointer active:scale-90 transition-transform"
-            aria-label="关闭"
-          >
-            <X className="w-4 h-4" />
-          </button>
-          <div className="absolute -bottom-6 left-4 flex items-end gap-3">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-sky-400 to-blue-600 flex items-center justify-center text-3xl border-2 border-slate-900 shadow-xl">
-              🐋
-            </div>
-            <div className="pb-0.5">
-              <p className="text-sm font-black text-white drop-shadow">蓝色大肥鱼</p>
-              <p className="text-[10px] text-slate-300">聪明但懒 · 事已至此，先吃饭吧</p>
-            </div>
+    <div
+      className="fixed inset-0 z-[90] flex flex-col bg-slate-950"
+      style={{ backgroundColor: '#020617' }}
+    >
+      {/* 顶栏：独立页签样式 */}
+      <div className="shrink-0 flex items-center justify-between px-4 pt-3 pb-2.5 border-b border-slate-800/80">
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-400 to-blue-600 flex items-center justify-center text-xl">🐋</div>
+          <div>
+            <p className="text-xs font-black text-white leading-tight">大肥鱼的朋友圈</p>
+            <p className="text-[9px] text-slate-500">蓝色大肥鱼 · 聪明但懒 · 事已至此，先吃饭吧</p>
           </div>
+        </div>
+        <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={() => void regenerate()}
             disabled={busy}
-            className="absolute bottom-2 right-3 px-2.5 py-1.5 rounded-full bg-white/10 border border-white/20 text-[10px] font-bold text-white flex items-center gap-1 cursor-pointer disabled:opacity-40 active:scale-95 transition-transform"
+            className="px-2.5 py-1.5 rounded-full bg-white/10 border border-white/20 text-[10px] font-bold text-white flex items-center gap-1 cursor-pointer disabled:opacity-40 active:scale-95 transition-transform"
           >
             {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
             生成今日动态
           </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-8 h-8 rounded-full bg-slate-800/80 border border-slate-700 text-white flex items-center justify-center cursor-pointer active:scale-90 transition-transform"
+            aria-label="关闭"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
+      </div>
 
-        {!hasAi && (
-          <p className="px-4 pt-8 text-[10px] text-slate-500 leading-relaxed">
-            未配置 DeepSeek API：文案走本地傲娇模板（同样基于真实数据）。
-            在「AI 顾问」里配置后，她会写得更有梗。
-          </p>
-        )}
-        {note && <p className="px-4 pt-2 text-[10px] text-sky-300 font-bold">{note}</p>}
+      {!hasAi && (
+        <p className="px-4 pt-3 text-[10px] text-slate-500 leading-relaxed shrink-0">
+          未配置 DeepSeek API：文案走本地傲娇模板（同样基于真实数据）。
+          在「AI 顾问」里配置后，她会写得更有梗。
+        </p>
+      )}
+      {note && <p className="px-4 pt-2 text-[10px] text-sky-300 font-bold shrink-0">{note}</p>}
 
-        {/* 朋友圈时间线 */}
-        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+      {/* 朋友圈时间线 */}
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
           {moments.length === 0 && !busy && (
             <p className="text-center text-xs text-slate-500 pt-10">她还没发过动态……去睡一觉再来催她。</p>
           )}
@@ -300,7 +301,6 @@ export const MomentsOverlay: React.FC<Props> = ({ records, userProfile, onClose 
             </div>
           ))}
         </div>
-      </div>
     </div>
   );
 };
