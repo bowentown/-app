@@ -92,7 +92,8 @@ export function calculateSleepScore(
 export function generateSleepStages(
   bedtimeStr: string,
   wakeTimeStr: string,
-  latencyMinutes: number = 12
+  latencyMinutes: number = 12,
+  wakeCount: number = 1
 ): {
   stages: SleepStageSegment[];
   deepMinutes: number;
@@ -133,13 +134,20 @@ export function generateSleepStages(
   currentMin += latency;
 
   // 生理预算：N3 集中在前半夜——绝对分钟随时长增长（前 4h 计 25%、其后 15%），
-  // 占比随之温和递减（4h≈25%、8h≈20%、12h≈18%）；REM 占比温和上升（20%→24%）。
-  // 这是从"人的睡眠结构"出发，而不是从"让生成器输出落进评分带"出发
+  // 占比随之温和递减（4h≈25%、8h≈20%、12h≈18%）；这从"人的睡眠结构"出发。
+  // REM 预算（前 4h 计 20%、其后 26%）只是上限：REM 集中在后半夜，分配天然
+  // 向长睡夜倾斜，短睡夜的兑现率低（2h 约 11%）——这正是 REM 的生理特性，
+  // 公式不要按实际占比去"校准"。
   const sleepBudget = Math.max(0, totalMin - latency);
   const deepTotal = Math.round(0.25 * Math.min(sleepBudget, 240) + 0.15 * Math.max(0, sleepBudget - 240));
   const remTotal = Math.round(0.20 * Math.min(sleepBudget, 240) + 0.26 * Math.max(0, sleepBudget - 240));
   let deepLeft = deepTotal;
   let remLeft = remTotal;
+
+  // 夜醒段：按用户记录的次数分配（每次 5 分钟，从第 2 周期起每隔一个周期落一段），
+  // 段数受夜晚长度约束；此前是固定的"第 2 周期 1 段 5 分钟"，与用户填的次数无关
+  const wakeSegmentsTarget = Math.max(0, Math.min(Math.round(wakeCount), 8));
+  let wakeSegmentsPlaced = 0;
 
   // Cycles of ~90 mins: deep -> light -> rem
   let cycleNum = 0;
@@ -196,8 +204,9 @@ export function generateSleepStages(
       currentMin += remDuration;
     }
 
-    // Occasional brief arousal
-    if (cycleNum === 2 && currentMin < totalMin - 20) {
+    // 夜醒段：第 2、4、6… 周期各落一段，直到配额用完
+    if (cycleNum >= 2
+        && wakeSegmentsPlaced < wakeSegmentsTarget && currentMin < totalMin - 20) {
       stages.push({
         stage: 'awake',
         startTime: formatTimeOffset(bedDate, currentMin),
@@ -205,6 +214,7 @@ export function generateSleepStages(
         durationMinutes: 5,
       });
       awakeMin += 5;
+      wakeSegmentsPlaced++;
       currentMin += 5;
     }
   }

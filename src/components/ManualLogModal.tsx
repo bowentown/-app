@@ -25,10 +25,12 @@ const HABIT_OPTIONS = [
   { id: 'workout', label: '晚间运动', icon: Dumbbell },
   { id: 'alcohol', label: '睡前饮酒', icon: Wine },
   { id: 'heavy_meal', label: '夜宵饱腹', icon: Utensils },
-].map((h) => ({
-  ...habitCatalogById[h.id],
-  icon: h.icon,
-}));
+].map((h) => {
+  const catalog = habitCatalogById[h.id];
+  // 目录缺 id 时宁可构建期报错，也别静默产出没有文字的空白 chip
+  if (!catalog) throw new Error('habitCatalog 缺少 id: ' + h.id);
+  return { ...catalog, icon: h.icon };
+});
 
 export const ManualLogModal: React.FC<ManualLogModalProps> = ({
   isOpen,
@@ -64,7 +66,7 @@ export const ManualLogModal: React.FC<ManualLogModalProps> = ({
   };
 
   const handleSave = () => {
-    const stagesData = generateSleepStages(bedtime, wakeTime, latencyMinutes);
+    const stagesData = generateSleepStages(bedtime, wakeTime, latencyMinutes, wakeCount);
     const [bH, bM] = bedtime.split(':').map(Number);
     const [wH, wM] = wakeTime.split(':').map(Number);
 

@@ -272,7 +272,7 @@ export const ActiveSleepModal: React.FC<ActiveSleepModalProps> = ({
     const bedtimeStr = `${bHour}:${bMin}`;
     const wakeTimeStr = `${wHour}:${wMin}`;
 
-    const stagesData = generateSleepStages(bedtimeStr, wakeTimeStr, latencyMinutes);
+    const stagesData = generateSleepStages(bedtimeStr, wakeTimeStr, latencyMinutes, wakeCount);
     // 统一语义：durationMinutes = 纯睡眠（卧床窗 − 觉醒段），与其他记录入口一致
     const sleepMinutes = Math.max(1, effectiveMinutes - stagesData.awakeMinutes);
     const { score, efficiency } = calculateSleepScore(
@@ -584,7 +584,7 @@ export const ActiveSleepModal: React.FC<ActiveSleepModalProps> = ({
                     key={h.id}
                     type="button"
                     onClick={() => setSelectedHabits((prev) => prev.includes(h.id) ? prev.filter((x) => x !== h.id) : [...prev, h.id])}
-                    style={on ? { backgroundColor: `${theme.accentHex}33`, borderColor: theme.accentHex } : undefined}
+                    style={on ? { backgroundColor: `${theme.accentHex}26`, borderColor: theme.accentHex } : undefined}
                     className={`px-2.5 py-1 rounded-full text-[10px] font-bold border transition-all cursor-pointer active:scale-95 ${on ? `${theme.accentText} border` : `${theme.textSecondary} ${theme.cardBg} border-slate-600`}`}
                   >
                     {h.label}
