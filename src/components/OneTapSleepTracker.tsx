@@ -21,6 +21,7 @@ export const OneTapSleepTracker: React.FC<OneTapSleepTrackerProps> = ({ onSaveRe
   const [elapsedMinutes, setElapsedMinutes] = useState(0);
   const [showSummaryModal, setShowSummaryModal] = useState(false);
   const [completedRecord, setCompletedRecord] = useState<SleepRecord | null>(null);
+  const [sessionTruncated, setSessionTruncated] = useState(false);
 
   useEffect(() => {
     if (!sleepStartTime) {
@@ -55,18 +56,21 @@ export const OneTapSleepTracker: React.FC<OneTapSleepTrackerProps> = ({ onSaveRe
   const handleWakeUp = () => {
     if (!sleepStartTime) return;
 
-    const startDate = new Date(sleepStartTime);
     const wakeDate = new Date();
 
-    const bedtimeStr = `${String(startDate.getHours()).padStart(2, '0')}:${String(
-      startDate.getMinutes()
+    // 会话时长上限 16 小时：忘记结束的会话（如放了几天）不产生多天时长的荒谬记录；
+    // 截断时入睡时刻按"醒来 − 16h"反推，保证分期推演窗口与记录时长一致
+    const rawDurationMinutes = Math.max(1, Math.round((wakeDate.getTime() - sleepStartTime) / 60000));
+    const exactDurationMinutes = Math.min(960, rawDurationMinutes);
+    const sessionTruncated = rawDurationMinutes > 960;
+    const effectiveStart = new Date(wakeDate.getTime() - exactDurationMinutes * 60000);
+
+    const bedtimeStr = `${String(effectiveStart.getHours()).padStart(2, '0')}:${String(
+      effectiveStart.getMinutes()
     ).padStart(2, '0')}`;
     const wakeTimeStr = `${String(wakeDate.getHours()).padStart(2, '0')}:${String(
       wakeDate.getMinutes()
     ).padStart(2, '0')}`;
-
-    // STRICT REALISTIC CALCULATION: EXACT DURATION, NO 7.5h OVERWRITE BUG
-    const exactDurationMinutes = Math.max(1, Math.round((wakeDate.getTime() - sleepStartTime) / 60000));
 
     const generated = generateSleepStages(bedtimeStr, wakeTimeStr);
 
@@ -120,6 +124,7 @@ export const OneTapSleepTracker: React.FC<OneTapSleepTrackerProps> = ({ onSaveRe
     localStorage.removeItem('somnacare_bedtime_start');
     setSleepStartTime(null);
     setCompletedRecord(newRecord);
+    setSessionTruncated(sessionTruncated);
     setShowSummaryModal(true);
     onSaveRecord(newRecord);
   };
@@ -215,6 +220,13 @@ export const OneTapSleepTracker: React.FC<OneTapSleepTrackerProps> = ({ onSaveRe
             <h3 className="text-2xl font-black tracking-tight text-white mb-2">
               本次睡眠评定 {completedRecord.sleepScore} 分
             </h3>
+
+            {sessionTruncated && (
+              <div className="mb-4 text-xs text-amber-300 bg-amber-950/60 p-2.5 rounded-xl border border-amber-500/40 flex items-center gap-1.5 text-left">
+                <AlertTriangle className="w-4 h-4 shrink-0 text-amber-400" />
+                <span>监测会话超过 16 小时，已按 16 小时记录（可能是忘记点"已醒来"）。</span>
+              </div>
+            )}
 
             {completedRecord.durationMinutes < 30 && (
               <div className="mb-4 text-xs text-amber-300 bg-amber-950/60 p-2.5 rounded-xl border border-amber-500/40 flex items-center gap-1.5 text-left">

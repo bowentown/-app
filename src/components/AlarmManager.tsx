@@ -90,12 +90,15 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
       const currentDay = now.getDay() === 0 ? 7 : now.getDay(); // 1-7
 
       alarms.forEach((alarm) => {
+        const fireKey = `${alarm.id}|${alarm.time}|${currentDay}`;
         if (
           alarm.enabled &&
           alarm.time === currentTimeStr &&
-          (alarm.repeatDays.length === 0 || alarm.repeatDays.includes(currentDay))
+          (alarm.repeatDays.length === 0 || alarm.repeatDays.includes(currentDay)) &&
+          lastFiredKeyRef.current !== fireKey
         ) {
           if (!activeRingingAlarm) {
+            lastFiredKeyRef.current = fireKey;
             setActiveRingingAlarm(alarm);
             sleepAudio.playAlarm(alarm.tone);
           }
@@ -106,6 +109,10 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
     const interval = window.setInterval(checkAlarm, 10000);
     return () => window.clearInterval(interval);
   }, [alarms, activeRingingAlarm]);
+
+  // 同一分钟内已响过并被手动停止的闹钟不再重触发（此前停止后若仍在原分钟内，
+  // 下一轮 10s 检查会立即再次响铃）
+  const lastFiredKeyRef = React.useRef<string>('');
 
   const handleTestTone = (tone: 'gentle_chime' | 'aurora_melody' | 'radar_beep') => {
     if (testingTone === tone) {

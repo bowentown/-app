@@ -173,6 +173,7 @@ export const App: React.FC = () => {
   };
   useEffect(() => {
     if (!isNativePlatform()) return;
+    let listenerHandle: any = null;
     try {
       const cap = (window as any).Capacitor;
       if (userProfile.bedtimeReminderEnabled) {
@@ -183,10 +184,16 @@ export const App: React.FC = () => {
       cap.Plugins?.GemmaLLM?.bedtimeAutoStartConsume?.().then((res: any) => {
         if (res?.consume) runGoodPath();
       });
-      cap.Plugins?.GemmaLLM?.addListener?.('bedtimeGood', () => runGoodPath());
+      // addListener 返回句柄，卸载/依赖变化时必须移除（否则每次改目标都叠加一个监听器）
+      Promise.resolve(cap.Plugins?.GemmaLLM?.addListener?.('bedtimeGood', () => runGoodPath()))
+        .then((h: any) => { listenerHandle = h; })
+        .catch(() => {});
     } catch {
       // ignore
     }
+    return () => {
+      try { listenerHandle?.remove?.(); } catch { /* ignore */ }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userProfile.targetBedtime, userProfile.bedtimeReminderEnabled]);
 

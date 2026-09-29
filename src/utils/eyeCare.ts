@@ -131,7 +131,13 @@ export async function applyEyeCare(cfg: EyeCareConfig | undefined, force = false
   const { warmColor, warmAlpha, dimAlpha } = eyeCareOverlayParams(cfg);
   const shouldRun = cfg.enabled && isInEyeCareWindow(cfg);
   const sig = shouldRun ? `on|${warmColor}|${warmAlpha.toFixed(3)}|${dimAlpha.toFixed(3)}` : 'off';
-  if (sig === lastAppliedSig && Date.now() - lastApplyAt < 800) return shouldRun;
+  // 目标状态与上次一致且已在生效 → 跳过（避免 30s 轮询反复 startForegroundService）
+  const alreadyInDesiredState = sig === lastAppliedSig && (shouldRun ? wasStarted() : !wasStarted());
+  if (alreadyInDesiredState && Date.now() - lastApplyAt < 800) return shouldRun;
+  if (sig === lastAppliedSig && alreadyInDesiredState) {
+    lastApplyAt = Date.now();
+    return shouldRun;
+  }
   lastApplyAt = Date.now();
   lastAppliedSig = sig;
 
