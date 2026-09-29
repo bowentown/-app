@@ -16,6 +16,7 @@ import { ManualLogModal } from './components/ManualLogModal';
 import { APP_THEMES } from './utils/themeStyles';
 import { isNativePlatform, syncAlarmsToNative } from './utils/nativeAlarmScheduler';
 import { applyEyeCare, eyeCareInAppStyles, isInEyeCareWindow } from './utils/eyeCare';
+import { consumePendingTab, syncPet } from './utils/petOverlay';
 import { LaunchSplash } from './components/LaunchSplash';
 import { BedtimeReminder, BedtimeReminderPhase } from './components/BedtimeReminder';
 
@@ -132,6 +133,33 @@ export const App: React.FC = () => {
       syncAlarmsToNative(userProfile.alarms || []);
     }
   }, []);
+
+  // 鲸鱼娘速览卡点行后拉起 App：读取并清除原生写入的目标分区
+  useEffect(() => {
+    if (!isNativePlatform()) return;
+    let cancelled = false;
+    const apply = () => {
+      void consumePendingTab().then((tab) => {
+        if (cancelled || !tab) return;
+        if ((TAB_ORDER as string[]).includes(tab)) setActiveTab(tab as NavTab);
+      });
+    };
+    apply();
+    // 从后台被桌宠拉起时 App 不重新挂载，靠 visibilitychange 补一次
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') apply();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      cancelled = true;
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, []);
+
+  // 桌宠速览卡文案跟随数据刷新（只在桌宠开着时推送）
+  useEffect(() => {
+    void syncPet(records, userProfile);
+  }, [records, userProfile]);
 
   // 作息目标到点提醒：目标就寝时刻起 15 分钟内、当日未提醒、且未在监测中 → 全屏提醒
   useEffect(() => {

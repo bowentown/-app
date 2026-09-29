@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ChevronDown,
   RotateCcw,
@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   Download,
   Upload,
+  Fish,
 } from 'lucide-react';
 import { UserProfile, CustomAlarmSetting, CustomAIConfig, SleepRecord, SleepStageSegment } from '../types/sleep';
 import { AlarmManager } from './AlarmManager';
@@ -28,6 +29,15 @@ function switchLauncherIcon(themeId: string) {
   }
 }
 import { getActiveModelLabel } from '../utils/localLlmEngine';
+import {
+  buildPetSnapshot,
+  isPetEnabled,
+  isPetNative,
+  petOpenPermissionSettings,
+  petPermissionGranted,
+  startPet,
+  stopPet,
+} from '../utils/petOverlay';
 
 // 作息目标联动工具：HH:MM ↔ 当日分钟数（跨午夜安全）
 const toMin = (t: string): number => {
@@ -116,6 +126,42 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
 }) => {
   const [themeOpen, setThemeOpen] = useState(false);
   const [isAIConfigOpen, setIsAIConfigOpen] = useState(false);
+
+  // 鲸鱼娘桌宠
+  const petNative = isPetNative();
+  const [petOn, setPetOn] = useState(() => isPetEnabled());
+  const [petGranted, setPetGranted] = useState(true);
+  const [petBusy, setPetBusy] = useState(false);
+
+  useEffect(() => {
+    if (!petNative) return;
+    void petPermissionGranted().then(setPetGranted);
+  }, [petNative]);
+
+  // 速览卡里那几行文案，随数据实时预览
+  const petPreview = buildPetSnapshot(records, userProfile);
+
+  const handlePetToggle = async (next: boolean) => {
+    if (!petNative) return;
+    setPetBusy(true);
+    try {
+      if (next) {
+        const res = await startPet(records, userProfile);
+        if (res.needPermission) {
+          setPetGranted(false);
+          setPetOn(false);
+          return;
+        }
+        setPetOn(res.ok);
+        if (res.ok) setPetGranted(true);
+      } else {
+        await stopPet();
+        setPetOn(false);
+      }
+    } finally {
+      setPetBusy(false);
+    }
+  };
 
   const handleExportJSON = () => {
     const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(records, null, 2));
@@ -216,6 +262,70 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             );
           })}
         </div>
+        )}
+      </div>
+
+      {/* 4. 鲸鱼娘桌宠悬浮窗 */}
+      <div className={`${theme.cardBg} rounded-3xl p-5 border ${theme.cardBorder} shadow-xl space-y-3`}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-2xl bg-sky-500/20 text-sky-300 flex items-center justify-center border border-sky-400">
+              <Fish className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-black text-white">鲸鱼娘桌宠</h3>
+              <p className="text-[10px] text-slate-400" aria-live="polite">
+                {petNative
+                  ? petOn
+                    ? '常驻桌面 · 点她打开速览卡'
+                    : '开启后常驻在其他应用之上'
+                  : '网页预览不可用，安装 APK 后生效'}
+              </p>
+            </div>
+          </div>
+          {petNative && (
+            <label className="relative inline-flex items-center cursor-pointer shrink-0">
+              <input
+                type="checkbox"
+                checked={petOn}
+                disabled={petBusy}
+                onChange={(e) => void handlePetToggle(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-slate-600 peer-checked:bg-sky-500 rounded-full transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:transition-transform peer-checked:after:translate-x-5" />
+            </label>
+          )}
+        </div>
+
+        {/* 速览卡预览：桌宠面板里就是这四行 */}
+        <div className="rounded-2xl bg-slate-900/60 border border-slate-700/60 p-3.5 space-y-1.5">
+          <p className="text-[11px] font-bold text-sky-300">{petPreview.status}</p>
+          {[
+            ['今晚', petPreview.rowToday],
+            ['趋势', petPreview.rowTrends],
+            ['顾问', petPreview.rowCoach],
+            ['护眼', '点她可直接开关护眼滤镜'],
+          ].map(([k, v]) => (
+            <div key={k} className="flex items-center justify-between text-[11px]">
+              <span className="text-slate-400 font-medium">{k}</span>
+              <span className="text-sky-200 font-bold text-right">{v}</span>
+            </div>
+          ))}
+        </div>
+
+        {petNative && !petGranted && (
+          <button
+            type="button"
+            onClick={() => void petOpenPermissionSettings()}
+            className="w-full py-2.5 rounded-xl bg-sky-500/20 border border-sky-400 text-sky-200 text-xs font-bold cursor-pointer active:scale-[0.98] transition-transform"
+          >
+            需要悬浮窗权限 · 前往系统设置授权
+          </button>
+        )}
+        {petNative && (
+          <p className="text-[10px] text-slate-500">
+            拖动可挪位置，松手自动吸附到屏幕边缘；点角色展开速览卡，点卡外收起。
+          </p>
         )}
       </div>
 
