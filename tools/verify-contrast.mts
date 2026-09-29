@@ -7,6 +7,9 @@
  * 实测偏差（第三轮报告），因此 chip 断言的阈值留了余量。
  * 方法论约束：颜色映射缺失必须报错，禁止 if(!x) return 静默跳过。
  */
+import { readdirSync, statSync, readFileSync } from 'node:fs';
+import { join as j2, relative as r2 } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { APP_THEMES } from '../src/utils/themeStyles.ts';
 
 const TAILWIND: Record<string, string> = {
@@ -70,6 +73,25 @@ for (const [name, theme] of Object.entries(APP_THEMES)) {
   // oklch 实测偏差余量（第三轮报告：静态 vs 浏览器差 ~0.2）
   if (c3 < 4.5) problems.push(`${name}: chip 文字 ${c3.toFixed(2)}:1 < 4.5`);
 }
+// ── 调用点扫描：那个曾经的缺陷（accentBg + 硬编码白字）发生在调用处，
+// 只算主题对象自身永远拦不住它 ──
+{
+  const SRC2 = fileURLToPath(new URL('../src', import.meta.url)).replace(/\/$/, '');
+  const walk = (d: string): string[] => readdirSync(d).flatMap((n) => {
+    const p2 = j2(d, n);
+    return statSync(p2).isDirectory() ? walk(p2) : (p2.endsWith('.tsx') ? [p2] : []);
+  });
+  for (const f of walk(SRC2)) {
+    const src = readFileSync(f, 'utf-8');
+    for (const m of src.matchAll(/className=\{`([^`]+)`\}/g)) {
+      const chunk = m[1];
+      if (chunk.includes('accentBg') && /(?<![-:a-z])text-white(?![-a-z])/.test(chunk)) {
+        problems.push(`${r2(SRC2, f)}:${src.slice(0, m.index).split('\n').length} 调用点 accentBg 与硬编码 text-white 同现（前景色必须走 accentFg）`);
+      }
+    }
+  }
+}
+
 if (problems.length > 0) {
   console.error('✗ 对比度护栏：');
   for (const p of problems) console.error('  ' + p);

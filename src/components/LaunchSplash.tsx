@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { ThemeConfig } from '../utils/themeStyles';
-import { useModalA11y } from '../utils/modalA11y';
 
 const KEY = 'somnacare_splash_shown';
 
@@ -268,13 +267,10 @@ export const LaunchSplash: React.FC<{ theme: ThemeConfig }> = ({ theme }) => {
     };
   }, [visible]);
 
-  const splashA11y = useModalA11y(visible, () => {}, '启动画面', { closeOnEscape: false });
-  if (!visible) return null;
+  if (!visible) return null;   // 装饰性开屏：不声明为对话框（内部无可聚焦元素，aria-modal 曾把读屏用户锁在画面外）
 
   return (
     <div
-      ref={splashA11y.ref}
-      {...splashA11y.dialogProps}
       className={`fixed inset-0 z-[200] overflow-hidden transition-opacity duration-500 ${fading ? 'opacity-0' : 'opacity-100'}`}
     >
       <SplashScene theme={theme} variant="splash" />

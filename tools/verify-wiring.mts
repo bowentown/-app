@@ -27,7 +27,8 @@ const files = listFiles(SRC);
 const imported = new Set<string>();
 for (const f of files) {
   const src = readFileSync(f, 'utf-8');
-  for (const m of src.matchAll(/from\s+['"](\.[^'"]+)['"]/g)) {
+  // 静态 from '...' 与动态 import('...') 都计入——React.lazy 的组件不是孤儿
+  for (const m of src.matchAll(/(?:from\s+|import\()['"](\.[^'"]+)['"]/g)) {
     // 相对导入必须以"导入文件所在目录"为基准解析，不能以 src/ 为基准
     const base = join(dirname(f), m[1]);
     for (const cand of [base, base + '.ts', base + '.tsx', join(base, 'index.ts'), join(base, 'index.tsx')]) {
@@ -40,10 +41,26 @@ for (const f of files) {
   }
 }
 
-const orphans = files.filter((f) => {
-  if (ENTRY.has(basename(f))) return false;
-  return !imported.has(f);
-});
+// 死代码的正确判据是"从入口不可达"：两个互相引用的孤儿此前会互相保活
+const reachable = new Set<string>();
+const queue = files.filter((f) => ENTRY.has(basename(f)));
+while (queue.length > 0) {
+  const f = queue.shift()!;
+  if (reachable.has(f)) continue;
+  reachable.add(f);
+  const src = readFileSync(f, 'utf-8');
+  for (const m of src.matchAll(/(?:from\s+|import\()['"](\.[^'"]+)['"]/g)) {
+    const base = join(dirname(f), m[1]);
+    for (const cand of [base, base + '.ts', base + '.tsx', join(base, 'index.ts'), join(base, 'index.tsx')]) {
+      try {
+        statSync(cand);
+        if (!reachable.has(cand)) queue.push(cand);
+        break;
+      } catch { /* 候选路径不存在 */ }
+    }
+  }
+}
+const orphans = files.filter((f) => !reachable.has(f));
 
 if (orphans.length > 0) {
   console.error('✗ 发现孤儿文件（无任何引用）：');

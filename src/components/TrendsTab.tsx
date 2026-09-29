@@ -150,7 +150,15 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
                   const isHovered = activeRecord?.id === r.id;
 
                   return (
-                    <g key={r.id} className="cursor-pointer" onClick={() => setHoveredRecord(r)}>
+                    <g
+                      key={r.id}
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`查看 ${r.date} 的睡眠详情`}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setHoveredRecord(r); } }}
+                      className="cursor-pointer"
+                      onClick={() => setHoveredRecord(r)}
+                    >
                       <circle
                         cx={x}
                         cy={y}

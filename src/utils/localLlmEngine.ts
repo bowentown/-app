@@ -133,7 +133,9 @@ export async function getLocalLlmSupport(): Promise<LocalLlmSupport> {
     try {
       await plugin.isSupported();
       return { supported: true, deviceMemoryGB: null, freeStorageGB: null };
-    } catch {
+    } catch (e) {
+      // 检测失败要如实上报——此前 catch 返回与成功完全相同的值，检测形同虚设
+      console.warn('[localLlm] isSupported 查询失败，按支持处理（门控交给实际加载）:', e);
       return { supported: true, deviceMemoryGB: null, freeStorageGB: null };
     }
   }
@@ -236,6 +238,12 @@ export async function downloadLocalLlm(
   if (plugin) {
     let progressHandle: any = null;
     let lastError: unknown = null;
+    // 原生侧本就有 downloadCancelled/cancelDownload，只是没人调用——
+    // JS 的 abort 不会让 await downloadModel 落定，必须显式触发原生取消
+    const onAbort = () => {
+      try { void plugin.cancelDownload?.(); } catch { /* ignore */ }
+    };
+    signal?.addEventListener('abort', onAbort, { once: true });
     for (const url of [NATIVE_LLM_MODEL.url, NATIVE_LLM_MODEL.fallbackUrl]) {
       if (signal?.aborted) throw lastError ?? new Error('下载已取消');
       try {
@@ -320,6 +328,7 @@ export async function deleteLocalLlm(): Promise<void> {
     } catch {
       // ignore
     }
+    loadedUrl = null;   // 原生引擎已被插件侧卸载，不复位会让重下后的生成直接被拒
     return;
   }
   if (typeof caches === 'undefined') return;
@@ -384,10 +393,27 @@ async function generateViaNative(
     tokenHandle.push(handle);
 
     try {
-      const result = await plugin.generate({
-        messages: messages.map((m) => ({ role: m.role, content: m.content })),
-        maxTokens: 220,
-      });
+      // 原生插件没有取消接口；把调用与 abort 信号竞速——UI 立即解锁（busy 在
+      // finally 复位，60s 超时和"停止"不再空操作）。代价：后台那次生成可能
+      // 继续跑完，但结果会被丢弃
+      const abortRace = signal
+        ? new Promise<never>((_, reject) => {
+            if (signal.aborted) { reject(new DOMException('Aborted', 'AbortError')); return; }
+            signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true });
+          })
+        : null;
+      const result = await (abortRace
+        ? Promise.race([
+            plugin.generate({
+              messages: messages.map((m) => ({ role: m.role, content: m.content })),
+              maxTokens: 220,
+            }),
+            abortRace,
+          ])
+        : plugin.generate({
+            messages: messages.map((m) => ({ role: m.role, content: m.content })),
+            maxTokens: 220,
+          }));
       if (result?.text && result.text.length > last.length) {
         handlers.onToken(result.text.slice(last.length));
         last = result.text;
@@ -403,6 +429,9 @@ async function generateViaNative(
     }
     if (!last.trim()) throw new Error('模型无输出');
     return last;
+  } catch (e) {
+    setLlmState('idle');   // 失败路径也复位：残留 'generating' 会被取证误读成 OOM
+    throw e;
   } finally {
     busy = false;
   }
@@ -463,6 +492,9 @@ async function generateViaWasm(
     } as any);
     setLlmState('ready');
     return full;
+  } catch (e) {
+    setLlmState('idle');   // 与原生路径一致：失败也复位，取证不再把主动停止误读成 OOM
+    throw e;
   } finally {
     busy = false;
   }

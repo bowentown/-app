@@ -106,6 +106,10 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
             lastFiredKeyRef.current = fireKey;
             setActiveRingingAlarm(alarm);
             sleepAudio.playAlarm(alarm.tone);
+            // "仅一次"语义落地：无重复日的闹钟响过即停用（原生侧同为单次调度）
+            if (alarm.repeatDays.length === 0) {
+              onUpdateAlarms(alarms.map((a) => (a.id === alarm.id ? { ...a, enabled: false } : a)));
+            }
           }
         }
       });

@@ -179,11 +179,13 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
         cfg?.systemPersona ||
         '你是一位资深临床睡眠医学顾问。结合用户的睡眠打分与周期推演数据（模型估算值，非传感器实测），以关怀、科学、富有实操性的语气为用户答疑解惑，并如实说明估算边界。';
 
-      // 1. 端侧小模型（Qwen3-0.6B, llama.cpp WASM）：危机/用药安全护栏最高优先级，不经过任何模型
-      if (cfg?.provider === 'local_llm') {
+      // 0. 危机/用药安全护栏：对所有档位（含云端 DeepSeek）统一短路——
+      // 此前只挂在端侧档内，默认的云端档请求成功时热线保证不生效，
+      // 设置页"安全护栏优先于模型"的承诺落空
+      {
         const intent = classifyIntent(text);
         if (intent.category === 'crisis' || intent.category === 'drug_inquiry') {
-          setActiveProviderName('本地引擎（安全护栏接管）');
+          setActiveProviderName('安全护栏接管');
           const guardReply = generateLocalChatReply(text, latestRecord, records);
           setChatMessages((prev) => [
             ...prev,
@@ -196,7 +198,10 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
           ]);
           return;
         }
+      }
 
+      // 1. 端侧小模型（Qwen3-0.6B, llama.cpp WASM）
+      if (cfg?.provider === 'local_llm') {
         const [support, cache] = await Promise.all([getLocalLlmSupport(), getLocalLlmCacheState()]);
         if (!support.supported || !cache.cached) {
           setActiveProviderName('本地引擎（端侧模型未就绪）');
@@ -258,7 +263,7 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
           // 极端情况下模型无输出时兜底到规则引擎
           setChatMessages((prev) =>
             prev.map((m) =>
-              m.id === aiId && m.content.trim() === '' ? { ...m, content: generateLocalChatReply(text, latestRecord, records) } : m
+              m.id === aiId && (m.content.trim() === '' || m.content.trim() === '……') ? { ...m, content: generateLocalChatReply(text, latestRecord, records) } : m
             )
           );
         } catch (err: any) {
@@ -304,7 +309,8 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
         const modelToUse = cfg.deepseekModel || 'deepseek-flash';
         setActiveProviderName(`DeepSeek (${modelToUse})`);
 
-        const dsRes = await fetch('https://api.deepseek.com/chat/completions', {
+        // 直连也走超时熔断：此前裸 fetch 挂起时 isSendingChat 永远为 true 且无停止入口
+        const dsRes = await fetchWithTimeout('https://api.deepseek.com/chat/completions', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -325,15 +331,19 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
 
         if (dsRes.ok) {
           const dsData = await dsRes.json();
-          const replyText = dsData.choices?.[0]?.message?.content || '已收到，为您调整睡眠建议。';
+          // 空内容不再伪装成模型回答：落空则继续走本地兜底（那条路径是诚实的）
+          const replyText = dsData.choices?.[0]?.message?.content;
           const aiReply: ChatMessage = {
             id: `ai-${Date.now()}`,
             role: 'assistant',
             content: replyText,
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           };
-          setChatMessages((prev) => [...prev, aiReply]);
-          return;
+          if (replyText && replyText.trim()) {
+            setChatMessages((prev) => [...prev, aiReply]);
+            return;
+          }
+          console.warn('[chat] DeepSeek 返回空内容，转本地兜底');
         }
       }
 
@@ -358,10 +368,13 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
       if (data.provider) {
         setActiveProviderName(data.provider);
       }
+      if (!data || typeof data !== 'object' || !data.result) {
+        throw new Error('服务端响应结构异常');
+      }
       const aiReply: ChatMessage = {
         id: `ai-${Date.now()}`,
         role: 'assistant',
-        content: data.reply || '已收到您的反馈，正在分析...',
+        content: data.reply || '（服务端返回了空回复，请重试）',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
       setChatMessages((prev) => [...prev, aiReply]);
@@ -509,7 +522,7 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
               className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
             >
               <div
-                className={`max-w-[88%] rounded-2xl px-3.5 py-2.5 leading-relaxed text-xs ${
+                className={`max-w-[88%] rounded-2xl px-3.5 py-2.5 leading-relaxed text-xs whitespace-pre-wrap ${
                   msg.role === 'user'
                     ? `${theme.accentBg.split(' ')[0]} ${theme.accentFg} font-medium rounded-br-none`
                     : `${theme.cardInnerBg} text-white border ${theme.cardInnerBorder} rounded-bl-none`

@@ -84,8 +84,8 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
     if (crash && !cancelled) {
       setLlmCrashNote(
         crash === 'loading'
-          ? '上次会话在加载端侧模型时被系统终止（大概率内存不足）。已自动改用更保守的内存配置；若再次发生，建议删除模型并改用规则引擎档位。'
-          : '上次会话在端侧模型生成回复时被系统终止（大概率内存不足）。若反复出现，建议删除模型并改用规则引擎档位。'
+          ? '上次会话在加载端侧模型时被中断（可能是内存不足、主动停止或系统回收）。已自动改用更保守的内存配置；若反复发生，可删除模型并改用规则引擎档位。'
+          : '上次会话在端侧模型工作中被中断（可能是内存不足、主动停止或系统回收）。若反复发生且并非你主动停止，可删除模型并改用规则引擎档位。'
       );
     }
     Promise.all([getLocalLlmSupport(), getLocalLlmCacheState()]).then(([s, c]) => {
@@ -186,6 +186,7 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
   };
 
   const handleSave = () => {
+    setHfToken(hfTokenVal.trim());
     onSaveConfig({
       provider,
       deepseekApiKey: deepseekApiKey.trim(),
@@ -325,7 +326,7 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
               <p className="text-[11px] text-slate-300 leading-relaxed">
                 {isNativeLlmAvailable()
                   ? 'APK 内使用原生 MediaPipe 引擎在本机推理（Gemma 3 1B int4，约 529 MB，mmap 加载），稳定性优于 WASM 方案。仅接管日常聊天；报告始终由规则引擎完成；危机与用药安全护栏优先于模型。'
-                  : '基于 llama.cpp WASM 在本机推理（Qwen3-0.6B Q4 量化，约 462 MB）。仅接管日常聊天；睡眠生理报告始终由规则引擎完成；命中自伤或药物处方疑问时安全护栏优先于模型。'}
+                  : '基于 llama.cpp WASM 在本机推理（Qwen3-0.6B Q4 量化，约 462 MB），生成速度约每秒几个字。仅接管日常聊天；睡眠生理报告始终由规则引擎完成；命中自伤或药物处方疑问时安全护栏优先于模型。'}
               </p>
 
               {/* 上次崩溃警告 */}
@@ -375,10 +376,8 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
                   <input
                     type="password"
                     value={hfTokenVal}
-                    onChange={(e) => {
-                      setHfTokenVal(e.target.value);
-                      setHfToken(e.target.value);
-                    }}
+                    onChange={(e) => setHfTokenVal(e.target.value)}
+                    onBlur={() => setHfToken(hfTokenVal.trim())}   // 失焦才落盘：此前每敲一键写一次存储
                     placeholder="hf_xxxxxxxxxxxx"
                     className={`w-full bg-[#0a0f1d] border border-slate-600 rounded-xl px-2.5 py-2 text-xs text-white font-mono placeholder-slate-500 focus:outline-none ${theme.focusRing}`}
                   />
@@ -435,7 +434,7 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
                     className={`w-full py-2.5 rounded-xl ${theme.accentBg} disabled:opacity-40 disabled:cursor-not-allowed ${theme.accentFg} font-bold flex items-center justify-center gap-1.5 shadow cursor-pointer`}
                   >
                     <Download className="w-4 h-4" />
-                    <span>下载端侧模型（约 462 MB）</span>
+                    <span>下载端侧模型（约 {Math.round((isNativeLlmAvailable() ? NATIVE_LLM_MODEL.expectedBytes : LOCAL_LLM_MODEL.expectedBytes) / 1_000_000)} MB）</span>
                   </button>
                 )}
               </div>

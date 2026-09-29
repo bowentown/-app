@@ -123,22 +123,31 @@ function hasDeepseek(cfg: any): boolean {
 async function callDeepseek(cfg: any, system: string, user: string): Promise<string | null> {
   try {
     const model = cfg.deepseekModel === 'deepseek-pro' ? 'deepseek-reasoner' : 'deepseek-chat';
-    const res = await fetch('https://api.deepseek.com/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${cfg.deepseekApiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: 'system', content: system },
-          { role: 'user', content: user },
-        ],
-        temperature: 1.1,
-        max_tokens: 600,
-      }),
-    });
+    // 25s 超时：此前裸 fetch 挂起会让 busy 永远 true、整个弹窗像坏了
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 25000);
+    let res: Response;
+    try {
+      res = await fetch('https://api.deepseek.com/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${cfg.deepseekApiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user },
+          ],
+          temperature: 1.1,
+          max_tokens: 600,
+        }),
+        signal: ctrl.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
     if (!res.ok) return null;
     const data = await res.json();
     return data.choices?.[0]?.message?.content ?? null;
@@ -275,8 +284,15 @@ export async function ensureTodayMoment(
         : [];
       const validCards: MomentCard[] = ['data', 'selfie', 'week'];
       cards = Array.isArray(parsed.cards)
-        ? parsed.cards.filter((c: any) => validCards.includes(c)).slice(0, 3)
+        ? [...new Set(parsed.cards.filter((c: any) => validCards.includes(c)) as MomentCard[])].slice(0, 3)
         : [];
+      // 数字白名单：编造的数据让"出处清单"变成谎言 → 整条退回本地模板
+      if (text && !numbersCheck(text, comments, facts)) {
+        console.warn('[petMoments] LLM 文案包含事实清单之外的数字，回退本地模板');
+        text = null;
+        comments = [];
+        cards = [];
+      }
     }
   }
   if (!text) {
@@ -290,7 +306,7 @@ export async function ensureTodayMoment(
     id: `m-${date}`,
     date,
     ts: now.getTime(),
-    text,
+    text: text ?? localMoment(facts).text,
     facts,
     cards: cards.length ? cards : ['data'],
     likes: pickLikes(),
@@ -301,6 +317,26 @@ export async function ensureTodayMoment(
   const next = upsert(list, m);
   saveMoments(next);
   return { moments: next, generated: true };
+}
+
+/**
+ * 数字白名单：文案与评论里出现的每个阿拉伯数字都必须在事实清单中出现过
+ * （≤12 的日常小数字除外——"两碗白饭""3 个 emoji"这类量词不属于数据）。
+ * 此前对 LLM 输出零校验，实测 mock 一次就编出 99 分/8.5 小时，而卡片下方
+ * 挂着"她不许自己编数字"的出处清单。
+ */
+function numbersCheck(text: string, comments: MomentComment[], facts: string[]): boolean {
+  const factNums = new Set((facts.join(' ').match(/\d+(?:\.\d+)?/g) ?? []));
+  const candidates = [text, ...comments.map((c) => c.text)];
+  for (const t of candidates) {
+    for (const n of t.match(/\d+(?:\.\d+)?/g) ?? []) {
+      if (factNums.has(n)) continue;
+      const v = Number(n);
+      if (Number.isFinite(v) && v >= 1 && v <= 12) continue;   // 日常小量词放行
+      return false;
+    }
+  }
+  return true;
 }
 
 /** 用户点赞：大肥鱼会回一句（只回一次）。 */
@@ -341,6 +377,7 @@ export async function commentMoment(
 
   m.replies.push({ friend: '鱼片', text: userText.trim() });
   m.replies.push({ friend: '蓝色大肥鱼', text: reply });
+  m.replies = m.replies.slice(-40);   // 与点赞回复的上限同思路
   saveMoments(list);
   return list;
 }

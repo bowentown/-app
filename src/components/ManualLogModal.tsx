@@ -159,8 +159,9 @@ export const ManualLogModal: React.FC<ManualLogModalProps> = ({
         <div className="py-4 space-y-4">
           {/* Date Selector */}
           <div>
-            <label className="block text-xs font-bold text-white mb-1.5">记录日期</label>
+            <label htmlFor="ml-date" className="block text-xs font-bold text-white mb-1.5">记录日期</label>
             <input
+              id="ml-date"
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
@@ -235,7 +236,7 @@ export const ManualLogModal: React.FC<ManualLogModalProps> = ({
 
           {/* Morning Mood */}
           <div>
-            <label className="block text-xs font-bold text-white mb-1.5">晨起状态感受</label>
+            <label htmlFor="ml-mood" className="block text-xs font-bold text-white mb-1.5">晨起状态感受</label>
             <div className="grid grid-cols-4 gap-2">
               {(
                 [
