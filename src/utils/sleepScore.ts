@@ -4,8 +4,8 @@ import { SleepRecord, SleepStageSegment, WakingMood } from '../types/sleep';
  * Calculates a 0-100 scientific sleep score based on:
  * - Total duration (40 pts) - scored against the user's own target (CBT-I sleep diary
  *   convention: compare against the prescribed window, not a population constant)
- * - Deep sleep ratio (20 pts) - optimal 15%-30% (short nights skew higher)
- * - REM sleep ratio (20 pts) - optimal 20%-28%
+ * - Deep sleep ratio (20 pts) - optimal 16%-25% (adult N3 ≈ 13-23% of sleep)
+ * - REM sleep ratio (20 pts) - optimal 20%-26%
  * - Sleep efficiency & awakenings (20 pts) - awakenings penalty, latency
  */
 export function calculateSleepScore(
@@ -17,7 +17,9 @@ export function calculateSleepScore(
   latencyMinutes: number,
   targetDurationMinutes: number = 480
 ): { score: number; efficiency: number } {
-  const totalBedMinutes = durationMinutes + awakeMinutes + latencyMinutes;
+  // awakeMinutes 已包含入睡潜伏期段（generateSleepStages 的首段清醒），
+  // 不能再加一次 latencyMinutes——那会把潜伏期算两遍，效率被系统性低报约 3 个百分点
+  const totalBedMinutes = durationMinutes + awakeMinutes;
   const efficiency = totalBedMinutes > 0 ? Math.round((durationMinutes / totalBedMinutes) * 100) : 0;
 
   // 1. Duration score (max 40) — 相对用户自设目标的偏差计分；过长与过短对称扣分
@@ -40,11 +42,11 @@ export function calculateSleepScore(
   // 2. Deep sleep ratio score (max 20)
   const deepRatio = durationMinutes > 0 ? deepSleepMinutes / durationMinutes : 0;
   let deepScore = 0;
-  if (deepRatio >= 0.15 && deepRatio <= 0.30) {
+  if (deepRatio >= 0.16 && deepRatio <= 0.25) {
     deepScore = 20;
-  } else if (deepRatio >= 0.11) {
+  } else if (deepRatio >= 0.12) {
     deepScore = 16;
-  } else if (deepRatio >= 0.07) {
+  } else if (deepRatio >= 0.08) {
     deepScore = 12;
   } else {
     deepScore = 8;
@@ -53,7 +55,7 @@ export function calculateSleepScore(
   // 3. REM sleep ratio score (max 20)
   const remRatio = durationMinutes > 0 ? remSleepMinutes / durationMinutes : 0;
   let remScore = 0;
-  if (remRatio >= 0.20 && remRatio <= 0.28) {
+  if (remRatio >= 0.20 && remRatio <= 0.26) {
     remScore = 20;
   } else if (remRatio >= 0.15) {
     remScore = 16;
@@ -130,16 +132,34 @@ export function generateSleepStages(
   awakeMin += latency;
   currentMin += latency;
 
+  // 生理预算：N3 集中在前半夜——绝对分钟随时长增长（前 4h 计 25%、其后 15%），
+  // 占比随之温和递减（4h≈25%、8h≈20%、12h≈18%）；REM 占比温和上升（20%→24%）。
+  // 这是从"人的睡眠结构"出发，而不是从"让生成器输出落进评分带"出发
+  const sleepBudget = Math.max(0, totalMin - latency);
+  const deepTotal = Math.round(0.25 * Math.min(sleepBudget, 240) + 0.15 * Math.max(0, sleepBudget - 240));
+  const remTotal = Math.round(0.20 * Math.min(sleepBudget, 240) + 0.26 * Math.max(0, sleepBudget - 240));
+  let deepLeft = deepTotal;
+  let remLeft = remTotal;
+
   // Cycles of ~90 mins: deep -> light -> rem
   let cycleNum = 0;
   while (currentMin < totalMin - 15) {
     cycleNum++;
     const remaining = totalMin - currentMin;
 
-    // Earlier cycles have more deep sleep, later cycles have more REM
-    const deepDuration = cycleNum <= 2 ? Math.min(30, Math.floor(remaining * 0.30)) : Math.min(13, Math.floor(remaining * 0.12));
-    const lightDuration = Math.min(30, Math.floor(remaining * 0.4));
-    const remDuration = cycleNum >= 2 ? Math.min(21, Math.floor(remaining * 0.23)) : Math.min(11, Math.floor(remaining * 0.13));
+    // N3 几乎只落在前两个周期（第一周期约 60%、第二周期收尾）；
+    // REM 第一周期很少、此后每周期释放剩余的约 55%（单段上限 35 分钟）
+    const deepDuration = cycleNum === 1
+        ? Math.min(deepLeft, Math.round(deepTotal * 0.6), Math.max(0, remaining - 12))
+        : cycleNum === 2
+        ? Math.min(deepLeft, Math.max(0, remaining - 12))
+        : 0;
+    const remDuration = cycleNum === 1
+        ? Math.min(remLeft, Math.round(remTotal * 0.15))
+        : Math.min(remLeft, 35, Math.max(7, Math.round(remLeft * 0.55)),
+                   Math.max(0, remaining - deepDuration - 6));
+    // 浅睡段每段封顶 40 分钟：既符合周期结构，也让循环继续切出后续周期
+    const lightDuration = Math.min(40, Math.max(6, remaining - deepDuration - remDuration));
 
     if (deepDuration > 5) {
       stages.push({
@@ -149,6 +169,7 @@ export function generateSleepStages(
         durationMinutes: deepDuration,
       });
       deepMin += deepDuration;
+      deepLeft -= deepDuration;
       currentMin += deepDuration;
     }
 
@@ -171,6 +192,7 @@ export function generateSleepStages(
         durationMinutes: remDuration,
       });
       remMin += remDuration;
+      remLeft -= remDuration;
       currentMin += remDuration;
     }
 

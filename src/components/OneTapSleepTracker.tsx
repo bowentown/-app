@@ -72,7 +72,9 @@ export const OneTapSleepTracker: React.FC<OneTapSleepTrackerProps> = ({ onSaveRe
       wakeDate.getMinutes()
     ).padStart(2, '0')}`;
 
-    const generated = generateSleepStages(bedtimeStr, wakeTimeStr);
+    // 启发式潜伏期：生成与评分必须用同一个值，否则分期图与记录字段互相矛盾
+    const latencyEst = exactDurationMinutes < 15 ? 2 : 12;
+    const generated = generateSleepStages(bedtimeStr, wakeTimeStr, latencyEst);
 
     // If sleep is genuinely short (< 60m, e.g. quick test or micro-nap), accurately scale stages
     let deepMin = generated.deepMinutes;
@@ -96,7 +98,7 @@ export const OneTapSleepTracker: React.FC<OneTapSleepTrackerProps> = ({ onSaveRe
       remMin,
       awakeMin,
       exactDurationMinutes < 15 ? 0 : 1,
-      exactDurationMinutes < 15 ? 2 : 12,
+      latencyEst,
       Math.round((targetDurationHours || 8) * 60)
     );
 

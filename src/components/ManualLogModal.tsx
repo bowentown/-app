@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
 import { X, Moon, Clock, Sparkles, Check, Smartphone, Coffee, Bath, Flower2, BookOpen, Dumbbell, Wine, Utensils } from 'lucide-react';
+import { HABIT_OPTIONS as HABIT_CATALOG_LIST } from '../utils/habitCatalog';
+
+const habitCatalogById: Record<string, { id: string; label: string }> = Object.fromEntries(HABIT_CATALOG_LIST.map((h) => [h.id, h]));
 import { SleepRecord, WakingMood } from '../types/sleep';
 import { calculateSleepScore, generateSleepStages } from '../utils/sleepScore';
 import { ThemeConfig } from '../utils/themeStyles';
@@ -12,6 +15,7 @@ interface ManualLogModalProps {
   targetDurationHours?: number;
 }
 
+// id/label 与 ActiveSleepModal 共用 habitCatalog；图标是本文件的展示层
 const HABIT_OPTIONS = [
   { id: 'screen_time', label: '睡前玩手机', icon: Smartphone },
   { id: 'caffeine', label: '下午喝咖啡/茶', icon: Coffee },
@@ -21,7 +25,10 @@ const HABIT_OPTIONS = [
   { id: 'workout', label: '晚间运动', icon: Dumbbell },
   { id: 'alcohol', label: '睡前饮酒', icon: Wine },
   { id: 'heavy_meal', label: '夜宵饱腹', icon: Utensils },
-];
+].map((h) => ({
+  ...habitCatalogById[h.id],
+  icon: h.icon,
+}));
 
 export const ManualLogModal: React.FC<ManualLogModalProps> = ({
   isOpen,
@@ -57,7 +64,7 @@ export const ManualLogModal: React.FC<ManualLogModalProps> = ({
   };
 
   const handleSave = () => {
-    const stagesData = generateSleepStages(bedtime, wakeTime);
+    const stagesData = generateSleepStages(bedtime, wakeTime, latencyMinutes);
     const [bH, bM] = bedtime.split(':').map(Number);
     const [wH, wM] = wakeTime.split(':').map(Number);
 

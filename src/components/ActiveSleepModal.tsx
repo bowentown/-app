@@ -5,6 +5,7 @@ import { getMoonInfo } from '../utils/moonPhase';
 import { sleepAudio } from '../utils/audioSynth';
 import { calculateSleepScore, generateSleepStages } from '../utils/sleepScore';
 import { SleepRecord, WakingMood } from '../types/sleep';
+import { HABIT_OPTIONS } from '../utils/habitCatalog';
 import { ThemeConfig } from '../utils/themeStyles';
 
 interface ActiveSleepModalProps {
@@ -14,18 +15,6 @@ interface ActiveSleepModalProps {
   theme: ThemeConfig;
   targetDurationHours?: number;
 }
-
-// 与 ManualLogModal.HABIT_OPTIONS 同一份清单（那边带图标，这里只需要 id/label）
-const HABIT_OPTIONS: { id: string; label: string }[] = [
-  { id: 'screen_time', label: '睡前玩手机' },
-  { id: 'caffeine', label: '下午喝咖啡/茶' },
-  { id: 'hot_bath', label: '睡前温水澡' },
-  { id: 'meditation', label: '冥想/腹式呼吸' },
-  { id: 'reading', label: '纸质书阅读' },
-  { id: 'workout', label: '晚间运动' },
-  { id: 'alcohol', label: '睡前饮酒' },
-  { id: 'heavy_meal', label: '夜宵饱腹' },
-];
 
 export const ActiveSleepModal: React.FC<ActiveSleepModalProps> = ({
   isOpen,
@@ -51,6 +40,8 @@ export const ActiveSleepModal: React.FC<ActiveSleepModalProps> = ({
   const [dreamNotes, setDreamNotes] = useState('');
   const [wakeCount, setWakeCount] = useState(1);
   const [latencyMinutes, setLatencyMinutes] = useState(15);
+  // 用户没动过滑块时，默认 15 只是猜测——如实保持"估算"标记
+  const [latencyTouched, setLatencyTouched] = useState(false);
   const [selectedHabits, setSelectedHabits] = useState<string[]>([]);
 
   const audioStreamRef = useRef<MediaStream | null>(null);
@@ -281,7 +272,7 @@ export const ActiveSleepModal: React.FC<ActiveSleepModalProps> = ({
     const bedtimeStr = `${bHour}:${bMin}`;
     const wakeTimeStr = `${wHour}:${wMin}`;
 
-    const stagesData = generateSleepStages(bedtimeStr, wakeTimeStr);
+    const stagesData = generateSleepStages(bedtimeStr, wakeTimeStr, latencyMinutes);
     // 统一语义：durationMinutes = 纯睡眠（卧床窗 − 觉醒段），与其他记录入口一致
     const sleepMinutes = Math.max(1, effectiveMinutes - stagesData.awakeMinutes);
     const { score, efficiency } = calculateSleepScore(
@@ -310,7 +301,7 @@ export const ActiveSleepModal: React.FC<ActiveSleepModalProps> = ({
       sleepScore: score,
       sleepEfficiency: efficiency,
       latencyMinutes,
-      latencyEstimated: false,
+      latencyEstimated: !latencyTouched,
       wakeCount,
       wakingMood: selectedMood,
       preSleepHabits: selectedHabits,
@@ -576,7 +567,7 @@ export const ActiveSleepModal: React.FC<ActiveSleepModalProps> = ({
               max={60}
               step={5}
               value={latencyMinutes}
-              onChange={(e) => setLatencyMinutes(Number(e.target.value))}
+              onChange={(e) => { setLatencyMinutes(Number(e.target.value)); setLatencyTouched(true); }}
               className="w-full"
               style={{ accentColor: theme.accentHex }}
             />
@@ -593,7 +584,8 @@ export const ActiveSleepModal: React.FC<ActiveSleepModalProps> = ({
                     key={h.id}
                     type="button"
                     onClick={() => setSelectedHabits((prev) => prev.includes(h.id) ? prev.filter((x) => x !== h.id) : [...prev, h.id])}
-                    className={`px-2.5 py-1 rounded-full text-[10px] font-bold border transition-all cursor-pointer active:scale-95 ${on ? `${theme.accentBg} text-white border-transparent` : `${theme.textSecondary} ${theme.cardBg} border-slate-600`}`}
+                    style={on ? { backgroundColor: `${theme.accentHex}33`, borderColor: theme.accentHex } : undefined}
+                    className={`px-2.5 py-1 rounded-full text-[10px] font-bold border transition-all cursor-pointer active:scale-95 ${on ? `${theme.accentText} border` : `${theme.textSecondary} ${theme.cardBg} border-slate-600`}`}
                   >
                     {h.label}
                   </button>

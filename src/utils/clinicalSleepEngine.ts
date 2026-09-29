@@ -446,8 +446,12 @@ export function generateLocalChatReply(
   }
 
   // 无任何记录时绝不编造数据：此前的 82 分 / 90 分钟深睡 / 7.5 小时等硬编码兜底值
-  // 会被以"结合您最近的记录"的措辞说给从未记录过的用户，属于凭空虚构
-  if (!latestRecord) {
+  // 会被以"结合您最近的记录"的措辞说给从未记录过的用户，属于凭空虚构。
+  // 只拦"需要个人数据"的意图；深睡/潜伏期等纯科普分支照常回答——
+  // 否则文案里"可以直接问通用问题"的承诺就是假的
+  const scienceOnly = ['early_awakening', 'caffeine_lifestyle', 'dreams_anxiety',
+    'circadian_shift', 'nap_recovery', 'detection_principles'].includes(intent.category);
+  if (!latestRecord && !scienceOnly) {
     return `👋 我还没有您的任何睡眠记录——不想拿编造的数字糊弄您。
 
 可以先做其中一件事，我们再细聊：
@@ -458,13 +462,14 @@ export function generateLocalChatReply(
   }
 
   // 提取动态插值数据（到这里必然有真实记录；字段级兜底仅防旧记录缺字段）
-  const score = latestRecord?.sleepScore || 82;
-  const deep = latestRecord?.deepSleepMinutes || 90;
+  // 用 ?? 只兜"字段缺失"（undefined），不吞 0——0 分/零深睡是合法的真实值
+  const score = latestRecord?.sleepScore ?? 82;
+  const deep = latestRecord?.deepSleepMinutes ?? 90;
   const durationH = latestRecord ? (latestRecord.durationMinutes / 60).toFixed(1) : '7.5';
-  const bedtime = latestRecord?.bedtime || '23:30';
-  const wakeTime = latestRecord?.wakeTime || '07:30';
-  const latency = latestRecord?.latencyMinutes || 15;
-  const wakeCount = latestRecord?.wakeCount || 1;
+  const bedtime = latestRecord?.bedtime ?? '23:30';
+  const wakeTime = latestRecord?.wakeTime ?? '07:30';
+  const latency = latestRecord?.latencyMinutes ?? 15;
+  const wakeCount = latestRecord?.wakeCount ?? 1;
 
   // 3. 意图分支详尽解答
   switch (intent.category) {
@@ -472,7 +477,7 @@ export function generateLocalChatReply(
       return `📊 **针对深睡眠（慢波期 N3）提升的临床建议**：\n\n结合您最近一晚的作息（深睡约 **${deep} 分钟**，入睡时间 **${bedtime}**）：\n\n1. 🛁 **核心体温下降法**：睡前 60–90 分钟进行约 40℃ 温水浴 15 分钟。热水使体表微血管扩张散热，在进入被窝时身体核心体温迅速下降 0.5–1℃，这是大脑松果体启动慢波深睡的生理触发开关；\n2. ☀️ **早晨户外日光锚定**：晨起 30 分钟内接触 15 分钟自然光，重置视交叉上核生物钟，能让当晚深睡波峰更集中在前两个 90 分钟周期；\n3. 🍷 **睡前严控酒精与重油**：酒精虽能缩短入睡时间，但会严重抑制慢波深睡并打碎后半夜睡眠。今晚可在极光睡眠中开启【床头夜钟伴眠】的白噪音掩蔽，让深睡更连续。`;
 
     case 'sleep_latency':
-      return `🌙 **应对入睡困难 · CBT-I“20分钟刺激控制法”**：\n\n您上一条记录的入睡潜伏期约为 **${latency} 分钟**。\n\n1. **打破“床 = 焦虑”的条件反射**：若躺下超过 20 分钟仍然毫无睡意，不要在床上翻来覆去强迫自己入睡！越用力想睡，脑内去甲肾上腺素水平越高；\n2. **离开床铺重置**：起身坐在昏暗柔和的灯光下（避免看手机屏幕），翻阅枯燥的书籍或听极光睡眠的 528Hz 修复颂磬，等到眼皮沉重、哈欠连天时再回到床上；\n3. **认知解耦**：告诉自己“闭目静躺本身就能让肌肉与神经获得 60% 以上的体能修复”，无需为今晚是否立刻睡着而自责。`;
+      return `🌙 **应对入睡困难 · CBT-I“20分钟刺激控制法”**：\n\n您上一条记录的入睡潜伏期约为 **${latency} 分钟**${latestRecord?.latencyEstimated ? '（按作息推算的估算值）' : ''}。\n\n1. **打破“床 = 焦虑”的条件反射**：若躺下超过 20 分钟仍然毫无睡意，不要在床上翻来覆去强迫自己入睡！越用力想睡，脑内去甲肾上腺素水平越高；\n2. **离开床铺重置**：起身坐在昏暗柔和的灯光下（避免看手机屏幕），翻阅枯燥的书籍或听极光睡眠的 528Hz 修复颂磬，等到眼皮沉重、哈欠连天时再回到床上；\n3. **认知解耦**：告诉自己“闭目静躺本身就能让肌肉与神经获得 60% 以上的体能修复”，无需为今晚是否立刻睡着而自责。`;
 
     case 'night_awakening':
       return `⏰ **针对夜间易醒（夜醒 ${wakeCount} 次）的应对指南**：\n\n半夜惊醒或翻身醒来是很多人常见的困扰：\n\n1. **千万不要看时间**：看闹钟屏幕会立刻触发认知算力（“天哪才 3 点”、“我只剩 3 小时能睡了”），瞬间拉高皮质醇心率。把手机倒扣在远离床头的位置；\n2. **腹式呼吸激活迷走神经**：夜间醒来身体微冷，平躺后把双手放在腹部，吸气 4 秒让腹部鼓起，屏息 2 秒，缓慢呼气 6 秒，连续 6–8 轮；\n3. **排查环境温度**：后半夜人体核心体温降至谷底，若卧室过冷或过热会导致翻身微觉醒。建议卧室温度保持在 19–21℃。`;

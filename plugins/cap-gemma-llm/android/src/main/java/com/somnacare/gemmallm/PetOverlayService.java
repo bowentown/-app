@@ -326,7 +326,7 @@ public class PetOverlayService extends Service {
         wrap.setPadding(dp(4), dp(4), dp(4), dp(4));   // 给回弹缩放留出窗口内的余量
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.VERTICAL);   // 上下排列，贴在角色身侧
-        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setGravity(Gravity.CENTER_HORIZONTAL);   // 竖向布局的水平居中用这个
 
         LinearLayout.LayoutParams p1 = new LinearLayout.LayoutParams(dp(44), dp(44));
         row.addView(fanButton(true, "看播报", new View.OnClickListener() {
