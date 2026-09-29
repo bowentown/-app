@@ -402,6 +402,28 @@ public class PetOverlayService extends Service {
         dot.setBackground(dg);
     }
 
+    /** 按钮摆位：贴角色左右不遮挡的一侧；放不下挪到角色下/上方。 */
+    private void placeBeside(int pw, int ph) {
+        DisplayInfo di = displayInfo();
+        int wx = petParams.x, wy = petParams.y;
+        int ww = dp(COLLAPSED_W_DP), wh = dp(COLLAPSED_H_DP);
+        int gap = dp(8), m = dp(4);
+        int leftRoom = wx - gap - m;
+        int rightRoom = di.width - (wx + ww) - gap - m;
+        int px, py;
+        if (leftRoom >= pw || rightRoom >= pw) {
+            boolean goLeft = leftRoom >= pw && (rightRoom < pw || leftRoom >= rightRoom);
+            px = goLeft ? wx - pw - gap : wx + ww + gap;
+            py = wy + wh / 2 - ph / 2;
+        } else {
+            px = wx + ww / 2 - pw / 2;
+            boolean belowOk = wy + wh + gap + ph <= di.height - m;
+            py = belowOk ? wy + wh + gap : wy - ph - gap;
+        }
+        fanLp.x = Math.max(m, Math.min(px, di.width - pw - m));
+        fanLp.y = Math.max(m, Math.min(py, di.height - ph - m));
+    }
+
     // ================= 大肥鱼播报气泡 =================
 
     private void showBubble(String msg, long durationMs) {
