@@ -97,6 +97,7 @@ export interface EyeCareConfig {
   warmStrength: number; // 0-100 滤镜强度
   dimStrength: number; // 0-100 屏幕减光强度
   scheduleEnabled: boolean; // 定时开关（默认关闭，用户按需开启）
+  auto?: boolean; // 自动日变：白天自动减弱，入夜（19-23 点）渐强至满档
   start: string; // 'HH:MM'
   end: string; // 'HH:MM'
 }

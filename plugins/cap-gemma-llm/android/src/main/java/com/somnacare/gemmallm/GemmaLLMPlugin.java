@@ -202,6 +202,8 @@ public class GemmaLLMPlugin extends Plugin {
     public void eyeCareStop(PluginCall call) {
         try {
             EyeCareService.removeOverlay(getContext());
+            getContext().getSharedPreferences("somnacare_prefs", Context.MODE_PRIVATE)
+                    .edit().putBoolean("eyecare_on", false).apply();
         } catch (Exception ignored) {
         }
         try {

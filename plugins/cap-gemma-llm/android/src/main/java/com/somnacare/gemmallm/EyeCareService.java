@@ -95,6 +95,7 @@ public class EyeCareService extends Service {
             String action = intent != null ? intent.getAction() : ACTION_APPLY;
             if (ACTION_STOP.equals(action)) {
                 removeOverlayInternal();
+                persistState(getApplicationContext(), false, null, 0f, 0f);
                 stopForeground(STOP_FOREGROUND_REMOVE);
                 stopSelf();
                 return START_NOT_STICKY;
@@ -114,6 +115,25 @@ public class EyeCareService extends Service {
 
     private static float clamp01(float v) {
         return Math.min(1f, Math.max(0f, v));
+    }
+
+    /** 滤镜层是否正在显示（磁贴状态源，同进程内可靠） */
+    public static boolean isActive() {
+        return warmLayer != null || dimLayer != null;
+    }
+
+    /** 持久化当前开关与参数（快捷设置磁贴在进程外/冷启动时使用） */
+    private static void persistState(Context context, boolean on, String color, float w, float d) {
+        try {
+            context.getSharedPreferences("somnacare_prefs", Context.MODE_PRIVATE)
+                    .edit()
+                    .putBoolean("eyecare_on", on)
+                    .putString("eyecare_color", color)
+                    .putFloat("eyecare_warm", w)
+                    .putFloat("eyecare_dim", d)
+                    .apply();
+        } catch (Exception ignored) {
+        }
     }
 
     /** 颜色 + 透明度 → 预乘进 ARGB 的 int（避免 View.setAlpha 触发离屏合成） */
@@ -187,6 +207,9 @@ public class EyeCareService extends Service {
                 dimLayer = null;
                 dimLp = null;
             }
+
+            persistState(context, warmLayer != null || dimLayer != null,
+                    warmColorHex == null ? "#FFB26B" : warmColorHex, w, d);
         } catch (Exception ignored) {
             // 悬浮窗应用失败不抛出，保持进程存活
         }

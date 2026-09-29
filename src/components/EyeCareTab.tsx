@@ -339,8 +339,37 @@ export const EyeCareTab: React.FC<EyeCareTabProps> = ({ userProfile, onUpdatePro
         document.body
       )}
 
-      {/* 4. 强度调节 */}
+      {/* 4. 强度调节（含自动日变） */}
       <div className={`${theme.cardBg} rounded-3xl p-5 border ${theme.cardBorder} shadow-xl space-y-3.5`}>
+        <div className={`${theme.cardInnerBg} border ${theme.cardInnerBorder} rounded-2xl p-3.5 flex items-center justify-between`}>
+          <div>
+            <span className="text-xs font-bold text-slate-200 block">自动日变</span>
+            <span className="text-[10px] text-slate-500">白天自动减弱，19–23 点渐强至满档</span>
+          </div>
+          <button
+            type="button"
+            data-no-swipe
+            onClick={(e) => {
+              e.stopPropagation();
+              patch({ auto: !cfg.auto });
+            }}
+            aria-pressed={!!cfg.auto}
+            aria-label="自动日变"
+            className="relative inline-flex items-center cursor-pointer shrink-0"
+          >
+            <span
+              className={`block w-10 h-5 rounded-full transition-colors relative ${
+                cfg.auto ? 'bg-orange-500' : 'bg-slate-600'
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${
+                  cfg.auto ? 'left-[22px]' : 'left-0.5'
+                }`}
+              />
+            </span>
+          </button>
+        </div>
         <div className="space-y-1.5">
           <div className="flex justify-between text-xs font-bold">
             <span className="text-slate-200">滤镜强度</span>

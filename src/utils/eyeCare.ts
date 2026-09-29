@@ -36,6 +36,21 @@ export async function eyeCareOpenPermissionSettings(): Promise<void> {
   }
 }
 
+/** 自动日变：白天（07-19 点）35%，19-23 点线性渐强至 100%，夜间满档（Twilight 式日落-日出） */
+export function withAutoStrength(cfg: EyeCareConfig, now: Date = new Date()): EyeCareConfig {
+  if (!cfg.auto) return cfg;
+  const h = now.getHours() + now.getMinutes() / 60;
+  let f: number;
+  if (h >= 7 && h < 19) f = 0.35;
+  else if (h >= 19 && h < 23) f = 0.35 + 0.65 * ((h - 19) / 4);
+  else f = 1;
+  return {
+    ...cfg,
+    warmStrength: Math.round(cfg.warmStrength * f),
+    dimStrength: Math.round(cfg.dimStrength * f),
+  };
+}
+
 /** 滤镜强度 → 悬浮层透明度（上限与原生侧一致：暖 0.60 / 暗 0.70） */
 export function eyeCareOverlayParams(cfg: EyeCareConfig): {
   warmColor: string;
@@ -128,7 +143,8 @@ export async function applyEyeCare(cfg: EyeCareConfig | undefined, force = false
     return cfg.enabled && isInEyeCareWindow(cfg);
   }
 
-  const { warmColor, warmAlpha, dimAlpha } = eyeCareOverlayParams(cfg);
+  const eff = withAutoStrength(cfg);
+  const { warmColor, warmAlpha, dimAlpha } = eyeCareOverlayParams(eff);
   const shouldRun = cfg.enabled && isInEyeCareWindow(cfg);
   const sig = shouldRun ? `on|${warmColor}|${warmAlpha.toFixed(3)}|${dimAlpha.toFixed(3)}` : 'off';
   // 目标状态与上次一致且已在生效 → 跳过（避免 30s 轮询反复 startForegroundService）
