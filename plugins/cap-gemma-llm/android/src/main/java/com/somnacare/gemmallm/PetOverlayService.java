@@ -182,7 +182,10 @@ public class PetOverlayService extends Service {
             case MotionEvent.ACTION_MOVE: {
                 int dx = (int) e.getRawX() - downRawX;
                 int dy = (int) e.getRawY() - downRawY;
-                if (!dragging && Math.hypot(dx, dy) > touchSlop) dragging = true;
+                if (!dragging && Math.hypot(dx, dy) > touchSlop) {
+                    dragging = true;
+                    if (whale != null) whale.setDragging(true);
+                }
                 if (dragging) {
                     // 拖到面板开着时先收面板，避免角色与卡片错位
                     if (expanded) collapsePanel();
@@ -195,6 +198,7 @@ public class PetOverlayService extends Service {
             }
             case MotionEvent.ACTION_UP:
                 if (dragging) {
+                    if (whale != null) whale.setDragging(false);
                     dockToEdge();
                 } else if (whale != null) {
                     whale.cheer();
@@ -202,7 +206,10 @@ public class PetOverlayService extends Service {
                 }
                 return true;
             case MotionEvent.ACTION_CANCEL:
-                if (dragging) dockToEdge();
+                if (dragging) {
+                    if (whale != null) whale.setDragging(false);
+                    dockToEdge();
+                }
                 return true;
             default:
                 return true;
