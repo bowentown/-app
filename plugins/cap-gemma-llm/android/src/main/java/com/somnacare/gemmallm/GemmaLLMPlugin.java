@@ -239,6 +239,38 @@ public class GemmaLLMPlugin extends Plugin {
     // ==== 鲸鱼娘桌宠悬浮窗 ====
 
     /** 悬浮窗权限状态（与护眼滤镜共用同一项系统授权）。 */
+    /** 睡前提醒的悬浮窗权限状态（BedtimeOverlayService 的主投递路径） */
+    @PluginMethod
+    public void bedtimePermission(PluginCall call) {
+        JSObject ret = new JSObject();
+        ret.put("granted", android.provider.Settings.canDrawOverlays(getContext()));
+        call.resolve(ret);
+    }
+
+    /** 睡前提醒：直接带用户去悬浮窗授权页（此前唯独这个功能漏了申请链路） */
+    @PluginMethod
+    public void bedtimeOpenPermission(PluginCall call) {
+        try {
+            android.content.Intent intent = new android.content.Intent(
+                    android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    android.net.Uri.parse("package:" + getContext().getPackageName()));
+            intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(intent);
+            call.resolve();
+        } catch (Exception e) {
+            try {
+                android.content.Intent fallback = new android.content.Intent(
+                        android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        android.net.Uri.parse("package:" + getContext().getPackageName()));
+                fallback.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+                getContext().startActivity(fallback);
+                call.resolve();
+            } catch (Exception e2) {
+                call.reject("无法打开授权页: " + e2.getMessage());
+            }
+        }
+    }
+
     @PluginMethod
     public void petPermission(PluginCall call) {
         JSObject ret = new JSObject();

@@ -21,6 +21,8 @@ interface CapacitorLocalNotificationsPlugin {
     vibration?: boolean;
     visibility?: number;
   }) => Promise<any>;
+  checkExactNotificationSetting?: () => Promise<{ exactAlarm: string }>;
+  changeExactNotificationSetting?: () => Promise<{ exactAlarm: string }>;
 }
 
 function getCapacitor(): any {
@@ -165,5 +167,39 @@ export async function syncAlarmsToNative(alarms: CustomAlarmSetting[]): Promise<
   } catch (err) {
     console.error('[NativeAlarm] 同步原生闹钟失败:', err);
     return { success: false, nativeScheduledCount: 0 };
+  }
+}
+
+/**
+ * 精确闹钟权限三态。此前徽章无条件声称"系统级精确唤醒已激活"，而插件在
+ * 权限缺失时会静默降级为非精确闹钟（只写一行 logcat）——Android 14+ 上
+ * SCHEDULE_EXACT_ALARM 默认拒绝，界面承诺与实际行为不符。
+ */
+export type ExactAlarmStatus = 'granted' | 'denied' | 'unknown';
+
+export async function getExactAlarmStatus(): Promise<ExactAlarmStatus> {
+  const cap = getCapacitor();
+  if (!isNativePlatform() || !cap?.Plugins?.LocalNotifications) return 'unknown';
+  try {
+    const plugin = cap.Plugins.LocalNotifications as CapacitorLocalNotificationsPlugin;
+    if (typeof plugin.checkExactNotificationSetting !== 'function') return 'unknown';
+    const res = await plugin.checkExactNotificationSetting();
+    return res?.exactAlarm === 'granted' ? 'granted' : res?.exactAlarm === 'denied' ? 'denied' : 'unknown';
+  } catch {
+    return 'unknown';
+  }
+}
+
+/** 带用户去系统"闹钟和提醒"授权页（插件 6.0+ 提供，旧版本降级返回 false）。 */
+export async function openExactAlarmSettings(): Promise<boolean> {
+  const cap = getCapacitor();
+  if (!isNativePlatform() || !cap?.Plugins?.LocalNotifications) return false;
+  try {
+    const plugin = cap.Plugins.LocalNotifications as CapacitorLocalNotificationsPlugin;
+    if (typeof plugin.changeExactNotificationSetting !== 'function') return false;
+    await plugin.changeExactNotificationSetting();
+    return true;
+  } catch {
+    return false;
   }
 }

@@ -19,6 +19,7 @@ import { applyEyeCare, eyeCareInAppStyles, isInEyeCareWindow } from './utils/eye
 import { consumePendingTab, syncPet } from './utils/petOverlay';
 import { LaunchSplash } from './components/LaunchSplash';
 import { BedtimeReminder, BedtimeReminderPhase } from './components/BedtimeReminder';
+import { sanitizeRecord } from './utils/recordSanitize';
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<NavTab>('today');
@@ -42,7 +43,11 @@ export const App: React.FC = () => {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed)) {
+          // 与导入路径共用同一条清洗：畸形记录（缺 bedtime / null 项 / 坏值）
+          // 此前会直接把首页打崩（.split 抛错）或产出 NaN
+          return parsed.map(sanitizeRecord).filter((r): r is SleepRecord => r !== null);
+        }
       } catch (e) {
         console.error('Failed to parse saved records, backing up corrupted key:', e);
         localStorage.setItem('somnacare_sleep_records_backup_corrupted', saved);

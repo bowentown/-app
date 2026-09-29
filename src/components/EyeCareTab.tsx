@@ -266,6 +266,7 @@ export const EyeCareTab: React.FC<EyeCareTabProps> = ({ userProfile, onUpdatePro
         <div ref={pickerA11y.ref} {...pickerA11y.dialogProps} className="fixed inset-0 z-[150] bg-black/60" onClick={() => setPickerOpen(false)}>
           <div
             data-no-swipe
+            role="presentation"
             className="absolute bottom-0 left-0 right-0 rounded-t-3xl p-6 pb-9 space-y-5"
             style={{ background: '#101828' }}
             onClick={(e) => e.stopPropagation()}

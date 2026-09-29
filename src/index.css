@@ -159,6 +159,13 @@ html {
   .aurora-ring::before {
     animation: none;
   }
+  /* 兜底：未逐一列举的 Tailwind 内置动画与 transition 一并静止
+     （animate-spin/pulse/bounce/in/ping + 54 处 transition-all） */
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 

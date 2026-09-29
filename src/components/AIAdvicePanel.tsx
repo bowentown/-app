@@ -579,6 +579,7 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
           />
           <button
             type="button"
+            aria-label="发送睡眠疑问"
             onClick={() => handleSendMessage()}
             disabled={!inputText.trim() || isSendingChat}
             className={`p-2.5 rounded-xl ${theme.accentBg} disabled:opacity-40 ${theme.accentFg} transition-all cursor-pointer`}

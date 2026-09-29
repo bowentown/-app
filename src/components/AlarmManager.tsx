@@ -18,9 +18,12 @@ import { CustomAlarmSetting } from '../types/sleep';
 import { sleepAudio } from '../utils/audioSynth';
 import { ThemeConfig } from '../utils/themeStyles';
 import {
+  getExactAlarmStatus,
   isNativePlatform,
-  syncAlarmsToNative,
+  openExactAlarmSettings,
   requestAlarmPermissions,
+  syncAlarmsToNative,
+  type ExactAlarmStatus,
 } from '../utils/nativeAlarmScheduler';
 
 interface AlarmManagerProps {
@@ -51,7 +54,7 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
 
   const [testingTone, setTestingTone] = useState<string | null>(null);
   const [activeRingingAlarm, setActiveRingingAlarm] = useState<CustomAlarmSetting | null>(null);
-  const [nativeStatus, setNativeStatus] = useState<{ isNative: boolean; scheduledCount: number }>({
+  const [nativeStatus, setNativeStatus] = useState<{ isNative: boolean; scheduledCount: number; exact?: ExactAlarmStatus }>({
     isNative: isNativePlatform(),
     scheduledCount: 0,
   });
@@ -66,8 +69,9 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
   useEffect(() => {
     const isNat = isNativePlatform();
     if (isNat) {
-      syncAlarmsToNative(alarms).then((res) => {
-        setNativeStatus({ isNative: true, scheduledCount: res.nativeScheduledCount });
+      syncAlarmsToNative(alarms).then(async (res) => {
+        const exact = await getExactAlarmStatus();
+        setNativeStatus({ isNative: true, scheduledCount: res.nativeScheduledCount, exact });
       });
     } else {
       setNativeStatus({ isNative: false, scheduledCount: 0 });
@@ -262,13 +266,35 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
           </p>
         ) : (
           <div className="flex items-center flex-wrap gap-x-2 gap-y-1">
-            <span className="text-[10px] font-black bg-emerald-950 text-emerald-300 border border-emerald-500/60 px-2 py-0.5 rounded-full inline-flex items-center gap-1 whitespace-nowrap">
-              <ShieldCheck className="w-3 h-3 shrink-0" />
-              <span>系统级精确唤醒已激活 ({nativeStatus.scheduledCount})</span>
-            </span>
-            <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap">
-              杀进程与息屏均不影响响铃
-            </span>
+            {nativeStatus.exact === 'denied' ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => { void openExactAlarmSettings(); }}
+                  className="text-[10px] font-black bg-amber-950 text-amber-300 border border-amber-500/60 px-2 py-0.5 rounded-full inline-flex items-center gap-1 whitespace-nowrap cursor-pointer active:scale-95 transition-transform"
+                >
+                  <ShieldCheck className="w-3 h-3 shrink-0" />
+                  <span>精确唤醒未授权，闹钟可能偏晚 · 去授权 ({nativeStatus.scheduledCount})</span>
+                </button>
+                <span className="text-[10px] text-amber-300/90 font-medium whitespace-nowrap">
+                  杀进程与息屏不影响响铃，但可能晚几分钟
+                </span>
+              </>
+            ) : nativeStatus.exact === 'unknown' ? (
+              <span className="text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-600 px-2 py-0.5 rounded-full inline-flex items-center gap-1 whitespace-nowrap">
+                <span>已调度 ({nativeStatus.scheduledCount}) · 精确性待确认</span>
+              </span>
+            ) : (
+              <span className="text-[10px] font-black bg-emerald-950 text-emerald-300 border border-emerald-500/60 px-2 py-0.5 rounded-full inline-flex items-center gap-1 whitespace-nowrap">
+                <ShieldCheck className="w-3 h-3 shrink-0" />
+                <span>系统级精确唤醒已激活 ({nativeStatus.scheduledCount})</span>
+              </span>
+            )}
+            {nativeStatus.exact !== 'denied' && (
+              <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap">
+                杀进程与息屏均不影响响铃
+              </span>
+            )}
             <span className="text-[10px] text-amber-300/90 font-medium whitespace-nowrap">
               若息屏未响：请允许自启动、省电设为“无限制”、调高通知音量
             </span>
@@ -354,6 +380,10 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
               ].map((t) => (
                 <div
                   key={t.key}
+                  role="radio"
+                  aria-checked={newTone === t.key}
+                  tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setNewTone(t.key as any); } }}
                   onClick={() => setNewTone(t.key as any)}
                   className={`p-2.5 rounded-xl border text-left cursor-pointer transition-all ${
                     newTone === t.key
@@ -365,6 +395,7 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
                     <span>{t.label}</span>
                     <button
                       type="button"
+                      aria-label={`试听铃声 ${t.label}`}
                       onClick={(e) => {
                         e.stopPropagation();
                         handleTestTone(t.key as any);
@@ -458,6 +489,7 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
                 <div className="flex items-center gap-3">
                   <button
                     type="button"
+                    aria-label="试听铃声"
                     onClick={() => handleTestTone(alarm.tone)}
                     title="试听铃声"
                     className={`w-11 h-11 rounded-xl ${theme?.cardBg || 'bg-slate-800'} ${theme?.accentText} flex items-center justify-center transition-all shrink-0 border ${innerBorder} shadow-inner cursor-pointer`}
@@ -483,6 +515,7 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
                           <button
                             type="button"
                             title="减小唤醒窗口"
+                            aria-label="减小唤醒窗口"
                             onClick={() => handleAdjustWindow(alarm.id, -1)}
                             className="px-1 hover:text-white cursor-pointer"
                           >
@@ -492,6 +525,7 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
                           <button
                             type="button"
                             title="增大唤醒窗口"
+                            aria-label="增大唤醒窗口"
                             onClick={() => handleAdjustWindow(alarm.id, +1)}
                             className="px-1 hover:text-white cursor-pointer"
                           >
@@ -506,6 +540,7 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
                 <div className="flex items-center gap-3">
                   <button
                     type="button"
+                    aria-label="删除闹钟"
                     onClick={() => handleDeleteAlarm(alarm.id)}
                     className="p-2 text-slate-400 hover:text-rose-400 rounded-lg transition-colors cursor-pointer"
                   >
@@ -515,6 +550,7 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
                   {/* Switch toggle */}
                   <button
                     type="button"
+                    aria-label={alarm.enabled ? '关闭该闹钟' : '开启该闹钟'}
                     onClick={() => handleToggleAlarm(alarm.id)}
                     className={`w-12 h-6 rounded-full transition-colors relative p-0.5 cursor-pointer ${
                       alarm.enabled ? theme?.accentBg.split(' ')[0] : 'bg-slate-700'

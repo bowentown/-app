@@ -368,6 +368,7 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
               {isNativeLlmAvailable() && (
                 <div className={`p-3 rounded-xl bg-[#0a0f1d] border border-slate-700 space-y-2`}>
                   <span className="text-[11px] font-bold text-white block">HuggingFace 访问令牌（首次下载需要）</span>
+                  <span className="text-[9px] text-slate-500 block">仅存本机浏览器存储、不经过任何服务器；建议在 HF 上创建只读（read）权限的令牌。备份导出不包含它。</span>
                   <input
                     type="password"
                     value={hfTokenVal}
@@ -458,6 +459,7 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
                   />
                   <button
                     type="button"
+                    aria-label={showDeepseekKey ? '隐藏 API Key' : '显示 API Key'}
                     onClick={() => setShowDeepseekKey(!showDeepseekKey)}
                     className="absolute right-2.5 top-2 text-slate-400 hover:text-white"
                   >
@@ -557,6 +559,7 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
                   />
                   <button
                     type="button"
+                    aria-label={showCustomKey ? '隐藏 API Key' : '显示 API Key'}
                     onClick={() => setShowCustomKey(!showCustomKey)}
                     className="absolute right-2.5 top-2 text-slate-400 hover:text-white"
                   >

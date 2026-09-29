@@ -162,8 +162,10 @@ const SoundscapePlayerInner: React.FC<{ theme: ThemeConfig; onClose: () => void 
   return createPortal(
     <>
     <div ref={playerA11y.ref} {...playerA11y.dialogProps} className="fixed inset-0 z-[150] bg-black/60" onClick={onClose}>
+    {/* 遮罩与内层容器的 onClick 只是鼠标便利/阻止冒泡，键盘路径是显式关闭按钮与 Escape */}
     <div
       data-no-swipe
+      role="presentation"
       className="absolute bottom-0 left-0 right-0 max-w-lg mx-auto rounded-t-3xl p-5 pb-9 max-h-[88vh] overflow-y-auto no-scrollbar space-y-4"
       style={{ background: '#0c1220' }}
       onClick={(e) => e.stopPropagation()}
@@ -319,9 +321,10 @@ const SoundscapePlayerInner: React.FC<{ theme: ThemeConfig; onClose: () => void 
     </div>
     </div>,
     {showBreath ? (
-      <div key="breath" ref={breathA11y.ref} {...breathA11y.dialogProps} className="fixed inset-0 z-[160] bg-black/70 flex items-center justify-center p-5" onClick={() => setShowBreath(false)}>
+      <div key="breath" ref={breathA11y.ref} {...breathA11y.dialogProps} aria-hidden="false" className="fixed inset-0 z-[160] bg-black/70 flex items-center justify-center p-5" onClick={() => setShowBreath(false)}>
         <div
           data-no-swipe
+          role="presentation"
           className="w-full max-w-sm rounded-3xl p-5"
           style={{ background: '#0c1220' }}
           onClick={(e) => e.stopPropagation()}

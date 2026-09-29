@@ -180,6 +180,10 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
                 {last7Records.map((r) => (
                   <span
                     key={r.id}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`查看 ${r.date} 的睡眠详情`}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setHoveredRecord(r); } }}
                     onClick={() => setHoveredRecord(r)}
                     className={`cursor-pointer ${
                       activeRecord?.id === r.id ? accentText + ' font-bold' : 'hover:text-white'
@@ -209,6 +213,10 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
                   return (
                     <div
                       key={r.id}
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`查看 ${r.date} 的睡眠详情`}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setHoveredRecord(r); } }}
                       onClick={() => setHoveredRecord(r)}
                       className="flex-1 flex flex-col items-center h-full justify-end cursor-pointer group"
                     >
@@ -286,6 +294,10 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
                 return (
                   <div
                     key={r.id}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`查看 ${r.date} 的睡眠详情`}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setHoveredRecord(r); } }}
                     onClick={() => setHoveredRecord(r)}
                     className="flex items-center gap-2 cursor-pointer group"
                   >
@@ -367,6 +379,7 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
                   {onDeleteRecord && (
                     <button
                       type="button"
+                      aria-label={`删除 ${r.date} 的睡眠记录`}
                       onClick={(e) => {
                         e.stopPropagation();
                         if (confirm(`确认删除 ${r.date} 的睡眠记录？`)) {
@@ -402,6 +415,10 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
         const best = wk.reduce((a, r) => (r.sleepScore > a.sleepScore ? r : a), wk[0]);
         return (
           <div
+            role="button"
+            tabIndex={0}
+            aria-label="展开本周睡眠小结详情"
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setIsHistoryExpanded(true); } }}
             onClick={() => setIsHistoryExpanded(true)}
             className={`${theme.cardBg} rounded-3xl p-5 border ${theme.cardBorder} shadow-xl space-y-4 cursor-pointer hover:border-white/20 active:scale-[0.99] transition-all`}
           >

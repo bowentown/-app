@@ -27,6 +27,13 @@ export class ErrorBoundary extends Component<Props, State> {
     window.location.reload();
   };
 
+  // 最后的逃生口：崩溃可能由 localStorage 里的坏数据引起，重载只会读到
+  // 同一份坏数据再次崩溃（死循环）。给用户一条真正能出去的路。
+  private handleReset = () => {
+    try { localStorage.clear(); } catch { /* ignore */ }
+    window.location.reload();
+  };
+
   public render() {
     if (this.state.hasError) {
       return (
@@ -35,15 +42,23 @@ export class ErrorBoundary extends Component<Props, State> {
             🌙
           </div>
           <h2 className="text-lg font-bold mb-2">应用界面出现小状况</h2>
-          <p className="text-xs text-slate-400 mb-5 max-w-xs leading-relaxed">
-            数据已安全缓存在本地，点击下方按钮即可重新加载。
+          <p className="text-xs text-slate-400 mb-4 max-w-xs leading-relaxed">
+            本地数据可能已损坏。可先尝试重新加载；若反复出现此页面，请重置本地数据
+            （会清除睡眠记录，若此前导出过备份可随后从【偏好】导入恢复）。
           </p>
           <button
             type="button"
             onClick={this.handleReload}
-            className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shadow-lg"
+            className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-lg"
           >
             重新加载应用
+          </button>
+          <button
+            type="button"
+            onClick={this.handleReset}
+            className="mt-3 px-5 py-2.5 rounded-xl bg-slate-800 border border-slate-600 text-slate-300 text-xs font-bold transition-all cursor-pointer hover:border-rose-500 hover:text-rose-300"
+          >
+            重置本地数据并重启
           </button>
         </div>
       );

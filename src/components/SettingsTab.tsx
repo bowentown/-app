@@ -45,65 +45,8 @@ import {
 } from '../utils/petOverlay';
 
 
-// 导入备份的逐条清洗：任何非对象/缺日期/字段异常的条目都会被安全跳过或兜底
-const numOr = (v: unknown, fallback: number): number =>
-  typeof v === 'number' && Number.isFinite(v) ? v : fallback;
-const strOr = (v: unknown, fallback: string): string =>
-  typeof v === 'string' && v.length > 0 ? v : fallback;
-const clampMin = (v: unknown, max: number): number => Math.max(0, Math.min(max, numOr(v, 0)));
-
-function sanitizeRecord(raw: unknown): SleepRecord | null {
-  if (typeof raw !== 'object' || raw === null) return null;
-  const r = raw as Record<string, unknown>;
-  const date = typeof r.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.date) ? r.date : null;
-  if (!date) return null;
-  const duration = clampMin(r.durationMinutes, 1440);
-  const stages = Array.isArray(r.stages)
-    ? (r.stages as unknown[])
-        .map((st): SleepStageSegment | null => {
-          if (typeof st !== 'object' || st === null) return null;
-          const s = st as Record<string, unknown>;
-          const stage = ['awake', 'rem', 'light', 'deep'].includes(s.stage as string)
-            ? (s.stage as SleepStageSegment['stage'])
-            : 'light';
-          return {
-            stage,
-            startTime: strOr(s.startTime, '23:30'),
-            endTime: strOr(s.endTime, '07:30'),
-            durationMinutes: Math.max(0, Math.round(numOr(s.durationMinutes, 0))),
-          };
-        })
-        .filter((x): x is SleepStageSegment => x !== null)
-    : [];
-  return {
-    id: strOr(r.id, `import-${Date.now()}-${Math.round(Math.random() * 1e6)}`),
-    date,
-    // 与 date 同等强度的时间格式校验："abc" 这类坏值会让下游 .split(':') 产出 NaN，
-    // 界面直接显示「早于目标 NaN 分钟」
-    bedtime: typeof r.bedtime === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(r.bedtime) ? r.bedtime : '23:30',
-    wakeTime: typeof r.wakeTime === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(r.wakeTime) ? r.wakeTime : '07:30',
-    durationMinutes: duration || 1,
-    deepSleepMinutes: clampMin(r.deepSleepMinutes, duration),
-    lightSleepMinutes: clampMin(r.lightSleepMinutes, duration),
-    remSleepMinutes: clampMin(r.remSleepMinutes, duration),
-    awakeMinutes: clampMin(r.awakeMinutes, 720),
-    sleepScore: Math.max(0, Math.min(100, numOr(r.sleepScore, 60))),
-    sleepEfficiency: Math.max(0, Math.min(100, numOr(r.sleepEfficiency, 80))),
-    latencyMinutes: clampMin(r.latencyMinutes, 480),
-    wakeCount: Math.max(0, Math.round(numOr(r.wakeCount, 0))),
-    wakingMood: (['refreshed', 'neutral', 'tired', 'groggy'].includes(r.wakingMood as string)
-      ? r.wakingMood
-      : 'neutral') as SleepRecord['wakingMood'],
-    preSleepHabits: Array.isArray(r.preSleepHabits)
-      ? (r.preSleepHabits as unknown[]).filter((x): x is string => typeof x === 'string')
-      : [],
-    dreamNotes: typeof r.dreamNotes === 'string' ? r.dreamNotes : undefined,
-    stages,
-    soundEvents: Array.isArray(r.soundEvents)
-      ? (r.soundEvents as SleepRecord['soundEvents'])
-      : undefined,
-  };
-}
+// 逐条清洗在 utils/recordSanitize.ts——启动加载路径共用同一条防线
+import { sanitizeRecord } from '../utils/recordSanitize';
 
 interface SettingsTabProps {
   records: SleepRecord[];
@@ -323,6 +266,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           <div className="flex items-center gap-2 shrink-0">
             <button
               type="button"
+              aria-label="减少播报频率"
               onClick={() => handlePetEveryChange(petEvery - 1)}
               disabled={petEvery <= 1}
               className="w-7 h-7 rounded-lg bg-slate-700/70 text-slate-200 text-sm font-black disabled:opacity-30 cursor-pointer active:scale-90 transition-transform"
@@ -332,6 +276,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             <span className="w-6 text-center text-xs font-black text-sky-300">{petEvery}</span>
             <button
               type="button"
+              aria-label="增加播报频率"
               onClick={() => handlePetEveryChange(petEvery + 1)}
               disabled={petEvery >= 20}
               className="w-7 h-7 rounded-lg bg-slate-700/70 text-slate-200 text-sm font-black disabled:opacity-30 cursor-pointer active:scale-90 transition-transform"

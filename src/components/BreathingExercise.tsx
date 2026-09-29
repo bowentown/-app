@@ -154,6 +154,7 @@ export const BreathingExercise: React.FC = () => {
 
         <button
           onClick={handleReset}
+          aria-label="重置呼吸练习"
           className="p-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors"
           title="重置"
         >

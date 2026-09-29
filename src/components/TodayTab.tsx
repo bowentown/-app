@@ -14,6 +14,7 @@ import { OneTapSleepTracker } from './OneTapSleepTracker';
 import { SoundscapePlayer } from './SoundscapePlayer';
 import { Music2 } from 'lucide-react';
 import { ThemeConfig } from '../utils/themeStyles';
+import { requestAlarmPermissions } from '../utils/nativeAlarmScheduler';
 
 interface TodayTabProps {
   records: SleepRecord[];
@@ -51,6 +52,9 @@ export const TodayTab: React.FC<TodayTabProps> = ({
 }) => {
   const latestRecord = records[0] || null;
   const [goalOpen, setGoalOpen] = useState(false);
+  // 睡前提醒的悬浮窗授权态：null=未检查。此前开关只翻布尔、不申请任何权限，
+  // 提醒的投递路径（悬浮窗 > 通知兜底）在 Android 13+ 上会静默全部失效
+  const [bedtimePerm, setBedtimePerm] = useState<boolean | null>(null);
   const [mixerOpen, setMixerOpen] = useState(false);
 
   // 得分环 + 数字 count-up（进入页面时 0 → 目标值，800ms 缓出）
@@ -88,6 +92,10 @@ export const TodayTab: React.FC<TodayTabProps> = ({
       {/* 2. Last Sleep Overview Card with Unified Theme Colors */}
       {latestRecord ? (
         <div
+          role="button"
+          tabIndex={0}
+          aria-label="查看最近一晚睡眠详情，跳转到趋势"
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onNavigateToTrends?.(); } }}
           onClick={() => onNavigateToTrends?.()}
           className={`rounded-3xl p-5 ${theme.cardBg} border ${theme.cardBorder} shadow-xl transition-all cursor-pointer hover:border-white/20 active:scale-[0.99]`}
         >
@@ -307,7 +315,19 @@ export const TodayTab: React.FC<TodayTabProps> = ({
             data-no-swipe
             onClick={(e) => {
               e.stopPropagation();
-              onUpdateProfile({ bedtimeReminderEnabled: !userProfile.bedtimeReminderEnabled });
+              const next = !userProfile.bedtimeReminderEnabled;
+              onUpdateProfile({ bedtimeReminderEnabled: next });
+              if (next) {
+                // 打开即检查两条投递路径的权限：通知（兜底路径）+ 悬浮窗（主路径）
+                void requestAlarmPermissions();
+                try {
+                  const cap = (window as any).Capacitor;
+                  const plugin = cap?.isNativePlatform?.() ? cap.Plugins?.GemmaLLM : null;
+                  if (plugin?.bedtimePermission) {
+                    void plugin.bedtimePermission().then((res: any) => setBedtimePerm(!!res?.granted));
+                  }
+                } catch { /* 网页端无原生层，按钮不显示 */ }
+              }
             }}
             aria-pressed={!!userProfile.bedtimeReminderEnabled}
             aria-label="到点提醒我"
@@ -326,6 +346,24 @@ export const TodayTab: React.FC<TodayTabProps> = ({
             </span>
           </button>
         </div>
+
+        {userProfile.bedtimeReminderEnabled && bedtimePerm === false && (
+          <button
+            type="button"
+            data-no-swipe
+            onClick={(e) => {
+              e.stopPropagation();
+              try {
+                const cap = (window as any).Capacitor;
+                const plugin = cap?.isNativePlatform?.() ? cap.Plugins?.GemmaLLM : null;
+                void plugin?.bedtimeOpenPermission?.();
+              } catch { /* ignore */ }
+            }}
+            className="w-full mt-2.5 py-2.5 rounded-xl bg-orange-500/20 border border-orange-400 text-orange-200 text-xs font-bold cursor-pointer active:scale-[0.98] transition-transform"
+          >
+            提醒需要悬浮窗权限 · 前往系统设置授权
+          </button>
+        )}
 
         {goalOpen && (
         <div className="space-y-4">
