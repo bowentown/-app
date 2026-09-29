@@ -160,6 +160,13 @@ public class EyeCareService extends Service {
 
             float w = clamp01(warmAlpha);
             float d = clamp01(dimAlpha);
+            // 真实参数落盘：悬浮窗/快捷设置磁贴就地开关时读的就是这里。
+            // 之前只有 STOP 会 persistState(false,null,0,0)，apply 从不写，
+            // 导致悬浮窗再开时读到 0/0 → 两层都不建 → 看似开启实际无滤镜。
+            // 双层都为 0 的调用是无效操作，不覆盖已存参数。
+            if (w > 0.005f || d > 0.005f) {
+                persistState(context, true, warmColorHex, w, d);
+            }
             // Android 12+ 非信任触摸拦截：同 UID 悬浮窗"组合透明度"必须 ≤ 0.8 才豁免触摸穿透。
             // 此处按加法保守钳制（拖满双滑杆时等比缩小，视觉上只是略淡一点，绝不拦触摸）。
             if (w + d > 0.78f) {

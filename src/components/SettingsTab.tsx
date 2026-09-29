@@ -31,11 +31,14 @@ function switchLauncherIcon(themeId: string) {
 import { getActiveModelLabel } from '../utils/localLlmEngine';
 import {
   buildPetSnapshot,
+  getBubbleEvery,
   isPetEnabled,
   isPetNative,
   petOpenPermissionSettings,
   petPermissionGranted,
+  setBubbleEvery,
   startPet,
+  syncPet,
   stopPet,
 } from '../utils/petOverlay';
 
@@ -132,6 +135,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   const [petOn, setPetOn] = useState(() => isPetEnabled());
   const [petGranted, setPetGranted] = useState(true);
   const [petBusy, setPetBusy] = useState(false);
+  const [petEvery, setPetEvery] = useState(() => getBubbleEvery());
 
   useEffect(() => {
     if (!petNative) return;
@@ -140,6 +144,14 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
 
   // 速览卡里那几行文案，随数据实时预览
   const petPreview = buildPetSnapshot(records, userProfile);
+
+  // 播报频率改动后立即推给桌宠（开着的话）
+  const handlePetEveryChange = (next: number) => {
+    const v = Math.max(1, Math.min(20, next));
+    setPetEvery(v);
+    setBubbleEvery(v);
+    if (petOn) void syncPet(records, userProfile);
+  };
 
   const handlePetToggle = async (next: boolean) => {
     if (!petNative) return;
@@ -297,20 +309,47 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           )}
         </div>
 
-        {/* 速览卡预览：桌宠面板里就是这四行 */}
+        {/* 速览卡预览：桌宠面板里就是这两行 */}
         <div className="rounded-2xl bg-slate-900/60 border border-slate-700/60 p-3.5 space-y-1.5">
           <p className="text-[11px] font-bold text-sky-300">{petPreview.status}</p>
-          {[
-            ['今晚', petPreview.rowToday],
-            ['趋势', petPreview.rowTrends],
-            ['顾问', petPreview.rowCoach],
-            ['护眼', '点她可直接开关护眼滤镜'],
-          ].map(([k, v]) => (
-            <div key={k} className="flex items-center justify-between text-[11px]">
-              <span className="text-slate-400 font-medium">{k}</span>
-              <span className="text-sky-200 font-bold text-right">{v}</span>
-            </div>
-          ))}
+          <div className="flex items-center justify-between text-[11px]">
+            <span className="text-slate-400 font-medium">今晚</span>
+            <span className="text-sky-200 font-bold text-right">{petPreview.rowToday}</span>
+          </div>
+          <p className="text-[10px] text-slate-500 pl-1">{petPreview.rowSub}</p>
+          <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-700/40">
+            <span className="text-slate-400 font-medium">护眼滤镜</span>
+            <span className="text-sky-200 font-bold text-right">点她可直接开关</span>
+          </div>
+        </div>
+
+        {/* 播报频率：每 N 次点击鲸鱼娘，她会以女仆口吻播报一次睡眠提醒 */}
+        <div className="flex items-center justify-between">
+          <div className="min-w-0">
+            <p className="text-[11px] font-bold text-white">女仆播报频率</p>
+            <p className="text-[10px] text-slate-500 leading-relaxed">
+              每 {petEvery} 次点她会用女仆的口吻播报一次睡眠提醒，其余点击打开速览卡
+            </p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => handlePetEveryChange(petEvery - 1)}
+              disabled={petEvery <= 1}
+              className="w-7 h-7 rounded-lg bg-slate-700/70 text-slate-200 text-sm font-black disabled:opacity-30 cursor-pointer active:scale-90 transition-transform"
+            >
+              −
+            </button>
+            <span className="w-6 text-center text-xs font-black text-sky-300">{petEvery}</span>
+            <button
+              type="button"
+              onClick={() => handlePetEveryChange(petEvery + 1)}
+              disabled={petEvery >= 20}
+              className="w-7 h-7 rounded-lg bg-slate-700/70 text-slate-200 text-sm font-black disabled:opacity-30 cursor-pointer active:scale-90 transition-transform"
+            >
+              ＋
+            </button>
+          </div>
         </div>
 
         {petNative && !petGranted && (
@@ -324,7 +363,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         )}
         {petNative && (
           <p className="text-[10px] text-slate-500">
-            拖动可挪位置，松手自动吸附到屏幕边缘；点角色展开速览卡，点卡外收起。
+            拖动可挪位置，松手自动吸附到屏幕边缘；点她会弹速览卡，达到播报次数时会头顶弹出气泡、用女仆的口吻关心您的睡眠。
           </p>
         )}
       </div>

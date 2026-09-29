@@ -262,12 +262,7 @@ public class GemmaLLMPlugin extends Plugin {
             return;
         }
         try {
-            getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-                    .putString(PetOverlayService.K_STATUS, safe(call, "status", "陪你到入睡"))
-                    .putString(PetOverlayService.K_ROW_TODAY, safe(call, "rowToday", "记录与就寝目标"))
-                    .putString(PetOverlayService.K_ROW_TRENDS, safe(call, "rowTrends", "近 7 日概况"))
-                    .putString(PetOverlayService.K_ROW_COACH, safe(call, "rowCoach", "问问 AI 顾问"))
-                    .apply();
+            writePetSnapshot(call);
             android.content.Intent intent = new android.content.Intent(getContext(), PetOverlayService.class)
                     .setAction(PetOverlayService.ACTION_START);
             if (Build.VERSION.SDK_INT >= 26) {
@@ -285,12 +280,7 @@ public class GemmaLLMPlugin extends Plugin {
     @PluginMethod
     public void petSync(PluginCall call) {
         try {
-            getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-                    .putString(PetOverlayService.K_STATUS, safe(call, "status", "陪你到入睡"))
-                    .putString(PetOverlayService.K_ROW_TODAY, safe(call, "rowToday", "记录与就寝目标"))
-                    .putString(PetOverlayService.K_ROW_TRENDS, safe(call, "rowTrends", "近 7 日概况"))
-                    .putString(PetOverlayService.K_ROW_COACH, safe(call, "rowCoach", "问问 AI 顾问"))
-                    .apply();
+            writePetSnapshot(call);
             android.content.Intent intent = new android.content.Intent(getContext(), PetOverlayService.class)
                     .setAction(PetOverlayService.ACTION_START);
             getContext().startService(intent);
@@ -298,6 +288,23 @@ public class GemmaLLMPlugin extends Plugin {
         } catch (Exception e) {
             call.reject("同步桌宠文案失败: " + e.getMessage());
         }
+    }
+
+    /** 文案快照 + 播报频率一次性落盘（petStart/petSync 共用）。 */
+    private void writePetSnapshot(PluginCall call) {
+        int every = 8;
+        try {
+            Integer e = call.getInt("bubbleEvery");
+            if (e != null && e >= 1 && e <= 50) every = e;
+        } catch (Exception ignored) {
+        }
+        getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                .putString(PetOverlayService.K_STATUS, safe(call, "status", "陪你到入睡"))
+                .putString(PetOverlayService.K_ROW_TODAY, safe(call, "rowToday", "目标 23:30"))
+                .putString(PetOverlayService.K_ROW_SUB, safe(call, "rowSub", "记得早点休息"))
+                .putString(PetOverlayService.K_PET_SAY, safe(call, "say", ""))
+                .putInt(PetOverlayService.K_BUBBLE_EVERY, every)
+                .apply();
     }
 
     @PluginMethod

@@ -2,7 +2,7 @@
  * 鲸鱼娘桌宠悬浮窗：Web 侧只负责开关与"文案快照"推送。
  *
  * 数据边界是刻意的：睡眠记录仍只存在 WebView 的 localStorage，原生侧一行也读不到、
- * 也不需要。这里推过去的只是四行展示文案，桌宠把它们渲染成速览卡。
+ * 也不需要。快照 = 面板两行文案 + 女仆播报词库（\n 分隔）+ 播报频率。
  */
 import type { SleepRecord, UserProfile } from '../types/sleep';
 
@@ -18,6 +18,25 @@ function gemma(): any | null {
 export const isPetNative = (): boolean => gemma() != null;
 
 const ENABLED_KEY = 'somnacare_pet_enabled';
+
+/** 每 N 次点击鲸鱼娘播报一次女仆提醒，其余点击显示速览卡。 */
+export const BUBBLE_EVERY_KEY = 'somnacare_pet_bubble_every';
+export const DEFAULT_BUBBLE_EVERY = 8;
+
+export function getBubbleEvery(): number {
+  try {
+    const n = Number(localStorage.getItem(BUBBLE_EVERY_KEY));
+    return Number.isFinite(n) && n >= 1 && n <= 50 ? Math.round(n) : DEFAULT_BUBBLE_EVERY;
+  } catch {
+    return DEFAULT_BUBBLE_EVERY;
+  }
+}
+
+export function setBubbleEvery(n: number): void {
+  try {
+    localStorage.setItem(BUBBLE_EVERY_KEY, String(Math.round(n)));
+  } catch { /* ignore */ }
+}
 
 export function isPetEnabled(): boolean {
   try {
@@ -75,57 +94,70 @@ function tonightRecord(records: SleepRecord[], now: Date): SleepRecord | undefin
   return records.find((r) => r.date === today);
 }
 
-/** 由当前数据算出四行展示文案。 */
+function greeting(now: Date): string {
+  const h = now.getHours();
+  if (h >= 23 || h < 6) return '夜深了';
+  if (h < 11) return '早安';
+  if (h < 14) return '午安';
+  if (h < 18) return '下午好';
+  return '晚上好';
+}
+
+/** 由当前数据算出面板两行文案 + 女仆播报词库。 */
 export function buildPetSnapshot(
   records: SleepRecord[],
   profile: UserProfile,
   now: Date = new Date(),
-): { status: string; rowToday: string; rowTrends: string; rowCoach: string } {
+): { status: string; rowToday: string; rowSub: string; say: string[] } {
   const bedtime = profile?.targetBedtime ?? '23:30';
-
-  // —— 标题行：就寝倒计时 / 记录中 ——
   const tonight = tonightRecord(records, now);
   const until = minutesUntil(bedtime, now);
-  let status: string;
+
+  // —— 今晚卡：大值一行 + 小字副行 ——
+  const rowToday = tonight ? `已记录 ${tonight.sleepScore} 分` : `目标 ${bedtime}`;
+  let rowSub: string;
   if (tonight) {
-    status = `昨晚睡了 ${fmtDuration(tonight.durationMinutes)}`;
-  } else if (until == null) {
-    status = '陪你到入睡';
-  } else if (until <= 60) {
-    status = `还有 ${until} 分钟就该睡了`;
+    rowSub = `睡了 ${fmtDuration(tonight.durationMinutes)}`;
+    if (tonight.sleepEfficiency >= 85) rowSub += ' · 效率很稳';
+  } else if (until != null && until > 0) {
+    rowSub = `还剩 ${fmtDuration(until)} 入睡`;
   } else {
-    const h = Math.floor(until / 60);
-    const m = until % 60;
-    status = `还有 ${h} 小时${m > 0 ? ` ${m} 分` : ''} 到 ${bedtime}`;
+    rowSub = '记得早点休息';
   }
 
-  // —— 今晚：就寝目标与今日记录 ——
-  const rowToday = tonight
-    ? `已记录 · ${tonight.sleepScore} 分`
-    : `目标 ${bedtime}${until != null && until > 0 ? ` · 还剩 ${fmtDuration(until)}` : ''}`;
+  // —— 女仆播报词库：每行一条，原生逐条轮播；没有的数据绝不编 ——
+  const say: string[] = [];
+  const h = now.getHours();
+  if (h >= 23 || h < 6) {
+    say.push('主人，夜已经很深了……请快去睡觉，这是女仆的请求哦。');
+  } else if (h >= 18) {
+    say.push('主人，晚上好呀～人家会一直陪着您到入睡的。');
+  } else if (h >= 11) {
+    say.push('主人，下午好～午后别太勉强自己哦。');
+  } else {
+    say.push('主人，早上好呀～昨晚睡得好吗？');
+  }
 
-  // —— 趋势：近 7 日均分（样本不足时明说，不编数）——
-  const week = records.slice(0, 7);
-  const rowTrends = week.length
-    ? `近 ${week.length} 日均 ${Math.round(week.reduce((a, r) => a + r.sleepScore, 0) / week.length)} 分`
-    : '还没有记录';
-
-  // —— 顾问：昨夜最值得说的一件事 ——
-  let rowCoach = '问问 AI 顾问';
   if (tonight) {
-    const worst = Math.max(tonight.awakeMinutes, tonight.latencyMinutes);
-    if (worst >= 30) {
-      rowCoach = `昨夜入睡花了 ${fmtDuration(tonight.latencyMinutes)}`;
-    } else if (tonight.sleepEfficiency >= 85) {
-      rowCoach = `昨夜效率 ${tonight.sleepEfficiency}%，很稳`;
-    } else {
-      rowCoach = `昨夜 ${tonight.sleepScore} 分，看看能改进什么`;
+    say.push(`主人昨晚睡了 ${fmtDuration(tonight.durationMinutes)}，得了 ${tonight.sleepScore} 分呢。`);
+    if (tonight.sleepEfficiency >= 85) {
+      say.push(`主人昨夜的睡眠效率有 ${tonight.sleepEfficiency}%，人家都替您高兴～`);
     }
-  } else if (week.length) {
-    rowCoach = '聊聊最近的睡眠';
+    if (tonight.latencyMinutes >= 30) {
+      say.push(`主人昨晚躺了 ${fmtDuration(tonight.latencyMinutes)} 才睡着，试试提前放下手机好不好？`);
+    }
+    if (tonight.awakeMinutes >= 30) {
+      say.push('主人昨晚半夜醒了好几次呢，睡前少喝点水会更好哦。');
+    }
+  } else if (until != null && until > 0) {
+    say.push(`主人，距离 ${bedtime} 的目标就寝还有 ${fmtDuration(until)}，提前洗个澡暖暖的吧～`);
+  } else {
+    say.push('主人还没有记录过睡眠呢。今晚按下开始，让人家守着您入睡吧～');
   }
+  say.push('天黑了记得开护眼滤镜哦，主人的眼睛人家可是很在意的～');
+  say.push('主人辛苦了，累了就早点休息，人家会在桌面等您的～');
 
-  return { status, rowToday, rowTrends, rowCoach };
+  return { status: greeting(now), rowToday, rowSub, say };
 }
 
 /** 启动桌宠（幂等：已运行则只刷新文案）。 */
@@ -136,9 +168,10 @@ export async function startPet(
   const g = gemma();
   if (!g) return { ok: false };
   const snap = buildPetSnapshot(records, profile);
+  const payload = { ...snap, say: snap.say.join('\n'), bubbleEvery: getBubbleEvery() };
   try {
-    if (isPetEnabled()) await g.petSync(snap);
-    else await g.petStart(snap);
+    if (isPetEnabled()) await g.petSync(payload);
+    else await g.petStart(payload);
     setEnabled(true);
     return { ok: true };
   } catch (e: any) {
@@ -159,7 +192,8 @@ export async function syncPet(
   const g = gemma();
   if (!g || !isPetEnabled()) return;
   try {
-    await g.petSync(buildPetSnapshot(records, profile));
+    const snap = buildPetSnapshot(records, profile);
+    await g.petSync({ ...snap, say: snap.say.join('\n'), bubbleEvery: getBubbleEvery() });
   } catch { /* 桌宠没开或服务已停，忽略 */ }
 }
 
