@@ -462,8 +462,10 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
 
       {/* 2. Interactive AI Consultation Chat */}
       <div className={`${theme.cardBg} rounded-3xl p-4 border ${theme.cardBorder} flex flex-col h-[460px]`}>
-        {/* Message feed */}
-        <div className="flex-1 overflow-y-auto py-2 space-y-3 pr-1 text-xs no-scrollbar">
+        {/* 消息流：嵌套纵向滚动容器。
+            swipe-nested 让浏览器不再为它单独做滚动方向判定，横滑立刻透给分区轨道
+            （否则内层容器的滚动仲裁会延迟 pointer 事件，真机上表现为"框内滑不动"）。*/}
+        <div className="flex-1 overflow-y-auto py-2 space-y-3 pr-1 text-xs no-scrollbar swipe-nested">
           {chatMessages.length <= 1 && (
             <div className="flex flex-col items-center justify-center py-7 gap-3 select-none" aria-hidden>
               <div className="relative">

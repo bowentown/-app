@@ -223,3 +223,14 @@ html {
   -webkit-user-select: auto;
   user-select: auto;
 }
+
+/* 分区内的嵌套纵向滚动容器（如 AI 聊天消息流）。
+   这些容器虽无横向内容，但浏览器仍会为它们单独做一次滚动方向判定，
+   导致横滑手势在判定完成前被"扣住"，分区轨道收不到 pointermove——
+   表现就是"在大聊天框里左右滑动换不了区"。
+   显式声明 pan-y 后，浏览器立即知道横向不属于内层容器，手势直达轨道；
+   overscroll-behavior 防止纵向滚到边界后把余量冒泡给外层分区滚动。 */
+.swipe-nested {
+  touch-action: pan-y;
+  overscroll-behavior: contain;
+}

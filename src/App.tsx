@@ -328,11 +328,17 @@ export const App: React.FC = () => {
     el.addEventListener('pointermove', onMove, { passive: false });
     el.addEventListener('pointerup', finish);
     el.addEventListener('pointercancel', finish);
+    // 手指在轨道外抬起时事件不会再冒泡回轨道，绑到 window 兜底，
+    // 否则 dragRef 会卡住，轨道永远停在半路且后续手势全部失灵
+    window.addEventListener('pointerup', finish);
+    window.addEventListener('pointercancel', finish);
     return () => {
       el.removeEventListener('pointerdown', onDown);
       el.removeEventListener('pointermove', onMove);
       el.removeEventListener('pointerup', finish);
       el.removeEventListener('pointercancel', finish);
+      window.removeEventListener('pointerup', finish);
+      window.removeEventListener('pointercancel', finish);
       window.removeEventListener('resize', measure);
       ro.disconnect();
     };

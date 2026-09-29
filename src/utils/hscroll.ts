@@ -118,6 +118,9 @@ export function attachHScroll(el: HTMLElement): () => void {
   el.addEventListener('pointermove', onMove, { passive: false });
   el.addEventListener('pointerup', end);
   el.addEventListener('pointercancel', end);
+  // 手指在元素外抬起时事件不冒泡回元素，绑 window 兜底避免状态卡死
+  window.addEventListener('pointerup', end);
+  window.addEventListener('pointercancel', end);
   return () => {
     const s = states.get(el);
     if (s?.raf) cancelAnimationFrame(s.raf);
@@ -126,5 +129,7 @@ export function attachHScroll(el: HTMLElement): () => void {
     el.removeEventListener('pointermove', onMove);
     el.removeEventListener('pointerup', end);
     el.removeEventListener('pointercancel', end);
+    window.removeEventListener('pointerup', end);
+    window.removeEventListener('pointercancel', end);
   };
 }
