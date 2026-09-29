@@ -410,7 +410,7 @@ public class PetOverlayService extends Service {
         btn.addView(iv, new FrameLayout.LayoutParams(-1, -1));
 
         // 护眼钮右上角一个状态点：绿=可开、琥珀=已开
-        if (!chatIcon) {
+        if (iconRes == R.drawable.pet_ic_eye) {
             View dot = new View(this);
             dot.setTag("pet_eye_dot");
             GradientDrawable dg = new GradientDrawable();
