@@ -3,7 +3,7 @@
  * Supports Rain, Ocean Surf, Night Forest/Crickets, Deep Pink Noise, and Tibetan Singing Bowl
  */
 
-type LayerKey = 'rain' | 'ocean' | 'forest' | 'whitenoise' | 'bowl';
+type LayerKey = 'rain' | 'ocean' | 'forest' | 'whitenoise' | 'bowl' | 'thunder' | 'campfire' | 'wind' | 'brown';
 
 class SleepAudioSynthesizer {
   private ctx: AudioContext | null = null;
@@ -88,7 +88,7 @@ class SleepAudioSynthesizer {
     }, 150);
   }
 
-  public play(type: 'rain' | 'ocean' | 'forest' | 'whitenoise' | 'bowl') {
+  public play(type: LayerKey) {
     this.initContext();
     if (!this.ctx) return;
 
@@ -134,6 +134,10 @@ class SleepAudioSynthesizer {
       case 'forest': this.startForest(gain, (...ns) => ns.forEach((n) => nodes.push(n))); break;
       case 'whitenoise': this.startPinkNoise(gain, (...ns) => ns.forEach((n) => nodes.push(n))); break;
       case 'bowl': this.startTibetanBowl(gain, (...ns) => ns.forEach((n) => nodes.push(n))); break;
+      case 'thunder': this.startThunder(gain, (...ns) => ns.forEach((n) => nodes.push(n))); break;
+      case 'campfire': this.startCampfire(gain, (...ns) => ns.forEach((n) => nodes.push(n))); break;
+      case 'wind': this.startWind(gain, (...ns) => ns.forEach((n) => nodes.push(n))); break;
+      case 'brown': this.startBrown(gain, (...ns) => ns.forEach((n) => nodes.push(n))); break;
     }
     this.layers.set(type, { gain, nodes });
     this.isPlaying = true;
@@ -207,6 +211,184 @@ class SleepAudioSynthesizer {
     const layer = this.layers.get(type);
     if (!layer || !this.ctx) return;
     layer.gain.gain.setTargetAtTime(Math.max(0, Math.min(1, vol)), this.ctx.currentTime, 0.05);
+  }
+
+  // 6. 雷雨敲窗：闷雨底 + 稀疏雨滴 + 随机远雷（低频滚雷包络）
+  private startThunder(dest: AudioNode, collect: (...n: (AudioNode | number)[]) => void) {
+    if (!this.ctx) return;
+    const bufferSize = 2 * this.ctx.sampleRate;
+    const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const output = noiseBuffer.getChannelData(0);
+    let lastOut = 0.0;
+    for (let i = 0; i < bufferSize; i++) {
+      const white = Math.random() * 2 - 1;
+      output[i] = (lastOut + 0.02 * white) / 1.02;
+      lastOut = output[i];
+      output[i] *= 2.2;
+    }
+    const whiteNoise = this.ctx.createBufferSource();
+    whiteNoise.buffer = noiseBuffer;
+    whiteNoise.loop = true;
+    const hp = this.ctx.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = 400;
+    const lp = this.ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 1500;
+    const bedGain = this.ctx.createGain();
+    bedGain.gain.value = 0.5;
+    whiteNoise.connect(hp); hp.connect(lp); lp.connect(bedGain); bedGain.connect(dest);
+    whiteNoise.start();
+    collect(whiteNoise, hp, lp, bedGain);
+
+    const drops = window.setInterval(() => {
+      if (!this.ctx || !this.isPlaying) return;
+      const osc = this.ctx.createOscillator();
+      const dropGain = this.ctx.createGain();
+      const freq = 900 + Math.random() * 1500;
+      osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(freq * 0.4, this.ctx.currentTime + 0.05);
+      dropGain.gain.setValueAtTime(0.03 * (0.5 + Math.random() * 0.5), this.ctx.currentTime);
+      dropGain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + 0.06);
+      osc.connect(dropGain); dropGain.connect(dest);
+      osc.start(); osc.stop(this.ctx.currentTime + 0.07);
+    }, 300);
+    collect(drops);
+
+    const thunder = () => {
+      if (!this.ctx || !this.isPlaying) return;
+      const dur = 2.2 + Math.random() * 2.2;
+      const rumbleBuf = this.ctx.createBuffer(1, Math.floor(this.ctx.sampleRate * dur), this.ctx.sampleRate);
+      const rumble = rumbleBuf.getChannelData(0);
+      let v = 0;
+      for (let i = 0; i < rumble.length; i++) {
+        v += (Math.random() * 2 - 1) * 0.03;
+        v *= 0.996;
+        rumble[i] = v * 2.8;
+      }
+      const src = this.ctx.createBufferSource();
+      src.buffer = rumbleBuf;
+      const lp2 = this.ctx.createBiquadFilter();
+      lp2.type = 'lowpass';
+      lp2.frequency.value = 110 + Math.random() * 160;
+      const g = this.ctx.createGain();
+      const t = this.ctx.currentTime;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.55 + Math.random() * 0.35, t + 0.18);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      src.connect(lp2); lp2.connect(g); g.connect(dest);
+      src.start(t);
+      collect(src, lp2, g);
+    };
+    const thunderTimer = window.setInterval(() => {
+      if (Math.random() < 0.6) thunder();
+    }, 8500);
+    collect(thunderTimer);
+  }
+
+  // 7. 篝火余温：棕噪暖场底 + 随机高频噼啪爆点
+  private startCampfire(dest: AudioNode, collect: (...n: (AudioNode | number)[]) => void) {
+    if (!this.ctx) return;
+    const bufferSize = 2 * this.ctx.sampleRate;
+    const buf = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    let last = 0;
+    for (let i = 0; i < bufferSize; i++) {
+      const white = Math.random() * 2 - 1;
+      last = (last + 0.02 * white) / 1.02;
+      data[i] = last * 3.2;
+    }
+    const bed = this.ctx.createBufferSource();
+    bed.buffer = buf;
+    bed.loop = true;
+    const lp = this.ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 420;
+    const bedGain = this.ctx.createGain();
+    bedGain.gain.value = 0.16;
+    bed.connect(lp); lp.connect(bedGain); bedGain.connect(dest);
+    bed.start();
+    collect(bed, lp, bedGain);
+
+    const crackle = () => {
+      if (!this.ctx || !this.isPlaying) return;
+      const dur = 0.015 + Math.random() * 0.06;
+      const cb = this.ctx.createBuffer(1, Math.max(1, Math.floor(this.ctx.sampleRate * dur)), this.ctx.sampleRate);
+      const cd = cb.getChannelData(0);
+      for (let i = 0; i < cd.length; i++) cd[i] = (Math.random() * 2 - 1) * (1 - i / cd.length);
+      const src = this.ctx.createBufferSource();
+      src.buffer = cb;
+      const hp = this.ctx.createBiquadFilter();
+      hp.type = 'highpass';
+      hp.frequency.value = 1400 + Math.random() * 2600;
+      const g = this.ctx.createGain();
+      const t = this.ctx.currentTime;
+      g.gain.setValueAtTime(0.05 + Math.random() * 0.12, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      src.connect(hp); hp.connect(g); g.connect(dest);
+      src.start(t);
+      collect(src, hp, g);
+    };
+    const crackleTimer = window.setInterval(() => {
+      if (Math.random() < 0.85) crackle();
+    }, 85);
+    collect(crackleTimer);
+  }
+
+  // 8. 山谷夜风：带通噪声 + 双 LFO 缓慢阵风
+  private startWind(dest: AudioNode, collect: (...n: (AudioNode | number)[]) => void) {
+    if (!this.ctx) return;
+    const bufferSize = 2 * this.ctx.sampleRate;
+    const buf = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = buf;
+    noise.loop = true;
+    const bp = this.ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = 320;
+    bp.Q.value = 0.9;
+    const gust = this.ctx.createGain();
+    gust.gain.value = 0.32;
+    const lfo1 = this.ctx.createOscillator();
+    lfo1.frequency.value = 0.06;
+    const lfo1G = this.ctx.createGain();
+    lfo1G.gain.value = 170;
+    lfo1.connect(lfo1G); lfo1G.connect(bp.frequency);
+    const lfo2 = this.ctx.createOscillator();
+    lfo2.frequency.value = 0.043;
+    const lfo2G = this.ctx.createGain();
+    lfo2G.gain.value = 0.14;
+    lfo2.connect(lfo2G); lfo2G.connect(gust.gain);
+    noise.connect(bp); bp.connect(gust); gust.connect(dest);
+    noise.start(); lfo1.start(); lfo2.start();
+    collect(noise, bp, gust, lfo1, lfo1G, lfo2, lfo2G);
+  }
+
+  // 9. 深棕噪音：积分白噪（比粉噪更低沉），低通护眠
+  private startBrown(dest: AudioNode, collect: (...n: (AudioNode | number)[]) => void) {
+    if (!this.ctx) return;
+    const bufferSize = 2 * this.ctx.sampleRate;
+    const buf = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    let last = 0;
+    for (let i = 0; i < bufferSize; i++) {
+      const white = Math.random() * 2 - 1;
+      last = (last + 0.02 * white) / 1.02;
+      data[i] = last * 3.5;
+    }
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = buf;
+    noise.loop = true;
+    const lp = this.ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 520;
+    const g = this.ctx.createGain();
+    g.gain.value = 0.42;
+    noise.connect(lp); lp.connect(g); g.connect(dest);
+    noise.start();
+    collect(noise, lp, g);
   }
 
   // Ringing alarm tone for custom wakeup alarms

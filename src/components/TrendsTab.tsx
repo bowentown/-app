@@ -214,12 +214,12 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
                     >
                       <div
                         className={`w-full max-w-[24px] h-20 rounded-md overflow-hidden flex flex-col-reverse ${
-                          isHovered ? 'ring-2 ring-indigo-400 shadow' : ''
+                          isHovered ? `ring-2 ${theme.accentRing} shadow` : ''
                         }`}
                       >
-                        <div style={{ height: `${deepPct}%`, backgroundColor: theme.accentHex }} />
+                        <div style={{ height: `${deepPct}%` }} className="bg-emerald-400" />
                         <div style={{ height: `${lightPct}%` }} className="bg-sky-400" />
-                        <div style={{ height: `${remPct}%` }} className="bg-indigo-300" />
+                        <div style={{ height: `${remPct}%` }} className="bg-violet-400" />
                         <div style={{ height: `${awakePct}%` }} className="bg-rose-400" />
                       </div>
 
@@ -238,13 +238,13 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
               <div className={`flex flex-col items-center gap-1 pt-1 border-t ${innerBorder} text-[10px] ${textSecondary}`}>
                 <div className="flex justify-center gap-3">
                   <span className="flex items-center gap-1">
-                    <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: theme.accentHex }} />深睡
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <span className="w-2.5 h-2.5 rounded-sm bg-indigo-300" />REM
+                    <span className="w-2.5 h-2.5 rounded-sm bg-emerald-400" />深睡
                   </span>
                   <span className="flex items-center gap-1">
                     <span className="w-2.5 h-2.5 rounded-sm bg-sky-400" />浅睡
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-2.5 h-2.5 rounded-sm bg-violet-400" />REM
                   </span>
                   <span className="flex items-center gap-1">
                     <span className="w-2.5 h-2.5 rounded-sm bg-rose-400" />清醒
@@ -418,14 +418,14 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
               <div className={`${innerBg} border ${innerBorder} rounded-2xl p-3`}>
                 <span className="text-[10px] text-slate-400 block mb-0.5">日均时长</span>
                 <span className="text-xl font-black font-mono text-white tabular-nums">
-                  {Math.floor(avgDurWk / 60)}<span className="text-xs">h</span>
-                  {avgDurWk % 60}<span className="text-xs">m</span>
+                  {Math.floor(avgDurWk / 60)}<span className="text-sm">H</span>
+                  {avgDurWk % 60}<span className="text-sm">M</span>
                 </span>
               </div>
               <div className={`${innerBg} border ${innerBorder} rounded-2xl p-3`}>
                 <span className="text-[10px] text-slate-400 block mb-0.5">场均深睡</span>
                 <span className="text-xl font-black font-mono text-emerald-400 tabular-nums">
-                  {avgDeepWk}<span className="text-xs">m</span>
+                  {avgDeepWk}<span className="text-sm">M</span>
                 </span>
               </div>
             </div>

@@ -47,13 +47,46 @@ const TRACKS: SoundscapeTrack[] = [
     soundType: 'bowl',
     accentColor: 'from-amber-950/60 to-orange-950/40',
   },
+  {
+    id: 'thunder',
+    name: '雷雨敲窗',
+    category: 'weather',
+    description: '闷雨幕与远处滚雷，天然声学掩蔽',
+    soundType: 'thunder',
+    accentColor: 'from-slate-900/70 to-blue-950/60',
+  },
+  {
+    id: 'campfire',
+    name: '篝火余温',
+    category: 'nature',
+    description: '柴火噼啪与低频暖噪，围炉冬夜',
+    soundType: 'campfire',
+    accentColor: 'from-orange-950/60 to-red-950/50',
+  },
+  {
+    id: 'wind',
+    name: '山谷夜风',
+    category: 'nature',
+    description: '缓慢阵风的低吟与远山回声',
+    soundType: 'wind',
+    accentColor: 'from-cyan-950/60 to-slate-900/50',
+  },
+  {
+    id: 'brown',
+    name: '深棕噪音',
+    category: 'noise',
+    description: '比粉噪更低沉厚重，掩蔽低频杂音',
+    soundType: 'brown',
+    accentColor: 'from-stone-900/70 to-neutral-950/60',
+  },
 ];
 
 // 预设混音（BetterSleep 式多层叠加）：[音效, 音量]
 const PRESET_MIXES: { name: string; desc: string; layers: Array<[SoundscapeTrack['soundType'], number]> }[] = [
   { name: '轻雨伴眠', desc: '细雨 + 粉噪掩蔽', layers: [['rain', 0.6], ['whitenoise', 0.25]] },
+  { name: '雷雨敲窗', desc: '雨幕 + 远雷沉浸', layers: [['thunder', 0.55]] },
   { name: '海浪夜林', desc: '潮汐 + 竹林夜风', layers: [['ocean', 0.55], ['forest', 0.3]] },
-  { name: '颂钵冥想', desc: '432Hz 单层沉浸', layers: [['bowl', 0.7]] },
+  { name: '篝火夜话', desc: '篝火 + 山谷夜风', layers: [['campfire', 0.6], ['wind', 0.22]] },
 ];
 
 const SoundscapePlayerInner: React.FC<{ theme: ThemeConfig; onClose: () => void }> = ({ theme, onClose }) => {
@@ -164,7 +197,7 @@ const SoundscapePlayerInner: React.FC<{ theme: ThemeConfig; onClose: () => void 
       </div>
 
       {/* 预设混音 */}
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         {PRESET_MIXES.map((m) => (
           <button
             key={m.name}

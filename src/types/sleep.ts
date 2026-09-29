@@ -59,9 +59,9 @@ export interface SleepAnalysisResult {
 export interface SoundscapeTrack {
   id: string;
   name: string;
-  category: 'nature' | 'noise' | 'meditation';
+  category: 'nature' | 'noise' | 'meditation' | 'weather';
   description: string;
-  soundType: 'rain' | 'ocean' | 'forest' | 'whitenoise' | 'bowl';
+  soundType: 'rain' | 'ocean' | 'forest' | 'whitenoise' | 'bowl' | 'thunder' | 'campfire' | 'wind' | 'brown';
   accentColor: string;
 }
 
