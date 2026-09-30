@@ -40,13 +40,15 @@ function factOf(facts: string[], prefix: string): string {
 }
 
 const SELFIE_SRC = `${import.meta.env.BASE_URL || '/'}whale-selfie.png`;
+const SELFIE_SRC_SPORT = `${import.meta.env.BASE_URL || '/'}whale-selfie-sport.png`;
 
 /** 配图卡（CSS 渲染零依赖，致敬 dsh-plugin-moments 的九宫格混合图卡）。 */
 const CardView: React.FC<{ type: MomentCard; moment: Moment }> = ({ type, moment }) => {
   if (type === 'selfie') {
+    const isSport = localStorage.getItem('somnacare_pet_skin') === 'sport';
     return (
       <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-sky-500/30 to-blue-900/40 border border-slate-700/60 aspect-square flex items-center justify-center">
-        <img src={SELFIE_SRC} alt="大肥鱼自拍" className="w-4/5 h-4/5 object-contain drop-shadow-[0_2px_8px_rgba(56,189,248,0.35)]" />
+        <img src={isSport ? SELFIE_SRC_SPORT : SELFIE_SRC} alt="大肥鱼自拍" className="w-4/5 h-4/5 object-contain drop-shadow-[0_2px_8px_rgba(56,189,248,0.35)]" />
         <span className="absolute bottom-1 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded-md bg-black/50 text-[9px] font-bold text-sky-200 whitespace-nowrap">
           今日营业自拍 · 拒绝加班
         </span>

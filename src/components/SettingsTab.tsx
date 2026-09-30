@@ -270,19 +270,22 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           )}
         </div>
 
-        {/* 播报词预览：点「消息」按钮看到的傲娇发言 */}
-        <div className="rounded-2xl bg-slate-900/60 border border-slate-700/60 p-3.5 space-y-1.5">
-          <p className="text-[10px] font-bold text-sky-300">🐋 蓝色大肥鱼 · 傲娇播报预览</p>
-          {petSay.slice(0, 3).map((line: string, i: number) => (
-            <p key={i} className="text-[11px] text-slate-300 leading-relaxed">{line}</p>
-          ))}
-        </div>
+        {/* 播报词预览：折叠 */}
+        <details className="rounded-2xl bg-slate-900/60 border border-slate-700/60 p-3.5">
+          <summary className="text-[10px] font-bold text-sky-300 cursor-pointer select-none">
+            傲娇播报预览（{petSay.length} 条）
+          </summary>
+          <div className="space-y-1.5 pt-2">
+            {petSay.slice(0, 4).map((line: string, i: number) => (
+              <p key={i} className="text-[11px] text-slate-300 leading-relaxed">{line}</p>
+            ))}
+          </div>
+        </details>
 
         {/* 换装 */}
         <div className="flex items-center justify-between">
           <div>
             <p className="text-[11px] font-bold text-white">大肥鱼服装</p>
-            <p className="text-[10px] text-slate-500">运动装 = pet-sport 资产（来自 whale-girl-plus 的 whale-girl-sport）</p>
           </div>
           <div className="flex gap-1.5 shrink-0">
             {['default', 'sport'].map((s) => (
@@ -342,11 +345,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             需要悬浮窗权限 · 前往系统设置授权
           </button>
         )}
-        {petNative && (
-          <p className="text-[10px] text-slate-500">
-            拖动可挪位置，松手自动吸附到屏幕边缘。点她弹「💬 消息 / 👁 护眼」两个按钮：消息看她头顶冒傲娇播报，护眼就地开关滤镜。
-          </p>
-        )}
+
       </div>
 
       {/* 2. Custom Alarm Clocks (Hardware Web Audio) */}
