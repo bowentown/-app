@@ -299,7 +299,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                     : 'bg-slate-800 border-slate-600 text-slate-400'
                 }`}
               >
-                {s === 'default' ? '常服' : '运动'}
+                {s === 'default' ? '常服' : '樱花'}
               </button>
             ))}
           </div>
