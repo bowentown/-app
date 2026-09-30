@@ -126,7 +126,7 @@ public class WhaleGirlView extends View {
 
     public WhaleGirlView(Context c, String skin) {
         super(c);
-        this.dir = "sport".equals(skin) ? DIR_SPORT : DIR_DEFAULT;
+        this.dir = "sakura".equals(skin) ? DIR_SPORT : DIR_DEFAULT;
         idle      = load("idle", 3, 2, "blink", null);
         joy       = load("joy", 2, 5, "loop", null);
         celebrate = load("celebrate", 3, 4, "loop", null);

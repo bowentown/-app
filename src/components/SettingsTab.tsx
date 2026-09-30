@@ -88,7 +88,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   // 未刷到时回退本地模板
   const petSay = getCachedLlmSay(userProfile.aiConfig) ?? buildPetSayLines(records, userProfile);
 
-  // 换装（运动版 = pet-sport 资产目录）
+  // 换装（樱花版 = 樱花装目录）
   const handlePetSkinChange = (skin: string) => {
     setPetSkinState(skin);
     setPetSkin(skin);
@@ -288,7 +288,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             <p className="text-[11px] font-bold text-white">大肥鱼服装</p>
           </div>
           <div className="flex gap-1.5 shrink-0">
-            {['default', 'sport'].map((s) => (
+            {['default', 'sakura'].map((s) => (
               <button
                 key={s}
                 type="button"
