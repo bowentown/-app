@@ -353,19 +353,31 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
           },
           body: JSON.stringify({
             model: isCustom ? modelToUse : modelToUse === 'deepseek-flash' ? 'deepseek-chat' : modelToUse === 'deepseek-pro' ? 'deepseek-reasoner' : modelToUse,
+            // 成本三件套：
+            // ① system 只放恒定 persona——易变数据放 system（前缀第 0 段）会让
+            //    每次记一晚睡眠就作废全部历史缓存（cache miss 曾占 73%）
+            // ② 历史只带最近 8 条——此前发全量 120 条，平均单次 18.5k token
+            // ③ 易变数据挪到尾部 user 消息——只作废尾部几十 token
+            // ④ max_tokens 400——输出是最贵的一项（¥8/M）
             messages: [
-              {
-                role: 'system',
-                content: `${customPersona}\n${personalCtx}`,
-              },
-              ...newHistory.map((m) => ({ role: m.role, content: m.content })),
+              { role: 'system', content: customPersona },
+              ...newHistory.slice(-8).map((m) => ({ role: m.role, content: m.content })),
+              ...(personalCtx ? [{ role: 'user' as const, content: `${personalCtx}\n\n（以上是我的真实睡眠数据，请结合它们回答我的问题）` }] : []),
             ],
             temperature: 0.7,
+            max_tokens: 400,
           }),
         });
 
         if (dsRes.ok) {
           const dsData = await dsRes.json();
+          // 缓存命中率可观测：hit 逐轮增长且 hitRate>0.8 = 前缀缓存生效
+          if (import.meta.env?.DEV && dsData.usage) {
+            const u = dsData.usage;
+            const hit = u.prompt_cache_hit_tokens ?? 0;
+            const miss = u.prompt_cache_miss_tokens ?? 0;
+            console.log('[llm usage]', { hit, miss, hitRate: hit + miss > 0 ? (hit / (hit + miss)).toFixed(2) : 'n/a' });
+          }
           // 空内容不再伪装成模型回答：落空则继续走本地兜底（那条路径是诚实的）
           const replyText = dsData.choices?.[0]?.message?.content;
           const aiReply: ChatMessage = {
@@ -378,8 +390,11 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
             setChatMessages((prev) => [...prev, aiReply]);
             return;
           }
-          console.warn('[chat] DeepSeek 返回空内容，转本地兜底');
+          console.warn('[chat] 云端返回空内容，转本地规则兜底');
         }
+        // 直连已尝试就不再用另一套 prompt 打服务端代理——两条路径的前缀毫无
+        // 重叠，必然双份 miss 且互相挤占缓存。失败交给外层 catch 走本地规则引擎
+        throw new Error('direct LLM failed');
       }
 
       // 3. Fallback to app server proxy

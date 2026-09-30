@@ -164,6 +164,9 @@ public class WhaleGirlView extends View {
             Bitmap b = BitmapFactory.decodeStream(in);
             if (b == null) return null;
             return new Anim(b, frames, fps, playback, motion);
+        } catch (OutOfMemoryError e) {
+            // 低内存设备解码 256×256 × 18 张可能 OOM：缺一张比崩进程好
+            return null;
         } catch (Exception e) {
             return null;
         }

@@ -76,9 +76,17 @@ for (const f of listFiles(SRC)) {
     const openEnd = tagEnd(src, i);
     if (openEnd === -1) continue;
     const tag2 = src.slice(i, openEnd);
-    if (!/type="(checkbox|radio)"/.test(tag2)) continue;
+    // type 属性兼容 JSX 表达式写法（type={"checkbox"}）
+    if (!/type=\{?['"]?(checkbox|radio)['"]?\}?/.test(tag2)) continue;
+    // 名称三来源均可：aria-label / aria-labelledby / <label> 包裹或 htmlFor 关联
     if (/aria-label|aria-labelledby/.test(tag2)) continue;
-    problems.push(`${rel}:${lineAt(i)} 开关式 <input> 缺 aria-label`);
+    // 向后看 3 行找 <label（包裹式）或 htmlFor=（关联式，id 在同一 input 上）
+    const ctx = src.slice(Math.max(0, i - 400), openEnd);
+    const inputId = tag2.match(/id="([^"]+)"/);
+    const wrapped = /<label[^>]*$/.test(ctx) && !/<\/label>/.test(ctx.slice(ctx.lastIndexOf('<label')));
+    const hasHtmlFor = inputId && new RegExp(`htmlFor=["']${inputId[1]}["']`).test(src);
+    if (wrapped || hasHtmlFor) continue;
+    problems.push(`${rel}:${lineAt(i)} 开关式 <input> 缺可访问名称（aria-label / label 包裹 / htmlFor）`);
   }
 
   // 规则 1c：onClick 的 <g>（可点击 SVG）必须有 role/tabIndex——
@@ -88,8 +96,9 @@ for (const f of listFiles(SRC)) {
     if (openEnd === -1) continue;
     const tag2 = src.slice(i, openEnd);
     if (!/onClick/.test(tag2)) continue;
-    if (/role=|tabIndex|aria-hidden/.test(tag2)) continue;
-    problems.push(`${rel}:${lineAt(i)} 可点击 <g> 未声明 role/tabIndex`);
+    // role= 单独存在不是键盘可操作的证明——必须 tabIndex 或 onKeyDown
+    if (/tabIndex|onKeyDown|aria-hidden/.test(tag2)) continue;
+    problems.push(`${rel}:${lineAt(i)} 可点击 <g> 缺 tabIndex/onKeyDown（键盘不可操作）`);
   }
 
   // 规则 2：onClick 的 div/span

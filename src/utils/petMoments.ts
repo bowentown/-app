@@ -51,18 +51,31 @@ export function loadMoments(): Moment[] {
       .filter((m) => m && typeof m.text === 'string' && typeof m.date === 'string')
       .map((m): Moment => ({
         ...m,
-        // 六个字段全部兜底：{date, text} 这样的残缺旧数据此前会在
+        // id 兜底：残缺旧数据 id=undefined 时 upsert 按 id 去重会产生"永远删不掉的僵尸记录"
+        id: typeof m.id === 'string' && m.id ? m.id : `m-${m.date}`,
+        ts: typeof m.ts === 'number' && Number.isFinite(m.ts) ? m.ts : Date.now(),
+        // 字段全部兜底：{date, text} 这样的残缺旧数据此前会在
         // m.comments.length / m.facts.map / m.replies.some 五处抛错
         facts: Array.isArray(m.facts) ? (m.facts as unknown[]).filter((x): x is string => typeof x === 'string') : [],
-        cards: Array.isArray(m.cards) && m.cards.length ? m.cards : ['data'],
-        likes: Array.isArray(m.likes) ? m.likes : [],
-        comments: Array.isArray(m.comments) ? m.comments : [],
-        replies: Array.isArray(m.replies) ? m.replies : [],
+        cards: Array.isArray(m.cards)
+          ? ([...new Set((m.cards as unknown[]).filter((c: any): c is MomentCard =>
+              c === 'data' || c === 'selfie' || c === 'week'))].slice(0, 3) as MomentCard[])
+          : ['data'],
+        likes: Array.isArray(m.likes) ? m.likes.filter((x: unknown): x is string => typeof x === 'string') : [],
+        comments: sanitizeComments(m.comments),
+        replies: sanitizeComments(m.replies),
         liked: m.liked === true,
       }));
   } catch {
     return [];
   }
+}
+
+/** 元素级校验：null 项或 text 为对象的元素曾让整页白屏（外部破坏/半截写入时） */
+function sanitizeComments(v: unknown): MomentComment[] {
+  if (!Array.isArray(v)) return [];
+  return (v as unknown[]).filter((c: any): c is MomentComment =>
+    !!c && typeof (c as any).friend === 'string' && typeof (c as any).text === 'string');
 }
 
 function saveMoments(list: Moment[]): void {
@@ -100,7 +113,8 @@ export function buildSleepFacts(
     facts.push(`昨晚睡眠时长 ${fmtDuration(lastNight.durationMinutes)}`);
     facts.push(`昨晚睡眠评分 ${lastNight.sleepScore}/100`);
     facts.push(`入睡效率 ${lastNight.sleepEfficiency}%`);
-    facts.push(`入睡耗时 ${fmtDuration(lastNight.latencyMinutes)}`);
+    // 推算值必须标注——此前把它当实测值讲，且本地模板据它骂人（第七轮缺陷类复发）
+    facts.push(`入睡耗时 ${fmtDuration(lastNight.latencyMinutes)}${lastNight.latencyEstimated ? '（按作息推算的估计值）' : ''}`);
     facts.push(`夜醒累计 ${fmtDuration(lastNight.awakeMinutes)}`);
   } else {
     facts.push('昨晚没有睡眠记录');
@@ -215,7 +229,10 @@ ${Object.entries(FRIEND_PERSONAS).map(([f, p]) => `   - ${f}：${p}`).join('\n')
 
 
 // —— 本地兜底（无 API Key / 调用失败）：同样只用真实数字 ——
-function localMoment(facts: string[]): { text: string; comments: MomentComment[]; cards: MomentCard[] } {
+function localMoment(
+  facts: string[],
+  lastNight?: SleepRecord,
+): { text: string; comments: MomentComment[]; cards: MomentCard[] } {
   const get = (prefix: string): string | null => {
     const f = facts.find((x) => x.startsWith(prefix));
     return f ? f.slice(prefix.length).trim() : null;
@@ -236,8 +253,12 @@ function localMoment(facts: string[]): { text: string; comments: MomentComment[]
   } else {
     text = '昨晚的觉睡得如何本鱼不知道——因为根本没有记录！事已至此，先睡觉吧 🛏';
   }
-  if (latency && /^\d+/.test(latency) && parseInt(latency, 10) >= 30) {
-    text += ' 躺半小时才睡着，手机没收！';
+  // 潜伏期骂人段只对实测值（未标注推算）生效；且解析 fmtDuration 的两种格式
+  // （"45 分" / "2 小时 0 分"——此前 parseInt 只读首段，120 分被读成 2）
+  const latencyRaw = lastNight?.latencyMinutes ?? 0;
+  const latencyIsEstimate = lastNight?.latencyEstimated === true;
+  if (!latencyIsEstimate && latencyRaw >= 30) {
+    text += ` 躺了 ${fmtDuration(latencyRaw)} 才睡着，手机没收！`;
   }
   if (eff && /^\d+/.test(eff) && parseInt(eff, 10) >= 85) {
     text += ' 效率倒是不赖，哼。';
@@ -306,7 +327,8 @@ function pickLikes(): string[] {
 }
 
 function upsert(list: Moment[], m: Moment): Moment[] {
-  return [m, ...list.filter((x) => x.id !== m.id)].slice(0, MAX_MOMENTS);
+  // 按 date 去重（与 ensureTodayMoment 的 existing 查找同键——按 id 曾产生僵尸重复）
+  return [m, ...list.filter((x) => x.date !== m.date)].slice(0, MAX_MOMENTS);
 }
 
 /**
@@ -322,11 +344,15 @@ export async function ensureTodayMoment(
 ): Promise<{ moments: Moment[]; generated: boolean }> {
   const list = loadMoments();
   const date = todayStr(now);
+  const today = date;   // 供 lastNight 查找用（同一值）
   const existing = list.find((m) => m.date === date);
   if (existing && !force) return { moments: list, generated: false };
+  const prevText = existing?.text;
 
   const facts = buildSleepFacts(records, profile, now);
   const cfg = profile?.aiConfig;
+  // 本地兜底模板需要原始数值字段（骂人段按实测潜伏期判断，见 localMoment）
+  const lastNight = records.find((r) => r.date === today);
   let text: string | null = null;
   let comments: MomentComment[] = [];
   let cards: MomentCard[] = [];
@@ -360,27 +386,44 @@ export async function ensureTodayMoment(
     }
   }
   if (!text) {
-    const fb = localMoment(facts);
+    const fb = localMoment(facts, lastNight);
     text = fb.text;
     comments = fb.comments;
     cards = fb.cards;
   }
 
+  // 重新生成只应刷新"大肥鱼写了什么"——用户已产生的点赞/评论/回复绝不能被抹掉
   const m: Moment = {
     id: `m-${date}`,
     date,
     ts: now.getTime(),
-    text: text ?? localMoment(facts).text,
+    text: text ?? localMoment(facts, lastNight).text,
     facts,
     cards: cards.length ? cards : ['data'],
-    likes: pickLikes(),
+    likes: existing?.likes ?? pickLikes(),
     comments,
-    liked: false,
-    replies: [],
+    liked: existing?.liked ?? false,
+    replies: existing?.replies ?? [],
   };
   const next = upsert(list, m);
   saveMoments(next);
-  return { moments: next, generated: true };
+  return { moments: next, generated: m.text !== prevText };
+}
+
+/** M6：重新生成冷却——同一自然日多次点击不再每次都打 LLM（10 分钟冷却）。 */
+const REGEN_COOLDOWN_MS = 10 * 60 * 1000;
+
+export function isRegenCoolingDown(now: Date = new Date()): boolean {
+  try {
+    const last = Number(localStorage.getItem('somnacare_pet_mom_regen_at'));
+    return Number.isFinite(last) && Date.now() - last < REGEN_COOLDOWN_MS;
+  } catch {
+    return false;
+  }
+}
+
+export function markRegenDone(now: Date = new Date()): void {
+  try { localStorage.setItem('somnacare_pet_mom_regen_at', String(Date.now())); } catch { /* ignore */ }
 }
 
 /**
@@ -390,42 +433,73 @@ export async function ensureTodayMoment(
  * 挂着"她不许自己编数字"的出处清单。
  */
 const CN_NUM: Record<string, number> = {
-  一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9, 十: 10,
-  两: 2, 半: 0.5, 廿: 20, 卅: 30,
+  一: 1, 二: 2, 两: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9, 十: 10, 半: 0.5,
 };
 
+/** 中文数字串（十X / X十 / 百 / 千 / 半）→ 数值；无法解析返回 null */
+function cnNumToValue(str: string): number | null {
+  const d: Record<string, number> = { 一:1, 二:2, 两:2, 三:3, 四:4, 五:5, 六:6, 七:7, 八:8, 九:9 };
+  if (str === '十') return 10;
+  if (str === '半') return 0.5;
+  if (str.includes('百') || str.includes('千')) {
+    const unit = str.includes('千') ? 1000 : 100;
+    const parts = str.split(/[百千]/);
+    const head = parts[0] ? (d[parts[0]] ?? (Number(parts[0]) || 1)) : 1;
+    const rest = parts[1] ? (d[parts[1]] ?? (Number(parts[1]) || 0)) : 0;
+    return head * unit + rest;
+  }
+  const m2 = str.match(/^([一二两三四五六七八九])?十([一二三四五六七八九])?$/);
+  if (m2) {
+    const tens = m2[1] ? d[m2[1]] : 1;
+    const ones = m2[2] ? d[m2[2]] : 0;
+    return tens * 10 + ones;
+  }
+  return str.length === 1 && d[str] !== undefined ? d[str] : null;
+}
+
 /**
- * 数字白名单（按单位判断，非按数值大小）：
- * 数字后紧跟数据单位（小时/分/次/%/天等）时，必须出现在事实清单里；
- * "第 1 次""第 3 碗"这类序数/量词豁免。此前按 1-12 数值豁免，
- * 恰好把"睡了 N 小时"这个最常被编造的句式整个放进豁免区；
- * 中文/全角数字归一化后同检。
+ * 数字白名单（(数值, 单位) 对判据）：
+ * 文案里"数字+数据单位"（小时/分/次/%/天）的组合，必须能在事实清单中
+ * 找到相同的组合；序数（"第 3 次"）豁免；中文/全角数字归一化后同检。
+ * 此前的三层漏洞（1-12 数值豁免、句尾无单位豁免、裸数值跨单位借用）
+ * 曾让"睡了 N 小时"这类编造整句放行——而卡片挂着"她不许自己编数字"。
  */
 function numbersCheck(text: string, comments: MomentComment[], facts: string[]): boolean {
   const norm = (t: string): string =>
     t.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0));
-  const factNums = new Set(norm(facts.join(' ')).match(/\d+(?:\.\d+)?/g) ?? []);
-  const DATA_UNIT = /(小时|钟头|分钟|分|次|%|％|天|日)/;
+  const UNIT = /(小时|钟头|分钟|分|次|%|％|天|日)/;
+  // 事实清单 → (数值 → 允许的单位集合)
+  const allowed = new Map<string, Set<string>>();
+  for (const f of norm(facts.join(' ')).matchAll(/(\d+(?:\.\d+)?)\s*(小时|钟头|分钟|分|次|%|％|天|日)/g)) {
+    const set = allowed.get(f[1]) ?? new Set<string>();
+    set.add(f[2]);
+    allowed.set(f[1], set);
+  }
   const texts = [norm(text), ...comments.map((c) => norm(c.text))];
   for (const t of texts) {
-    for (const m of t.matchAll(/\d+(?:\.\d+)?/g)) {
-      const n = m[0];
-      if (factNums.has(n)) continue;
-      const after = t.slice((m.index ?? 0) + n.length, (m.index ?? 0) + n.length + 4);
-      // 非数据单位（第 X 次、第 X 碗等）豁免
-      if (!DATA_UNIT.test(after)) continue;
+    for (const m of t.matchAll(/(\d+(?:\.\d+)?)(\s*)(小时|钟头|分钟|分|次|%|％|天|日)/g)) {
+      const num = m[1], unit = m[3];
+      const okUnits = allowed.get(num);
+      if (okUnits?.has(unit)) continue;         // 数值+单位都在事实清单 ✓
+      const before = t.slice(Math.max(0, (m.index ?? 0) - 2), m.index ?? 0);
+      if (before.endsWith('第')) continue;      // 序数豁免："第 3 次"
       return false;
     }
+    // 中文数字 + 数据单位（"九十九分""八小时"）
     for (const cn of Object.keys(CN_NUM)) {
-      if (new RegExp(cn + '\\s*(?:小时|钟头|个钟头)').test(t) && !factNums.has(String(CN_NUM[cn]))) {
-        return false;   // "八小时"这类中文数字+数据单位
-      }
+      const m2 = t.match(new RegExp(cn + '\\s*(小时|钟头|分钟|分|次|天)'));
+      if (!m2) continue;
+      const unit = m2[1];
+      const ok = [...allowed.entries()].some(([num, units]) => units.has(unit) && Number(num) === CN_NUM[cn]);
+      if (!ok) return false;
     }
   }
   return true;
 }
 
 const SAY_CACHE_KEY = 'somnacare_pet_say_llm';
+const SAY_FAIL_KEY = 'somnacare_pet_say_fail';   // 负缓存：失败后 30 分钟内不再重发
+const SAY_FAIL_TTL_MS = 30 * 60 * 1000;
 const SAY_CACHE_TTL_MS = 20 * 60 * 60 * 1000;   // 20 小时：一天一刷
 
 export function getCachedLlmSay(cfg?: any): string[] | null {
@@ -460,6 +534,12 @@ export async function generatePetSayLinesLlm(
 ): Promise<string[] | null> {
   const cfg = profile?.aiConfig;
   if (!hasLlm(cfg)) return null;
+  // 负缓存：失败后 30 分钟内不重发——此前每次 records/userProfile 变化都
+  // 重发一次 25s 请求，把"质量守门"变成了"成本放大器"
+  try {
+    const failAt = Number(localStorage.getItem(SAY_FAIL_KEY));
+    if (Number.isFinite(failAt) && Date.now() - failAt < SAY_FAIL_TTL_MS) return null;
+  } catch { /* ignore */ }
   const facts = buildSleepFacts(records, profile, now);
   const raw = await callLlm(
     cfg,
@@ -472,14 +552,22 @@ ${facts.map((f) => '- ' + f).join('\n')}
 请生成 8 条大肥鱼在悬浮窗气泡里对鱼片说的话。`,
   );
   const parsed = raw ? parseJsonLoose(raw) : null;
-  if (!parsed || !Array.isArray(parsed.lines)) return null;
+  if (!parsed || !Array.isArray(parsed.lines)) {
+    try { localStorage.setItem(SAY_FAIL_KEY, String(Date.now())); } catch { /* ignore */ }
+    return null;
+  }
   const lines = parsed.lines
-    .filter((l: any) => typeof l === 'string' && l.trim().length >= 4 && l.trim().length <= 60)
+    .map((l: any) => (typeof l === 'string' ? l.trim().replace(/\n/g, ' ') : ''))
+    .filter((l: string) => l.length >= 4 && l.length <= 60)
     .map((l: string) => l.trim())
     .slice(0, 10);
-  if (lines.length < 4) return null;
+  if (lines.length < 4) {
+    try { localStorage.setItem(SAY_FAIL_KEY, String(Date.now())); } catch { /* ignore */ }
+    return null;
+  }
   if (!numbersCheck(lines.join('\n'), [], facts)) {
     console.warn('[petMoments] LLM 语录含事实清单之外的数字，整组弃用');
+    try { localStorage.setItem(SAY_FAIL_KEY, String(Date.now())); } catch { /* ignore */ }
     return null;
   }
   cacheLlmSay(lines);
@@ -512,19 +600,36 @@ export async function commentMoment(
 
   let reply: string | null = null;
   if (hasLlm(cfg)) {
+    // 独立 system：不复用朋友圈 prompt（其输出契约是 {text,cards,comments}）。
+    // 针对性铁律：必须直接回应鱼片评论里的具体内容，禁止答非所问的模板腔
     const raw = await callLlm(
       cfg,
-      PERSONA_SYSTEM,
-      `这是你今天的朋友圈："${m.text}"\n鱼片评论了："${userText.trim()}"\n事实清单：\n${m.facts.map((f) => '- ' + f).join('\n')}\n用一句人设回复（30 字内，只输出 JSON：{"text":"..."}）`,
+      `你是 DeepSeek 的"蓝色大肥鱼"（社区共创人设）：聪明但懒、傲娇嘴甜、管用户叫"鱼片"、口头禅"事已至此，先吃饭吧"。这是睡眠 App，你刚发了条朋友圈，鱼片在下面评论了。
+铁律：reply 必须直接回应鱼片评论的具体内容（他问什么答什么、他夸什么接什么、他吐槽就嘴硬）；
+禁止答非所问、禁止复述数据、禁止编造【事实清单】之外的数字；30 字内；只输出 JSON：{"text":"..."}`,
+      `你今天的朋友圈："${m.text}"
+事实清单：
+${m.facts.map((f) => '- ' + f).join('\n')}
+鱼片的评论："${userText.trim()}"
+请生成回复。`,
     );
     const parsed = raw ? parseJsonLoose(raw) : null;
-    if (parsed && typeof parsed.text === 'string' && parsed.text.trim()) reply = parsed.text.trim();
+    if (parsed && typeof parsed.text === 'string' && parsed.text.trim()) {
+      const cand = parsed.text.trim();
+      // 与正文/语录同一纪律：编造事实清单之外的数字 → 退回本地池
+      reply = numbersCheck(cand, [], m.facts) ? cand : null;
+    }
   }
   if (!reply) reply = localReply();
 
-  m.replies.push({ friend: '鱼片', text: userText.trim() });
-  m.replies.push({ friend: '蓝色大肥鱼', text: reply });
-  m.replies = m.replies.slice(-40);   // 与点赞回复的上限同思路
-  saveMoments(list);
-  return list;
+  // await 之后再读盘：请求最长 25s，期间用户可能点过赞——
+  // 用旧快照整表覆写会把这些互动丢掉（第八轮 W3）
+  const fresh = loadMoments();
+  const target = fresh.find((x) => x.id === id);
+  if (!target) return fresh;
+  target.replies.push({ friend: '鱼片', text: userText.trim() });
+  target.replies.push({ friend: '蓝色大肥鱼', text: reply });
+  target.replies = target.replies.slice(-40);
+  saveMoments(fresh);
+  return fresh;
 }

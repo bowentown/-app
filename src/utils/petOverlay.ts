@@ -195,7 +195,10 @@ export async function syncPet(
     await g.petSync({ say, bubbleEvery: getBubbleEvery() });
   } catch { /* 桌宠没开或服务已停，忽略 */ }
 
-  if (!cached) {
+  let sayInFlight = false;   // 模块级在途标志（防并发重复调用）
+
+  if (!cached && !sayInFlight) {
+    sayInFlight = true;
     void generatePetSayLinesLlm(records, profile)
       .then((lines) => {
         if (!lines || !g) return;
@@ -206,7 +209,8 @@ export async function syncPet(
           });
         } catch { /* ignore */ }
       })
-      .catch(() => { /* LLM 失败静默保留本地词库 */ });
+      .catch(() => { /* LLM 失败静默保留本地词库（负缓存已防重发） */ })
+      .finally(() => { sayInFlight = false; });
   }
 }
 

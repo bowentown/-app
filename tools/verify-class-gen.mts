@@ -30,10 +30,6 @@ function listFiles(dir: string, ext: string): string[] {
 }
 
 /** Tailwind 在 CSS 里的转义规则（我们只处理 token 里会出现的字符） */
-const escapeForCss = (token: string): string =>
-  '.' + token
-    .replace(/[:/.\[\]#%&(),'"]/g, (ch) => '\\' + ch);
-
 // ── 收集源码 token ──
 const tokens = new Set<string>();
 const addChunk = (chunk: string): void => {
@@ -63,9 +59,21 @@ for (const f of listFiles(SRC, '.tsx')) {
     addChunk(m[1].replace(/\$\{[^}]*\}/g, ' '));
   }
 
-  // 拼接类名禁令：${...}/NN 透明度后缀（Tailwind 4 只认完整字面量，动态拼接永不生成）
-  for (const m of src.matchAll(/\$\{[^}]*\}\/\d+/g)) {
-    violations.push(`${rel}:${lineAt(m.index ?? 0)} 动态透明度后缀拼接 "${m[0]}" —— Tailwind 不生成，改用内联 style`);
+  // 拼接类名禁令：六种形态全拦（Tailwind 4 只认完整字面量，动态拼接永不生成）
+  // 拼接禁令只在 className 属性内扫——同样的 ${x}/v1 写法在 fetch URL 里是合法的
+  const concatPatterns: Array<[RegExp, string]> = [
+    [/\$\{[^}]*\}\/\d+/, '动态透明度后缀 ${x}/N'],
+    [/\$\{[^}]*\}\/[a-z]+/, '动态具名透明度 ${x}/full'],
+    [/bg-\$\{[^}]*\}/, '前缀拼接 bg-${x}'],
+    [/\$\{[^}]*\}-[a-z]{3,}/, '后缀拼接 ${x}-dark'],
+    [/\.replace\(['"]bg-['"],/, 'replace 派生类名'],
+  ];
+  for (const cm of src.matchAll(/className=["'{][^\n]*/g)) {
+    for (const [re, name] of concatPatterns) {
+      for (const m of cm[0].matchAll(new RegExp(re.source, 'g'))) {
+        violations.push(`${rel}:${lineAt((cm.index ?? 0) + (m.index ?? 0))} ${name} "${m[0]}" —— Tailwind 不生成，改用字面量或内联 style`);
+      }
+    }
   }
 }
 // 主题槽位值（拼接类名的源头都要在这里被核对到）；id/name/tag/desc 是标识符非类名

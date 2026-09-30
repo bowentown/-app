@@ -56,10 +56,11 @@ const CardView: React.FC<{ type: MomentCard; moment: Moment }> = ({ type, moment
   if (type === 'week') {
     // 事实串是「近 ${week.length} 日有 N 天达到 80 分」——记录不足 7 天时
     // 写死的前缀匹配不上，曾显示 0/7 与出处清单直接矛盾
-    const weekFact = moment.facts.find((f) => f.startsWith('近 ')) ?? '';
-    const m = weekFact.match(/近 (\d+) 日有 (\d+) 天/);
-    const goodDays = m ? Number(m[2]) : 0;
-    const total = m ? Number(m[1]) : 7;
+    // 两条"近 N 日"fact 都以"近 "开头，必须按内容找"有 N 天"那条——
+    // 此前 find(startsWith) 命中"平均"那条 → 正则恒 null → 恒显 0/7
+    const weekMatch = moment.facts.map((f) => f.match(/近 (\d+) 日有 (\d+) 天/)).find(Boolean) ?? null;
+    const goodDays = weekMatch ? Number(weekMatch[2]) : 0;
+    const total = weekMatch ? Number(weekMatch[1]) : 7;
     const pct = Number.isFinite(goodDays) ? Math.min(100, Math.round((goodDays / (total || 7)) * 100)) : 0;
     return (
       <div className="rounded-xl bg-gradient-to-br from-emerald-900/40 to-slate-900 border border-emerald-800/40 aspect-square p-2.5 flex flex-col justify-between">

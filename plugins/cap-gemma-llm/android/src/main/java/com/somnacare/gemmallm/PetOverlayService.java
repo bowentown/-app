@@ -81,6 +81,15 @@ public class PetOverlayService extends Service {
     private final Runnable bubbleHide = new Runnable() {
         @Override public void run() { hideBubble(); }
     };
+    // 护眼开关的 600ms 延迟反馈：纳入 onDestroy 清理（服务销毁后曾对新气泡 addView）
+    private final Runnable eyeFeedback = new Runnable() {
+        @Override public void run() {
+            updateEyeButton();
+            showBubble(EyeCareService.isActive()
+                    ? "护眼滤镜给你开了哦～别再瞪着屏幕啦，鱼片。"
+                    : "滤镜关掉了……哼，记得谢本鱼。", FEEDBACK_MS);
+        }
+    };
 
     private boolean fanShown;
     private boolean minimized;
@@ -178,7 +187,6 @@ public class PetOverlayService extends Service {
             whale = new WhaleGirlView(this);
             petRoot.addView(whale, new FrameLayout.LayoutParams(
                     FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
-            whale.start();
 
             petParams = new WindowManager.LayoutParams(
                     dp(COLLAPSED_W_DP), dp(COLLAPSED_H_DP),
@@ -208,8 +216,15 @@ public class PetOverlayService extends Service {
             });
 
             wm.addView(petRoot, petParams);
+            whale.start();   // 窗口上屏成功才启动 33ms 自循环——失败路径才能完整回收
             main.post(drowsyTick);
-        } catch (Exception e) {
+        } catch (Throwable e) {
+            // OOM（Error）会穿透 catch(Exception)——解码 10MB 精灵图正是重内存路径，
+            // 必须降级停服而不是带崩进程
+            if (whale != null) { try { whale.stop(); } catch (Exception ignored) { } }
+            if (petRoot != null) {
+                try { wm.removeViewImmediate(petRoot); } catch (Exception ignored) { }
+            }
             petRoot = null;
             whale = null;
             stopSelf();
@@ -302,6 +317,10 @@ public class PetOverlayService extends Service {
         if (fanShown) return;
         hideBubble();
         try {
+            // 弧形镜像：角色中心在屏幕左半 → 扇面开在右侧（与 placeBeside 同判据）。
+            // 必须在 buildFan 之前赋值——近/远侧偏移由它决定
+            DisplayInfo diPre = displayInfo();
+            fanOnRight = (petParams.x + petParams.width / 2) < diPre.width / 2;
             FrameLayout v = buildFan();
             v.setOnTouchListener((vv, e) -> {
                 if (e.getActionMasked() == MotionEvent.ACTION_OUTSIDE) hideFan();
@@ -397,12 +416,7 @@ public class PetOverlayService extends Service {
                 toggleEyeCare();
                 if (whale != null) whale.cheer();
                 // 服务异步生效，稍等一下再刷新状态点与气泡反馈
-                main.postDelayed(() -> {
-                    updateEyeButton();
-                    showBubble(EyeCareService.isActive()
-                            ? "护眼滤镜给你开了哦～别再瞪着屏幕啦，鱼片。"
-                            : "滤镜关掉了……哼，记得谢本鱼。", FEEDBACK_MS);
-                }, 600);
+                main.postDelayed(eyeFeedback, 600);
             }
         });
         FrameLayout.LayoutParams p2 = new FrameLayout.LayoutParams(btn, btn, Gravity.TOP | Gravity.START);
@@ -476,7 +490,7 @@ public class PetOverlayService extends Service {
     /** 最小化：缩成 40dp 小鲸鱼，动画照常，点她恢复。位置沿用当前点、重新夹取。 */
     private void minimize() {
         minimized = true;
-        hideFan();
+        hideFan();       // 关闭后用户再点她 → 以"还原"图标重建扇面
         hideBubble();
         petParams.width = dp(MINI_DP);
         petParams.height = dp(MINI_DP);
@@ -491,7 +505,7 @@ public class PetOverlayService extends Service {
     /** 恢复原尺寸。 */
     private void restore() {
         minimized = false;
-        hideFan();
+        hideFan();       // 同上：恢复后扇面重建为"最小化"图标
         hideBubble();
         petParams.width = dp(COLLAPSED_W_DP);
         petParams.height = dp(COLLAPSED_H_DP);
@@ -511,9 +525,9 @@ public class PetOverlayService extends Service {
         int gap = dp(2), m = dp(4);   // 尽量贴身
         int leftRoom = wx - gap - m;
         int rightRoom = di.width - (wx + ww) - gap - m;
-        int px, py;
         if (leftRoom >= pw || rightRoom >= pw) {
-            boolean goLeft = leftRoom >= pw && (rightRoom < pw || leftRoom >= rightRoom);
+            // 侧别与 buildFan 的弧形镜像保持同一判据：角色在左半屏 → 扇面在右
+            boolean goLeft = !fanOnRight;
             px = goLeft ? wx - pw - gap : wx + ww + gap;
             py = wy + wh / 2 - ph / 2;
         } else {
@@ -596,8 +610,13 @@ public class PetOverlayService extends Service {
                     .start();
             main.postDelayed(bubbleHide, durationMs);
         } catch (Exception e) {
-            bubbleRoot = null;
+            // addView 之后的失败：移除已上屏窗口，并回滚角色的说话姿态
+            if (bubbleRoot != null) {
+                try { wm.removeViewImmediate(bubbleRoot); } catch (Exception ignored) { }
+                bubbleRoot = null;
+            }
             bubbleShown = false;
+            if (whale != null) whale.setTalking(false);
         }
     }
 
@@ -812,6 +831,9 @@ public class PetOverlayService extends Service {
     }
 
     private void startForegroundCompat(String text) {
+        // 通知构建失败绝不能跳过 startForeground——startForegroundService 拉起的
+        // 服务 5 秒内未 startForeground 会被系统杀进程，且此前整个 catch 把失败吞光
+        Notification n = null;
         try {
             ensureChannel();
             Intent launch = getPackageManager().getLaunchIntentForPackage(getPackageName());
@@ -825,7 +847,7 @@ public class PetOverlayService extends Service {
             Intent stop = new Intent(this, PetOverlayService.class).setAction(ACTION_STOP);
             PendingIntent stopPi = PendingIntent.getService(this, 5, stop,
                     PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-            Notification n = b.setSmallIcon(android.R.drawable.ic_menu_compass)
+            n = b.setSmallIcon(android.R.drawable.ic_menu_compass)
                     .setContentTitle("大肥鱼陪着你")
                     .setContentText(text)
                     .setContentIntent(pi)
@@ -834,21 +856,33 @@ public class PetOverlayService extends Service {
                     .setOngoing(true)
                     .setOnlyAlertOnce(true)
                     .build();
-            if (Build.VERSION.SDK_INT >= 34) {
-                try {
-                    startForeground(NOTIFICATION_ID, n,
-                            android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
-                    return;
-                } catch (Exception ignored) { }
+        } catch (Exception e) {
+            android.util.Log.e("PetOverlay", "通知构建失败，用最小合法通知兜底", e);
+        }
+        if (n == null) {
+            try { n = new Notification(); } catch (Exception e2) { stopSelf(); return; }
+        }
+        if (Build.VERSION.SDK_INT >= 34) {
+            try {
+                startForeground(NOTIFICATION_ID, n,
+                        android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
+                return;
+            } catch (Exception e) {
+                android.util.Log.e("PetOverlay", "startForeground(34) 失败，降级两参重试", e);
             }
+        }
+        try {
             startForeground(NOTIFICATION_ID, n);
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            android.util.Log.e("PetOverlay", "startForeground 失败", e);
+            stopSelf();
         }
     }
 
     @Override
     public void onDestroy() {
         main.removeCallbacks(drowsyTick);
+        main.removeCallbacks(eyeFeedback);
         try {
             android.hardware.display.DisplayManager dm =
                     (android.hardware.display.DisplayManager) getSystemService(DISPLAY_SERVICE);
@@ -864,8 +898,6 @@ public class PetOverlayService extends Service {
             petRoot = null;
         }
         whale = null;
-        getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-                .remove("pet_minimized").apply();
         super.onDestroy();
     }
 }
