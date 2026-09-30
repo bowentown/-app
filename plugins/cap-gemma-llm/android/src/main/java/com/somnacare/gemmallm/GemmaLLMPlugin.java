@@ -840,7 +840,7 @@ public class GemmaLLMPlugin extends Plugin {
                     }
                 }
 
-                final int requestId = call.getData().getInt("requestId", 0);
+                final int requestId = call.getData().has("requestId") ? call.getData().optInt("requestId", 0) : 0;
                 Future<String> future = session.generateResponseAsync((String partial, boolean done) -> {
                     JSObject p = new JSObject();
                     p.put("text", partial == null ? "" : partial);
