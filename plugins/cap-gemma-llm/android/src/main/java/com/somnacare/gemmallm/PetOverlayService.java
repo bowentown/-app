@@ -525,6 +525,7 @@ public class PetOverlayService extends Service {
         int gap = dp(2), m = dp(4);   // 尽量贴身
         int leftRoom = wx - gap - m;
         int rightRoom = di.width - (wx + ww) - gap - m;
+        int px, py;
         if (leftRoom >= pw || rightRoom >= pw) {
             // 侧别与 buildFan 的弧形镜像保持同一判据：角色在左半屏 → 扇面在右
             boolean goLeft = !fanOnRight;
