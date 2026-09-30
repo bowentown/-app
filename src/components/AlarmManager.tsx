@@ -497,7 +497,7 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
                 className={`p-4 rounded-2xl border transition-all flex items-center justify-between ${
                   alarm.enabled
                     ? `${innerBg} ${innerBorder} text-white shadow-md`
-                    : `${innerBg}/40 border-slate-800 text-slate-400 opacity-60`
+                    : `bg-black/20 border-slate-800 text-slate-400 opacity-60`
                 }`}
               >
                 <div className="flex items-center gap-3">
