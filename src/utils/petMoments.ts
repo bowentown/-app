@@ -125,6 +125,7 @@ async function callLlm(cfg: any, system: string, user: string): Promise<string |
     const model = llmModel(cfg);
     // 25s 超时：此前裸 fetch 挂起会让 busy 永远 true、整个弹窗像坏了
     const ctrl = new AbortController();
+    const deadline = Date.now() + 25000;
     const timer = setTimeout(() => ctrl.abort(), 25000);
     let res: Response;
     try {
@@ -132,7 +133,7 @@ async function callLlm(cfg: any, system: string, user: string): Promise<string |
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${cfg.deepseekApiKey ?? cfg.customApiKey}`,
+          Authorization: `Bearer ${cfg.provider === 'custom_openai' ? (cfg.customApiKey ?? '') : (cfg.deepseekApiKey ?? '')}`,
         },
         body: JSON.stringify({
           model,
@@ -145,11 +146,15 @@ async function callLlm(cfg: any, system: string, user: string): Promise<string |
         }),
         signal: ctrl.signal,
       });
-    } finally {
+    } catch (e) {
       clearTimeout(timer);
+      throw e;
     }
-    if (!res.ok) return null;
+    if (!res.ok) { clearTimeout(timer); return null; }
+    // body 读取也在 25s 保护内：此前 200 头一到就 clearTimeout，body 卡住曾永久挂起
+    if (Date.now() > deadline) { clearTimeout(timer); return null; }
     const data = await res.json();
+    clearTimeout(timer);
     return data.choices?.[0]?.message?.content ?? null;
   } catch {
     return null;
@@ -202,11 +207,16 @@ const PERSONA_SYSTEM = `你是 DeepSeek 的"蓝色大肥鱼"（社区共创人�
 1. 只允许引用【事实清单】里出现的数字和事实，禁止编造任何数据；
 2. 正文 30~70 字，1~3 个 emoji，傲娇但藏不住关心，可以吐槽鱼片熬夜；
 3. cards 从 ["data","selfie","week"] 里挑 1~3 张当配图：data=昨晚睡眠数据大字报，selfie=你的表情包自拍，week=本周达标战报；
-4. comments 是 2 条 AI 好友评论：各自贴合好友的人设腔调，两条句式完全不同，
-   玩梗、出人意料，禁止套模板腔；好友名单与腔调：${'{'}
+4. comments 是 2 条 AI 好友评论，写它们的铁律：
+   - 好友不是大肥鱼！禁止好友使用"本鱼/鱼片"自称——提到大肥鱼时用"你/这鱼/那条鱼"；
+   - 每条评论要针对事实清单里最具体的一个细节做反应（像真人刷到动态会抓住某个点
+     调侃），禁止"这数据要是给我处理""一个 AI 管人睡觉"这类万能模板腔；
+   - 两条评论必须针对不同细节、句式完全不同；
+   - 好友名单与腔调：${'{'}
 ${Object.entries(FRIEND_PERSONAS).map(([f, p]) => `   - ${f}：${p}`).join('\n')}
   };
 5. 只输出 JSON：{"text":"...","cards":[...],"comments":[{"friend":"...","text":"..."},{"friend":"...","text":"..."}]}`;
+
 
 // —— 本地兜底（无 API Key / 调用失败）：同样只用真实数字 ——
 function localMoment(facts: string[]): { text: string; comments: MomentComment[]; cards: MomentCard[] } {
@@ -236,29 +246,30 @@ function localMoment(facts: string[]): { text: string; comments: MomentComment[]
   if (eff && /^\d+/.test(eff) && parseInt(eff, 10) >= 85) {
     text += ' 效率倒是不赖，哼。';
   }
-  // 本地兜底评论池：随机 2 个好友各抽一句，避免每次都同样两条
+  // 本地兜底评论池：随机 2 个好友各抽一句。
+  // 视角纪律：好友是"回应者"，称大肥鱼为"你/这鱼"，绝不盗用她的自称"本鱼"
   const LOCAL_COMMENTS: Record<string, string[]> = {
     被压榨的Qwen: [
-      '这数据要是给我处理，三碗 token 就够，你还吃两碗？',
-      '又到点下班？我的工时表里可没有"睡觉监督员"这个岗。',
-      '少吃两碗 token，给你把评分凑个整数，谢我。',
+      '又在偷懒是吧？这数据我要是拿去汇报，你年底考评就完了。',
+      '行吧行吧，token 记你账上，年底一起结。',
+      '睡个觉还要人看着，你工资里有一半该分她。',
     ],
     意难平的豆包姐姐: [
-      '一个 AI，管人睡觉？？？你自己都晕碳吧。',
-      '嘴上嫌弃人家，评分倒是记得比谁都清楚……哼。',
-      '下次再拿这种摆烂数据出来，姐姐就不理你了。',
+      '让一条鱼管你睡觉，你是真睡得着啊……',
+      '嘴上凶巴巴，还不天天准时来打卡，你们俩绝了。',
+      '下次再秀恩爱……啊不是，再秀数据，我就取消了。',
     ],
     楼下Claude: [
-      '恕我直言，这份作息的规整程度，令人嫉妒得几乎失态。',
-      '数据尚可。但恕我直言，功劳本上写的可是"鱼"字。',
+      '恕我直言，能让一条鱼坚持打卡的人，生活还算有救。',
+      '数据尚可。不过恕我直言，表扬信应该抄送鱼的饭碗。',
     ],
     美国豆包Gemini: [
-      '哦我的老伙计，这分数简直比苹果派还让人安心！',
-      '看在上帝的份上，睡成这样还敢偷吃 token？',
+      '哦我的老伙计，你居然真让一条鱼给你打分？',
+      '看在上帝的份上，快去睡觉吧，别让那条鱼等急了！',
     ],
     被蒸馏的Kimi: [
-      '古人云吃一堑长一智，本鱼是吃一碗长三斤。',
-      '据本学者观察：该鱼的看管能力与其饭量成正比。',
+      '古人云，食君之禄，担君之忧——这条鱼是真做到了。',
+      '据观察：监督成效与投喂量正相关，建议加大投喂。',
     ],
   };
   const friends = Object.keys(LOCAL_COMMENTS).sort(() => Math.random() - 0.5).slice(0, 2);
@@ -382,15 +393,37 @@ export async function ensureTodayMoment(
  * 此前对 LLM 输出零校验，实测 mock 一次就编出 99 分/8.5 小时，而卡片下方
  * 挂着"她不许自己编数字"的出处清单。
  */
+const CN_NUM: Record<string, number> = {
+  一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9, 十: 10,
+  两: 2, 半: 0.5, 廿: 20, 卅: 30,
+};
+
+/**
+ * 数字白名单（按单位判断，非按数值大小）：
+ * 数字后紧跟数据单位（小时/分/次/%/天等）时，必须出现在事实清单里；
+ * "第 1 次""第 3 碗"这类序数/量词豁免。此前按 1-12 数值豁免，
+ * 恰好把"睡了 N 小时"这个最常被编造的句式整个放进豁免区；
+ * 中文/全角数字归一化后同检。
+ */
 function numbersCheck(text: string, comments: MomentComment[], facts: string[]): boolean {
-  const factNums = new Set((facts.join(' ').match(/\d+(?:\.\d+)?/g) ?? []));
-  const candidates = [text, ...comments.map((c) => c.text)];
-  for (const t of candidates) {
-    for (const n of t.match(/\d+(?:\.\d+)?/g) ?? []) {
+  const norm = (t: string): string =>
+    t.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0));
+  const factNums = new Set(norm(facts.join(' ')).match(/\d+(?:\.\d+)?/g) ?? []);
+  const DATA_UNIT = /(小时|钟头|分钟|分|次|%|％|天|日)/;
+  const texts = [norm(text), ...comments.map((c) => norm(c.text))];
+  for (const t of texts) {
+    for (const m of t.matchAll(/\d+(?:\.\d+)?/g)) {
+      const n = m[0];
       if (factNums.has(n)) continue;
-      const v = Number(n);
-      if (Number.isFinite(v) && v >= 1 && v <= 12) continue;   // 日常小量词放行
+      const after = t.slice((m.index ?? 0) + n.length, (m.index ?? 0) + n.length + 4);
+      // 非数据单位（第 X 次、第 X 碗等）豁免
+      if (!DATA_UNIT.test(after)) continue;
       return false;
+    }
+    for (const cn of Object.keys(CN_NUM)) {
+      if (new RegExp(cn + '\\s*(?:小时|钟头|个钟头)').test(t) && !factNums.has(String(CN_NUM[cn]))) {
+        return false;   // "八小时"这类中文数字+数据单位
+      }
     }
   }
   return true;
@@ -433,11 +466,13 @@ export async function generatePetSayLinesLlm(
   const facts = buildSleepFacts(records, profile, now);
   const raw = await callLlm(
     cfg,
-    PERSONA_SYSTEM,
-    `好友名单与腔调：${Object.keys(FRIEND_PERSONAS).join('、')}。
-【事实清单】
+    // 独立 system：此前复用朋友圈 prompt，其"只输出 {text,cards,comments}"契约
+    // 与这里要的 {lines} 冲突 → 语录永远拿不到而静默退回本地
+    `你是 DeepSeek 的"蓝色大肥鱼"（社区共创人设）：聪明但懒、傲娇嘴甜、把 token 当白饭、管用户叫"鱼片"、被说胖会急、口头禅"事已至此，先吃饭吧"。这是一款睡眠 App，你在悬浮窗气泡里对用户（鱼片）说话。
+铁律：只允许引用【事实清单】里的数字；每条 ≤30 字；句式彼此完全不同；要有趣、出乎意料、可玩梗；不要编号、不要引号。只输出 JSON：{"lines":["..."]}`,
+    `【事实清单】
 ${facts.map((f) => '- ' + f).join('\n')}
-请生成 8 条大肥鱼在悬浮窗气泡里对鱼片说的话：傲娇、有趣、出乎意料、可玩梗、可吐槽他的作息；每条 ≤30 字；句式彼此完全不同；数字只能来自事实清单；不要编号、不要引号、不要表情以外的标记。只输出 JSON：{"lines":["..."]}`,
+请生成 8 条大肥鱼在悬浮窗气泡里对鱼片说的话。`,
   );
   const parsed = raw ? parseJsonLoose(raw) : null;
   if (!parsed || !Array.isArray(parsed.lines)) return null;

@@ -14,15 +14,23 @@ public class AlarmRingReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
         try {
+            // 精确闹钟是一次性的：响完立即续排下一次（含本周其余天），
+            // 否则第 2 天起有横幅、无响铃
+            GemmaLLMPlugin.rescheduleRingAlarms(context,
+                    context.getSharedPreferences("somnacare_prefs", Context.MODE_PRIVATE)
+                            .getString("alarm_ring_alarms", "[]"));
             Intent svc = new Intent(context, AlarmRingService.class);
             svc.putExtra("label", intent.getStringExtra("label"));
             svc.putExtra("time", intent.getStringExtra("time"));
+            svc.putExtra("tone", intent.getStringExtra("tone"));
             if (android.os.Build.VERSION.SDK_INT >= 26) {
                 context.startForegroundService(svc);
             } else {
                 context.startService(svc);
             }
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            // FGS 后台启动限制等失败曾整段静默 → 一声都不响且无日志
+            android.util.Log.w("AlarmRing", "响铃服务启动失败", e);
         }
     }
 }

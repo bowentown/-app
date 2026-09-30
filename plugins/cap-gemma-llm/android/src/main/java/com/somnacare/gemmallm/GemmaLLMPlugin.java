@@ -421,8 +421,6 @@ public class GemmaLLMPlugin extends Plugin {
         }
     }
 
-    /** 设定/更新提醒时间（'HH:MM'），并立即重排闹钟。 */
-    @PluginMethod
     // ================= 闹钟持续响铃（AlarmRingService） =================
 
     /** 稳定请求码：同一条闹钟重复调度时 FLAG_UPDATE_CURRENT 原地替换 */
@@ -453,11 +451,15 @@ public class GemmaLLMPlugin extends Plugin {
             org.json.JSONArray codes = new org.json.JSONArray();
             java.util.Calendar now = java.util.Calendar.getInstance();
             for (int i = 0; i < arr.length(); i++) {
+                // 逐条容错：此前一条 time 坏值抛异常会跳出整段——
+                // 旧请求码已取消、新码表未写入 = 所有闹钟全部消失
+                try {
                 org.json.JSONObject a = arr.getJSONObject(i);
                 String id = a.optString("id", "alarm-" + i);
                 String[] hm = a.optString("time", "07:30").split(":");
                 int hour = Integer.parseInt(hm[0]);
                 int minute = hm.length > 1 ? Integer.parseInt(hm[1]) : 0;
+                if (hour < 0 || hour > 23 || minute < 0 || minute > 59) continue;
                 String tone = a.optString("tone", "gentle_chime");
                 org.json.JSONArray days = a.optJSONArray("repeatDays");
                 if (days != null && days.length() == 0) {
@@ -467,25 +469,35 @@ public class GemmaLLMPlugin extends Plugin {
                     cal.set(java.util.Calendar.MINUTE, minute);
                     cal.set(java.util.Calendar.SECOND, 0);
                     if (cal.getTimeInMillis() <= now.getTimeInMillis()) cal.add(java.util.Calendar.DAY_OF_YEAR, 1);
+                    if (hour < 0 || hour > 23 || minute < 0 || minute > 59) throw new IllegalArgumentException("bad time");
                     scheduleOneRingAlarm(context, am, sp, codes, id, 0, tone,
                             a.optString("label", ""), a.optString("time", ""), cal.getTimeInMillis());
                 } else if (days != null) {
                     for (int d = 0; d < days.length(); d++) {
                         int isoDay = days.optInt(d, 1);
                         // 距该星期几的下一次出现（1=周一…7=周日）
-                        int delta = (isoDay - now.get(java.util.Calendar.DAY_OF_WEEK) + 7 - 1) % 7;
-                        if (delta == 0) delta = 7;   // 当天按"下次"算：统一排到下周同日
+                        // Calendar.DAY_OF_WEEK 恒为 1=周日…7=周六，先转 ISO（1=周一…7=周日）
+                        // 再算差值——此前直接相减 49/49 组全错配（横幅响的日子响铃不响）
+                        int isoToday = ((now.get(java.util.Calendar.DAY_OF_WEEK) + 5) % 7) + 1;
+                        int delta = (isoDay - isoToday + 7) % 7;
                         java.util.Calendar cal = (java.util.Calendar) now.clone();
                         cal.add(java.util.Calendar.DAY_OF_YEAR, delta);
                         cal.set(java.util.Calendar.HOUR_OF_DAY, hour);
                         cal.set(java.util.Calendar.MINUTE, minute);
                         cal.set(java.util.Calendar.SECOND, 0);
+                        // 同日但时刻已过 → 推到下周同日（首次创建当天就该响）
+                        if (cal.getTimeInMillis() <= now.getTimeInMillis()) {
+                            cal.add(java.util.Calendar.DAY_OF_YEAR, 7);
+                        }
                         scheduleOneRingAlarm(context, am, sp, codes, id, isoDay, tone,
                                 a.optString("label", ""), a.optString("time", ""), cal.getTimeInMillis());
                     }
                 }
             }
             sp.edit().putString("alarm_ring_codes", codes.toString()).apply();
+            } catch (Exception alarmErr) {
+                android.util.Log.w("GemmaLLM", "跳过一条无法解析的闹钟", alarmErr);
+            }
         } catch (Exception ignored) {
         }
     }
@@ -552,11 +564,16 @@ public class GemmaLLMPlugin extends Plugin {
         call.resolve(ret);
     }
 
+    /** 设定/更新提醒时间（'HH:MM'），并立即重排闹钟。 */
+    @PluginMethod
     public void bedtimeReminderSchedule(PluginCall call) {
         String time = call.getString("time", "23:30");
         try {
             getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                    .edit().putString("bedtime_target", time).apply();
+                    .edit()
+                    .putString("bedtime_target", time)
+                    .putBoolean("bedtime_reminder_on", true)   // BootReceiver 的启用标志
+                    .apply();
             scheduleBedtimeAlarm(getContext());
             JSObject ret = new JSObject();
             ret.put("ok", true);
@@ -823,10 +840,12 @@ public class GemmaLLMPlugin extends Plugin {
                     }
                 }
 
+                final int requestId = call.getData().getInt("requestId", 0);
                 Future<String> future = session.generateResponseAsync((String partial, boolean done) -> {
                     JSObject p = new JSObject();
                     p.put("text", partial == null ? "" : partial);
                     p.put("done", done);
+                    p.put("requestId", requestId);
                     notifyListeners("llmToken", p);
                 });
                 String result = future.get();

@@ -62,7 +62,13 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
       const saved = localStorage.getItem(CHAT_KEY);
       if (saved) {
         const list = JSON.parse(saved);
-        if (Array.isArray(list) && list.length > 0) return list.slice(-120);
+        if (Array.isArray(list)) {
+          return list
+            .filter((m) => m && typeof m.content === 'string' &&
+              m.content.trim() !== '' && m.content.trim() !== '……' &&
+              (m.role === 'user' || m.role === 'assistant'))
+            .slice(-120);
+        }
       }
     } catch { /* 损坏则回到欢迎语 */ }
     return [
@@ -75,9 +81,14 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
     ];
   });
   useEffect(() => {
-    try {
-      localStorage.setItem(CHAT_KEY, JSON.stringify(chatMessages.slice(-120)));
-    } catch { /* 配额满时保内存即可 */ }
+    // 300ms 防抖：流式生成时每个 token 都会改 chatMessages，
+    // 逐次同步 stringify+setItem 约 220 次/生成，全压在打字机路径上
+    const t = setTimeout(() => {
+      try {
+        localStorage.setItem(CHAT_KEY, JSON.stringify(chatMessages.slice(-120)));
+      } catch { /* 配额满时保内存即可 */ }
+    }, 300);
+    return () => clearTimeout(t);
   }, [chatMessages]);
   const [inputText, setInputText] = useState('');
   const [isSendingChat, setIsSendingChat] = useState(false);
@@ -320,20 +331,28 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
         return;
       }
 
-      // 2. If user configured DeepSeek directly in APK: call DeepSeek client-side directly
-      if (cfg?.provider === 'deepseek' && cfg.deepseekApiKey) {
-        const modelToUse = cfg.deepseekModel || 'deepseek-flash';
-        setActiveProviderName(`DeepSeek (${modelToUse})`);
+      // 2. 云端直连：DeepSeek 官方档或自建 OpenAI 兼容档（自建档此前落到不存在的
+      //    /api 代理 → 实际回的是本地规则引擎，而界面仍宣称"自建 API"）
+      if ((cfg?.provider === 'deepseek' && cfg.deepseekApiKey) ||
+          (cfg?.provider === 'custom_openai' && cfg.customApiKey && cfg.customBaseUrl)) {
+        const isCustom = cfg.provider === 'custom_openai';
+        const endpoint = isCustom
+          ? `${String(cfg.customBaseUrl).replace(/\/+$/, '')}/chat/completions`
+          : 'https://api.deepseek.com/chat/completions';
+        const modelToUse = isCustom
+          ? (cfg.customModelName || 'deepseek-chat')
+          : (cfg.deepseekModel || 'deepseek-flash');
+        setActiveProviderName(isCustom ? `自建 API (${modelToUse})` : `DeepSeek (${modelToUse})`);
 
         // 直连也走超时熔断：此前裸 fetch 挂起时 isSendingChat 永远为 true 且无停止入口
-        const dsRes = await fetchWithTimeout('https://api.deepseek.com/chat/completions', {
+        const dsRes = await fetchWithTimeout(endpoint, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${cfg.deepseekApiKey}`,
+            Authorization: `Bearer ${isCustom ? cfg.customApiKey : cfg.deepseekApiKey}`,
           },
           body: JSON.stringify({
-            model: modelToUse === 'deepseek-flash' ? 'deepseek-chat' : modelToUse === 'deepseek-pro' ? 'deepseek-reasoner' : modelToUse,
+            model: isCustom ? modelToUse : modelToUse === 'deepseek-flash' ? 'deepseek-chat' : modelToUse === 'deepseek-pro' ? 'deepseek-reasoner' : modelToUse,
             messages: [
               {
                 role: 'system',

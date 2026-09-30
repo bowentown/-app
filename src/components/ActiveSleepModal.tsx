@@ -607,7 +607,7 @@ export const ActiveSleepModal: React.FC<ActiveSleepModalProps> = ({
               onChange={(e) => setDreamNotes(e.target.value)}
               placeholder="还记得做过的梦吗？输入几个关键词或画面..."
               rows={2}
-              className={`w-full ${theme.cardInnerBg} border ${theme.cardInnerBorder} rounded-xl p-3 text-xs ${theme.textSecondary} placeholder-slate-500 focus:outline-none`}
+              className={`w-full ${theme.cardInnerBg} border ${theme.cardInnerBorder} rounded-xl p-3 text-xs ${theme.textSecondary} placeholder-slate-500 focus:outline-none ${theme.focusRing}`}
             />
           </div>
 

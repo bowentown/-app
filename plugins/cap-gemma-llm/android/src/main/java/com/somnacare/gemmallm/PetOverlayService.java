@@ -321,9 +321,11 @@ public class PetOverlayService extends Service {
                     View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
             placeBeside(v.getMeasuredWidth(), v.getMeasuredHeight());
             // 首帧透明：初始 alpha/scale 在 addView 之前设好，避免闪一帧
-            LinearLayout row = (LinearLayout) v.getChildAt(0);
-            for (int i = 0; i < row.getChildCount(); i++) {
-                View b = row.getChildAt(i);
+            // 按钮 direct 挂在 wrap 上（弧形布局），遍历容器自身子视图——
+            // 此前强转 LinearLayout 抛 CCE 被 catch 吞掉，按钮从未 addView
+            java.util.ArrayList<View> btns = new java.util.ArrayList<>();
+            for (int i = 0; i < v.getChildCount(); i++) btns.add(v.getChildAt(i));
+            for (View b : btns) {
                 b.setAlpha(0f);
                 b.setScaleX(0.2f);
                 b.setScaleY(0.2f);
@@ -333,8 +335,8 @@ public class PetOverlayService extends Service {
             fanShown = true;
 
             // 逐个带回弹弹出，比面板的整卡滑入轻快
-            for (int i = 0; i < row.getChildCount(); i++) {
-                View b = row.getChildAt(i);
+            for (int i = 0; i < btns.size(); i++) {
+                View b = btns.get(i);
                 b.animate().alpha(1f).scaleX(1f).scaleY(1f).setStartDelay(i * 55L)
                         .setDuration(210)
                         .setInterpolator(new android.view.animation.OvershootInterpolator(1.8f))

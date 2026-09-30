@@ -105,7 +105,12 @@ export const MomentsOverlay: React.FC<Props> = ({ records, userProfile, onClose 
   const inputRef = useRef<HTMLInputElement>(null);
 
   const hasAi =
-    userProfile?.aiConfig?.provider === 'deepseek' && !!userProfile?.aiConfig?.deepseekApiKey;
+    (!!userProfile?.aiConfig?.provider === true &&
+      (userProfile.aiConfig.provider === 'deepseek'
+        ? !!userProfile.aiConfig.deepseekApiKey
+        : userProfile.aiConfig.provider === 'custom_openai'
+        ? !!userProfile.aiConfig.customApiKey && !!userProfile.aiConfig.customBaseUrl
+        : false));
 
   // 首次打开自动补今天的动态（已有则跳过）
   useEffect(() => {

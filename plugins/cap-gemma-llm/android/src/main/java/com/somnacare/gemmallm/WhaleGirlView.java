@@ -71,6 +71,7 @@ public class WhaleGirlView extends View {
     private long stateSince;
     private long cheerUntil;        // 庆祝播到这个时刻
     private long ambientUntil;      // 小动作播到这个时刻
+    private boolean pendingCheer;   // 点她时若在做小动作：等这一段播完再庆祝（不打断更自然）
     private boolean talking;
     private float drowsy;
     private boolean dragging;
@@ -98,6 +99,14 @@ public class WhaleGirlView extends View {
                     ambientUntil = now + IDLE_PAUSE_MIN + rng.nextInt(IDLE_PAUSE_VAR);
                 } else if (drowsy > 0.5f) {
                     ambientUntil = now + 15000;  // 深夜困倦时不折腾，安静睡觉
+                } else if (pendingCheer) {
+                    // 用户点过她：小动作这一段已播完，现在兑现庆祝
+                    pendingCheer = false;
+                    if (cheers.length > 0) {
+                        pick(cheers[rng.nextInt(cheers.length)]);
+                        cheerUntil = now + 1800;
+                    }
+                    ambientUntil = now + 1800;
                 } else {
                     // 待机歇够了 → 随机来一段小动作
                     Anim next = ambient[rng.nextInt(ambient.length)];
@@ -178,6 +187,11 @@ public class WhaleGirlView extends View {
     /** 庆祝：点角色、开关注护眼时随机来一段，播约 1.8s 回常态。 */
     public void cheer() {
         if (cheers.length == 0) return;
+        // 正在做小动作时不打断：标记 pending，等这一段完整播完再庆祝
+        if (current != idle && current != sleep && ambientUntil > System.currentTimeMillis()) {
+            pendingCheer = true;
+            return;
+        }
         pick(cheers[rng.nextInt(cheers.length)]);
         cheerUntil = System.currentTimeMillis() + 1800;
     }

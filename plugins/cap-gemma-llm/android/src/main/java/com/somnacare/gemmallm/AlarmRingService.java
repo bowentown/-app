@@ -55,19 +55,28 @@ public class AlarmRingService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        if (intent != null && ACTION_STOP.equals(intent.getAction())) {
+        if (intent == null) {
+            // START_STICKY 重投的 null intent 会重置 5 分钟计时 → "最长 5 分钟"不成立
+            stopSelf();
+            return START_NOT_STICKY;
+        }
+        if (ACTION_STOP.equals(intent.getAction())) {
             stopRing();
             return START_NOT_STICKY;
         }
-        String label = intent != null ? intent.getStringExtra("label") : null;
-        String time = intent != null ? intent.getStringExtra("time") : null;
+        // 两条闹钟落在同一分钟会二次投递：先释放旧 player/vibrator/wakelock，
+        // 否则旧 MediaPlayer 仍在循环且无引用可达——停铃与超时都停不掉它
+        releaseRingResources();
+        String label = intent.getStringExtra("label");
+        String time = intent.getStringExtra("time");
+        String tone = intent.getStringExtra("tone");
         startRingForeground(label, time);
-        startSound();
+        startSound(tone);
         startVibrate();
         wakeScreen();
         // 用户不关就一直响，5 分钟后自动收场
         main.postDelayed(autoStop, AUTO_STOP_MS);
-        return START_STICKY;
+        return START_NOT_STICKY;   // 被杀即停：null intent 重启曾重置 5 分钟计时
     }
 
     private void startRingForeground(String label, String time) {
@@ -104,8 +113,9 @@ public class AlarmRingService extends Service {
         startForeground(20260931, n);
     }
 
-    private void startSound() {
+    private void startSound(String tone) {
         try {
+            // 原生资源当前仅 gentle_chime；aurora_melody/radar_beep 待补资源后按 tone 映射
             int resId = getResources().getIdentifier("gentle_chime", "raw", getPackageName());
             player = new MediaPlayer();
             player.setAudioAttributes(new AudioAttributes.Builder()
@@ -172,6 +182,13 @@ public class AlarmRingService extends Service {
 
     private void stopRing() {
         main.removeCallbacks(autoStop);
+        releaseRingResources();
+        stopForeground(STOP_FOREGROUND_REMOVE);
+        stopSelf();
+    }
+
+    /** 释放响铃资源（stopRing 与二次投递共用）。 */
+    private void releaseRingResources() {
         if (player != null) {
             try { player.stop(); player.release(); } catch (Exception ignored) { }
             player = null;
@@ -184,8 +201,6 @@ public class AlarmRingService extends Service {
             try { if (wakeLock.isHeld()) wakeLock.release(); } catch (Exception ignored) { }
             wakeLock = null;
         }
-        stopForeground(STOP_FOREGROUND_REMOVE);
-        stopSelf();
     }
 
     @Override

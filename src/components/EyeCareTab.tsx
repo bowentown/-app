@@ -438,7 +438,7 @@ export const EyeCareTab: React.FC<EyeCareTabProps> = ({ userProfile, onUpdatePro
                 type="time"
                 value={cfg.start}
                 onChange={(e) => patch({ start: e.target.value || '22:00' })}
-                className="w-full bg-transparent text-sm font-mono font-bold text-white focus:outline-none cursor-pointer"
+                className={`w-full bg-transparent text-sm font-mono font-bold text-white focus:outline-none ${theme?.focusRing} cursor-pointer`}
                 aria-label="定时开始时间"
               />
             </div>
@@ -448,7 +448,7 @@ export const EyeCareTab: React.FC<EyeCareTabProps> = ({ userProfile, onUpdatePro
                 type="time"
                 value={cfg.end}
                 onChange={(e) => patch({ end: e.target.value || '07:00' })}
-                className="w-full bg-transparent text-sm font-mono font-bold text-white focus:outline-none cursor-pointer"
+                className={`w-full bg-transparent text-sm font-mono font-bold text-white focus:outline-none ${theme?.focusRing} cursor-pointer`}
                 aria-label="定时结束时间"
               />
             </div>

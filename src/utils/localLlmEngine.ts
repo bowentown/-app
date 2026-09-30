@@ -5,6 +5,7 @@ import type { Wllama, CacheManager } from '@wllama/wllama';
 // 而 Android 上这段代码永远不会执行。类型引用用 import type，编译期擦除。
 
 let wasmUrlCache: string | null = null;
+let generateSeq = 0;
 async function loadWasmUrl(): Promise<string> {
   if (wasmUrlCache == null) {
     wasmUrlCache = (await import('@wllama/wllama/esm/wasm/wllama.wasm?url')).default;
@@ -369,6 +370,9 @@ async function generateViaNative(
   if (busy) throw new Error('端侧模型正在处理中，请稍候');
   busy = true;
   const tokenHandle: any[] = [];
+  // 自增请求号：abort 竞速弃单后原生仍在跑并广播 token——
+  // 带 requestId 过滤，旧回答不会流进下一条提问的气泡
+  const requestId = ++generateSeq;
   try {
     if (!loadedUrl) {
       handlers.onStage?.('loading');
@@ -382,6 +386,7 @@ async function generateViaNative(
 
     let last = '';
     const handle = await plugin.addListener('llmToken', (p: any) => {
+      if (p?.requestId !== undefined && p.requestId !== requestId) return;   // 旧弃单的迟到 token
       // MediaPipe 的 ProgressListener 回调为累计文本：换算成增量再转发
       const text: string = p?.text ?? '';
       if (text.length > last.length && text.startsWith(last)) {
@@ -402,18 +407,14 @@ async function generateViaNative(
             signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true });
           })
         : null;
+      const genOpts = {
+        messages: messages.map((m) => ({ role: m.role, content: m.content })),
+        maxTokens: 220,
+        requestId,
+      };
       const result = await (abortRace
-        ? Promise.race([
-            plugin.generate({
-              messages: messages.map((m) => ({ role: m.role, content: m.content })),
-              maxTokens: 220,
-            }),
-            abortRace,
-          ])
-        : plugin.generate({
-            messages: messages.map((m) => ({ role: m.role, content: m.content })),
-            maxTokens: 220,
-          }));
+        ? Promise.race([plugin.generate(genOpts), abortRace])
+        : plugin.generate(genOpts));
       if (result?.text && result.text.length > last.length) {
         handlers.onToken(result.text.slice(last.length));
         last = result.text;

@@ -180,7 +180,7 @@ export const ManualLogModal: React.FC<ManualLogModalProps> = ({
                 type="time"
                 value={bedtime}
                 onChange={(e) => setBedtime(e.target.value)}
-                className="w-full bg-transparent text-2xl font-black text-white font-mono focus:outline-none cursor-pointer"
+                className={`w-full bg-transparent text-2xl font-black text-white font-mono focus:outline-none ${theme?.focusRing} cursor-pointer`}
               />
             </div>
 
@@ -193,7 +193,7 @@ export const ManualLogModal: React.FC<ManualLogModalProps> = ({
                 type="time"
                 value={wakeTime}
                 onChange={(e) => setWakeTime(e.target.value)}
-                className="w-full bg-transparent text-2xl font-black text-white font-mono focus:outline-none cursor-pointer"
+                className={`w-full bg-transparent text-2xl font-black text-white font-mono focus:outline-none ${theme?.focusRing} cursor-pointer`}
               />
             </div>
           </div>

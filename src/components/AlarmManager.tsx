@@ -337,7 +337,7 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
               type="time"
               value={newTime}
               onChange={(e) => setNewTime(e.target.value)}
-              className="bg-transparent text-4xl font-black font-mono text-white focus:outline-none tracking-widest cursor-pointer"
+              className={`bg-transparent text-4xl font-black font-mono text-white focus:outline-none ${theme?.focusRing} tracking-widest cursor-pointer`}
             />
           </div>
 
@@ -436,6 +436,7 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
               </div>
               <input
                 type="checkbox"
+                aria-label="启用浅睡唤醒窗口"
                 checked={newSmartWake}
                 onChange={(e) => setNewSmartWake(e.target.checked)}
                 className={`w-5 h-5 rounded cursor-pointer`}

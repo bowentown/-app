@@ -379,7 +379,7 @@ export const TodayTab: React.FC<TodayTabProps> = ({
                     targetWakeTime: toClock(toMin(e.target.value) + Math.round(userProfile.targetDurationHours * 60)),
                   })
                 }
-                className="w-full bg-transparent text-2xl font-black text-white font-mono focus:outline-none cursor-pointer"
+                className={`w-full bg-transparent text-2xl font-black text-white font-mono focus:outline-none ${theme?.focusRing} cursor-pointer`}
               />
             </div>
             <div className={`${theme.cardInnerBg} border ${theme.cardInnerBorder} rounded-2xl p-3.5 shadow-inner`}>
@@ -391,7 +391,7 @@ export const TodayTab: React.FC<TodayTabProps> = ({
                   const durH = Math.min(12, Math.max(4, Math.round(((toMin(e.target.value) - toMin(userProfile.targetBedtime) + 1440) % 1440) / 30) * 0.5));
                   onUpdateProfile({ targetWakeTime: e.target.value, targetDurationHours: durH });
                 }}
-                className="w-full bg-transparent text-2xl font-black text-white font-mono focus:outline-none cursor-pointer"
+                className={`w-full bg-transparent text-2xl font-black text-white font-mono focus:outline-none ${theme?.focusRing} cursor-pointer`}
               />
             </div>
           </div>

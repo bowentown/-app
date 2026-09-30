@@ -460,6 +460,16 @@ export const App: React.FC = () => {
     showToast('已删除该条睡眠数据');
   };
 
+  // 主题类同步挂到 <html>：7 处弹窗 portal 到 document.body（在根 div 之外），
+  // .theme-* 后代规则（如纯黑主题去阴影）需从 documentElement 起才能命中
+  useEffect(() => {
+    const root = document.documentElement;
+    const cls = `theme-${userProfile.themeColor || 'midnight'}`;
+    root.classList.remove('theme-midnight', 'theme-pure_dark', 'theme-warm_amber', 'theme-serene_blue');
+    root.classList.add(cls);
+    return () => root.classList.remove(cls);
+  }, [userProfile.themeColor]);
+
   // Obtain active theme config (card, text, page all linked)
   const currentTheme = APP_THEMES[userProfile.themeColor as keyof typeof APP_THEMES] || APP_THEMES.midnight;
 
