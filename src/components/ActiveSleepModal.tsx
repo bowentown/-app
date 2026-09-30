@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Bell, Volume2, Sparkles, X, ChevronRight, Check, CloudRain, Waves, Flower2, Sunrise, CloudSun, Coffee, CloudFog } from 'lucide-react';
 import MoonDisc from './MoonDisc';
 import { getMoonInfo } from '../utils/moonPhase';
@@ -321,7 +322,8 @@ export const ActiveSleepModal: React.FC<ActiveSleepModalProps> = ({
   const elapsedMins = Math.floor((elapsedSeconds % 3600) / 60);
   const elapsedSecs = elapsedSeconds % 60;
 
-  return (
+  // portal 到 body：分区滑动容器带 translate3d，fixed 退化 → 跨页
+  return createPortal(
     <div ref={a11yRef} {...dialogProps} className={`fixed inset-0 z-50 ${theme.pageBg} ${theme.textPrimary} flex flex-col justify-between p-6 select-none overflow-y-auto`}>
       {/* 氛围背景：星点闪烁 + 顶部主题色极光辉光 */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
@@ -633,6 +635,7 @@ export const ActiveSleepModal: React.FC<ActiveSleepModalProps> = ({
           <p className={`text-[11px] ${theme.textMuted} text-center`}>屏幕保持亮起 · 手机放置枕边效果最佳</p>
         </div>
       )}
-    </div>
+    </div>,
+    document.body
   );
 };

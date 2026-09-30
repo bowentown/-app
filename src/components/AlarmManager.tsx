@@ -105,7 +105,9 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
           if (!activeRingingAlarm) {
             lastFiredKeyRef.current = fireKey;
             setActiveRingingAlarm(alarm);
-            sleepAudio.playAlarm(alarm.tone);
+            // native：响铃由 AlarmRingService 循环负责（WebView 计时器息屏会被冻结，
+            // Web Audio 曾只响一声就停）；web 才走 Web Audio
+            if (!isNativePlatform()) sleepAudio.playAlarm(alarm.tone);
             // "仅一次"语义落地：无重复日的闹钟响过即停用（原生侧同为单次调度）
             if (alarm.repeatDays.length === 0) {
               onUpdateAlarms(alarms.map((a) => (a.id === alarm.id ? { ...a, enabled: false } : a)));
@@ -135,6 +137,11 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
 
   const handleStopRinging = () => {
     sleepAudio.stop();
+    // 原生侧同步停掉持续响铃服务
+    try {
+      const cap = (window as any).Capacitor;
+      if (cap?.isNativePlatform?.()) void cap.Plugins?.GemmaLLM?.alarmRingStop?.();
+    } catch { /* ignore */ }
     setActiveRingingAlarm(null);
   };
 

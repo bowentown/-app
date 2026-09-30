@@ -423,6 +423,135 @@ public class GemmaLLMPlugin extends Plugin {
 
     /** 设定/更新提醒时间（'HH:MM'），并立即重排闹钟。 */
     @PluginMethod
+    // ================= 闹钟持续响铃（AlarmRingService） =================
+
+    /** 稳定请求码：同一条闹钟重复调度时 FLAG_UPDATE_CURRENT 原地替换 */
+    private static int ringRequestCode(String id, int isoDay) {
+        return 2_000_000 + Math.abs((id + ":" + isoDay).hashCode()) % 1_000_000;
+    }
+
+    /** 按闹钟表重排响铃闹钟；json 为空/格式坏时视为全取消。Boot 重排复用。 */
+    public static void rescheduleRingAlarms(Context context, String alarmsJson) {
+        android.app.AlarmManager am = (android.app.AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+        if (am == null) return;
+        android.content.SharedPreferences sp =
+                context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        // 先取消旧表（存下的请求码集合），避免已删除的闹钟残留继续响
+        try {
+            org.json.JSONArray oldCodes = new org.json.JSONArray(sp.getString("alarm_ring_codes", "[]"));
+            for (int i = 0; i < oldCodes.length(); i++) {
+                am.cancel(android.app.PendingIntent.getBroadcast(context, oldCodes.getInt(i),
+                        new Intent(context, AlarmRingReceiver.class),
+                        android.app.PendingIntent.FLAG_UPDATE_CURRENT | android.app.PendingIntent.FLAG_IMMUTABLE));
+            }
+        } catch (Exception ignored) {
+        }
+        sp.edit().remove("alarm_ring_codes").apply();
+        if (alarmsJson == null || alarmsJson.isEmpty()) return;
+        try {
+            org.json.JSONArray arr = new org.json.JSONArray(alarmsJson);
+            org.json.JSONArray codes = new org.json.JSONArray();
+            java.util.Calendar now = java.util.Calendar.getInstance();
+            for (int i = 0; i < arr.length(); i++) {
+                org.json.JSONObject a = arr.getJSONObject(i);
+                String id = a.optString("id", "alarm-" + i);
+                String[] hm = a.optString("time", "07:30").split(":");
+                int hour = Integer.parseInt(hm[0]);
+                int minute = hm.length > 1 ? Integer.parseInt(hm[1]) : 0;
+                String tone = a.optString("tone", "gentle_chime");
+                org.json.JSONArray days = a.optJSONArray("repeatDays");
+                if (days != null && days.length() == 0) {
+                    // 单次：下一个匹配时刻（今天已过则明天）
+                    java.util.Calendar cal = (java.util.Calendar) now.clone();
+                    cal.set(java.util.Calendar.HOUR_OF_DAY, hour);
+                    cal.set(java.util.Calendar.MINUTE, minute);
+                    cal.set(java.util.Calendar.SECOND, 0);
+                    if (cal.getTimeInMillis() <= now.getTimeInMillis()) cal.add(java.util.Calendar.DAY_OF_YEAR, 1);
+                    scheduleOneRingAlarm(context, am, sp, codes, id, 0, tone,
+                            a.optString("label", ""), a.optString("time", ""), cal.getTimeInMillis());
+                } else if (days != null) {
+                    for (int d = 0; d < days.length(); d++) {
+                        int isoDay = days.optInt(d, 1);
+                        // 距该星期几的下一次出现（1=周一…7=周日）
+                        int delta = (isoDay - now.get(java.util.Calendar.DAY_OF_WEEK) + 7 - 1) % 7;
+                        if (delta == 0) delta = 7;   // 当天按"下次"算：统一排到下周同日
+                        java.util.Calendar cal = (java.util.Calendar) now.clone();
+                        cal.add(java.util.Calendar.DAY_OF_YEAR, delta);
+                        cal.set(java.util.Calendar.HOUR_OF_DAY, hour);
+                        cal.set(java.util.Calendar.MINUTE, minute);
+                        cal.set(java.util.Calendar.SECOND, 0);
+                        scheduleOneRingAlarm(context, am, sp, codes, id, isoDay, tone,
+                                a.optString("label", ""), a.optString("time", ""), cal.getTimeInMillis());
+                    }
+                }
+            }
+            sp.edit().putString("alarm_ring_codes", codes.toString()).apply();
+        } catch (Exception ignored) {
+        }
+    }
+
+    private static void scheduleOneRingAlarm(Context context, android.app.AlarmManager am,
+            android.content.SharedPreferences sp, org.json.JSONArray codes,
+            String id, int isoDay, String tone, String label, String time, long at) {
+        int code = ringRequestCode(id, isoDay);
+        Intent i = new Intent(context, AlarmRingReceiver.class);
+        i.putExtra("label", label);
+        i.putExtra("time", time);
+        i.putExtra("tone", tone);
+        android.app.PendingIntent pi = android.app.PendingIntent.getBroadcast(context, code, i,
+                android.app.PendingIntent.FLAG_UPDATE_CURRENT | android.app.PendingIntent.FLAG_IMMUTABLE);
+        boolean exact = android.os.Build.VERSION.SDK_INT < 31 || am.canScheduleExactAlarms();
+        if (exact) {
+            am.setExactAndAllowWhileIdle(android.app.AlarmManager.RTC_WAKEUP, at, pi);
+        } else {
+            am.setAndAllowWhileIdle(android.app.AlarmManager.RTC_WAKEUP, at, pi);
+        }
+        codes.put(code);
+    }
+
+    @PluginMethod
+    public void alarmRingSchedule(PluginCall call) {
+        try {
+            // JS 侧 JSON.stringify 后传字符串：Capacitor JSArray 的 toString 不是合法 JSON
+            String json = call.getString("alarmsJson", "[]");
+            getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                    .edit().putString("alarm_ring_alarms", json).apply();
+            rescheduleRingAlarms(getContext(), json);
+        } catch (Exception e) {
+            call.reject("闹钟响铃排程失败: " + e.getMessage());
+            return;
+        }
+        JSObject ret = new JSObject();
+        ret.put("ok", true);
+        call.resolve(ret);
+    }
+
+    @PluginMethod
+    public void alarmRingCancel(PluginCall call) {
+        try {
+            getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                    .edit().putString("alarm_ring_alarms", "[]").apply();
+            rescheduleRingAlarms(getContext(), "");
+        } catch (Exception ignored) {
+        }
+        JSObject ret = new JSObject();
+        ret.put("ok", true);
+        call.resolve(ret);
+    }
+
+    @PluginMethod
+    public void alarmRingStop(PluginCall call) {
+        try {
+            Intent stop = new Intent(getContext(), AlarmRingService.class)
+                    .setAction(AlarmRingService.ACTION_STOP);
+            getContext().startService(stop);
+        } catch (Exception ignored) {
+        }
+        JSObject ret = new JSObject();
+        ret.put("ok", true);
+        call.resolve(ret);
+    }
+
     public void bedtimeReminderSchedule(PluginCall call) {
         String time = call.getString("time", "23:30");
         try {

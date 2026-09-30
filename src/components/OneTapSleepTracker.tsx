@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Moon, Sun, AlertTriangle } from 'lucide-react';
 import { SleepRecord } from '../types/sleep';
 import { calculateSleepScore, generateSleepStages, formatDurationChinese } from '../utils/sleepScore';
@@ -234,7 +235,7 @@ export const OneTapSleepTracker: React.FC<OneTapSleepTrackerProps> = ({ onSaveRe
       </div>
 
       {/* Completion Modal - 100% Solid & Strict Duration Display */}
-      {showSummaryModal && completedRecord && (
+      {showSummaryModal && completedRecord && createPortal(
         <div ref={summaryModalA11y.ref} {...summaryModalA11y.dialogProps} className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4">
           <div className={`${theme.cardBg} border-2 ${theme.accentBorder} rounded-3xl w-full max-w-sm p-6 text-white shadow-2xl text-center`}>
             <div className={`text-sm font-bold ${theme.accentText} mb-1`}>
@@ -290,7 +291,8 @@ export const OneTapSleepTracker: React.FC<OneTapSleepTrackerProps> = ({ onSaveRe
               确定并查看详情
             </button>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   );

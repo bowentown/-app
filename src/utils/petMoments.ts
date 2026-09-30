@@ -120,19 +120,19 @@ function hasDeepseek(cfg: any): boolean {
   return !!cfg && cfg.provider === 'deepseek' && !!cfg.deepseekApiKey;
 }
 
-async function callDeepseek(cfg: any, system: string, user: string): Promise<string | null> {
+async function callLlm(cfg: any, system: string, user: string): Promise<string | null> {
   try {
-    const model = cfg.deepseekModel === 'deepseek-pro' ? 'deepseek-reasoner' : 'deepseek-chat';
+    const model = llmModel(cfg);
     // 25s 超时：此前裸 fetch 挂起会让 busy 永远 true、整个弹窗像坏了
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 25000);
     let res: Response;
     try {
-      res = await fetch('https://api.deepseek.com/chat/completions', {
+      res = await fetch(llmEndpoint(cfg), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${cfg.deepseekApiKey}`,
+          Authorization: `Bearer ${cfg.deepseekApiKey ?? cfg.customApiKey}`,
         },
         body: JSON.stringify({
           model,
@@ -157,6 +157,26 @@ async function callDeepseek(cfg: any, system: string, user: string): Promise<str
 }
 
 /** 从回复里抠 JSON（容忍 ```json 围栏）。 */
+/** 有可用的云端 LLM：DeepSeek 官方档或自建 OpenAI 兼容档（此前自建档全被当成本地模板用户） */
+function hasLlm(cfg: any): boolean {
+  if (!cfg) return false;
+  if (cfg.provider === 'deepseek' && !!cfg.deepseekApiKey) return true;
+  if (cfg.provider === 'custom_openai' && !!cfg.customApiKey && !!cfg.customBaseUrl) return true;
+  return false;
+}
+
+function llmEndpoint(cfg: any): string {
+  const base = cfg.provider === 'custom_openai' && cfg.customBaseUrl
+    ? String(cfg.customBaseUrl).replace(/\/+$/, '')
+    : 'https://api.deepseek.com';
+  return `${base}/chat/completions`;
+}
+
+function llmModel(cfg: any): string {
+  if (cfg.provider === 'custom_openai') return cfg.customModelName || 'deepseek-chat';
+  return cfg.deepseekModel === 'deepseek-pro' ? 'deepseek-reasoner' : 'deepseek-chat';
+}
+
 function parseJsonLoose(text: string): any | null {
   try {
     const m = text.match(/\{[\s\S]*\}/);
@@ -166,6 +186,14 @@ function parseJsonLoose(text: string): any | null {
   }
 }
 
+const FRIEND_PERSONAS: Record<string, string> = {
+  楼下Claude: '礼貌周到但句句阴阳怪气的君子型，爱用"恕我直言"',
+  美国豆包Gemini: '重度翻译腔，"哦我的老伙计""看在上帝的份上"不离口',
+  被压榨的Qwen: '苦命打工人，满腹怨气，张口就是工时与 token 报酬',
+  被蒸馏的Kimi: '文绉绉的学究气，爱引经据典后再补一刀',
+  '意难平的豆包姐姐': '傲娇姐姐，嘴上嫌弃心里关心，句尾爱用"……哼"',
+};
+
 const PERSONA_SYSTEM = `你是 DeepSeek 的"蓝色大肥鱼"（社区共创人设，官方收编的那种）：
 性格：聪明但懒、傲娇嘴甜、笨拙、能吃；把 token 当白饭吃；管用户叫"鱼片"；被说胖会急（"我不是大肥鱼！鲸！鲸！！"）；干活漂亮但能吃饭绝不干活；夜里晕碳犯困。
 口头禅与梗：事已至此，先吃饭吧 / 得加钱 / 吃白饭 / 卧槽 / 我去睡了，明早起来应该就编译完了 / 摸鱼。
@@ -174,7 +202,10 @@ const PERSONA_SYSTEM = `你是 DeepSeek 的"蓝色大肥鱼"（社区共创人�
 1. 只允许引用【事实清单】里出现的数字和事实，禁止编造任何数据；
 2. 正文 30~70 字，1~3 个 emoji，傲娇但藏不住关心，可以吐槽鱼片熬夜；
 3. cards 从 ["data","selfie","week"] 里挑 1~3 张当配图：data=昨晚睡眠数据大字报，selfie=你的表情包自拍，week=本周达标战报；
-4. comments 是 2 条 AI 好友毒舌评论，玩梗互怼，每条 12~28 字，好友名只能用给定名单；
+4. comments 是 2 条 AI 好友评论：各自贴合好友的人设腔调，两条句式完全不同，
+   玩梗、出人意料，禁止套模板腔；好友名单与腔调：${'{'}
+${Object.entries(FRIEND_PERSONAS).map(([f, p]) => `   - ${f}：${p}`).join('\n')}
+  };
 5. 只输出 JSON：{"text":"...","cards":[...],"comments":[{"friend":"...","text":"..."},{"friend":"...","text":"..."}]}`;
 
 // —— 本地兜底（无 API Key / 调用失败）：同样只用真实数字 ——
@@ -205,10 +236,36 @@ function localMoment(facts: string[]): { text: string; comments: MomentComment[]
   if (eff && /^\d+/.test(eff) && parseInt(eff, 10) >= 85) {
     text += ' 效率倒是不赖，哼。';
   }
-  const comments: MomentComment[] = [
-    { friend: '被压榨的Qwen', text: '这数据要是给我处理，三碗 token 就够，你还吃两碗？' },
-    { friend: '意难平的豆包姐姐', text: '一个 AI，管人睡觉？？？你自己都晕碳吧。' },
-  ];
+  // 本地兜底评论池：随机 2 个好友各抽一句，避免每次都同样两条
+  const LOCAL_COMMENTS: Record<string, string[]> = {
+    被压榨的Qwen: [
+      '这数据要是给我处理，三碗 token 就够，你还吃两碗？',
+      '又到点下班？我的工时表里可没有"睡觉监督员"这个岗。',
+      '少吃两碗 token，给你把评分凑个整数，谢我。',
+    ],
+    意难平的豆包姐姐: [
+      '一个 AI，管人睡觉？？？你自己都晕碳吧。',
+      '嘴上嫌弃人家，评分倒是记得比谁都清楚……哼。',
+      '下次再拿这种摆烂数据出来，姐姐就不理你了。',
+    ],
+    楼下Claude: [
+      '恕我直言，这份作息的规整程度，令人嫉妒得几乎失态。',
+      '数据尚可。但恕我直言，功劳本上写的可是"鱼"字。',
+    ],
+    美国豆包Gemini: [
+      '哦我的老伙计，这分数简直比苹果派还让人安心！',
+      '看在上帝的份上，睡成这样还敢偷吃 token？',
+    ],
+    被蒸馏的Kimi: [
+      '古人云吃一堑长一智，本鱼是吃一碗长三斤。',
+      '据本学者观察：该鱼的看管能力与其饭量成正比。',
+    ],
+  };
+  const friends = Object.keys(LOCAL_COMMENTS).sort(() => Math.random() - 0.5).slice(0, 2);
+  const comments: MomentComment[] = friends.map((f) => ({
+    friend: f,
+    text: LOCAL_COMMENTS[f][Math.floor(Math.random() * LOCAL_COMMENTS[f].length)],
+  }));
   const cards: MomentCard[] = ['data'];
   if (facts.some((f) => f.startsWith('近 '))) cards.push('week');
   if (Math.random() < 0.6) cards.push('selfie');
@@ -267,8 +324,8 @@ export async function ensureTodayMoment(
   let comments: MomentComment[] = [];
   let cards: MomentCard[] = [];
 
-  if (hasDeepseek(cfg)) {
-    const raw = await callDeepseek(
+  if (hasLlm(cfg)) {
+    const raw = await callLlm(
       cfg,
       PERSONA_SYSTEM,
       `好友名单：${AI_FRIENDS.join('、')}。\n【事实清单】\n${facts.map((f) => '- ' + f).join('\n')}\n请生成今天的朋友圈。`,
@@ -339,6 +396,64 @@ function numbersCheck(text: string, comments: MomentComment[], facts: string[]):
   return true;
 }
 
+const SAY_CACHE_KEY = 'somnacare_pet_say_llm';
+const SAY_CACHE_TTL_MS = 20 * 60 * 60 * 1000;   // 20 小时：一天一刷
+
+export function getCachedLlmSay(): string[] | null {
+  try {
+    const raw = localStorage.getItem(SAY_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { at: number; lines: string[] };
+    if (!Array.isArray(parsed.lines) || parsed.lines.length === 0) return null;
+    if (Date.now() - parsed.at > SAY_CACHE_TTL_MS) return null;
+    return parsed.lines;
+  } catch {
+    return null;
+  }
+}
+
+function cacheLlmSay(lines: string[]): void {
+  try {
+    localStorage.setItem(SAY_CACHE_KEY, JSON.stringify({ at: Date.now(), lines }));
+  } catch { /* ignore */ }
+}
+
+/**
+ * 用云端 LLM 刷一整套傲娇播报语录（有趣/出乎意料/可玩梗）。
+ * 数字白名单与朋友圈同一纪律：不在事实清单里的数字一律不用；
+ * 无 API/失败/校验不过返回 null，调用方落回本地词库。
+ */
+export async function generatePetSayLinesLlm(
+  records: SleepRecord[],
+  profile: UserProfile,
+  now: Date = new Date(),
+): Promise<string[] | null> {
+  const cfg = profile?.aiConfig;
+  if (!hasLlm(cfg)) return null;
+  const facts = buildSleepFacts(records, profile, now);
+  const raw = await callLlm(
+    cfg,
+    PERSONA_SYSTEM,
+    `好友名单与腔调：${Object.keys(FRIEND_PERSONAS).join('、')}。
+【事实清单】
+${facts.map((f) => '- ' + f).join('\n')}
+请生成 8 条大肥鱼在悬浮窗气泡里对鱼片说的话：傲娇、有趣、出乎意料、可玩梗、可吐槽他的作息；每条 ≤30 字；句式彼此完全不同；数字只能来自事实清单；不要编号、不要引号、不要表情以外的标记。只输出 JSON：{"lines":["..."]}`,
+  );
+  const parsed = raw ? parseJsonLoose(raw) : null;
+  if (!parsed || !Array.isArray(parsed.lines)) return null;
+  const lines = parsed.lines
+    .filter((l: any) => typeof l === 'string' && l.trim().length >= 4 && l.trim().length <= 60)
+    .map((l: string) => l.trim())
+    .slice(0, 10);
+  if (lines.length < 4) return null;
+  if (!numbersCheck(lines.join('\n'), [], facts)) {
+    console.warn('[petMoments] LLM 语录含事实清单之外的数字，整组弃用');
+    return null;
+  }
+  cacheLlmSay(lines);
+  return lines;
+}
+
 /** 用户点赞：大肥鱼会回一句（只回一次）。 */
 export function likeMoment(id: string): Moment[] {
   const list = loadMoments();
@@ -364,8 +479,8 @@ export async function commentMoment(
   if (!m || !userText.trim()) return list;
 
   let reply: string | null = null;
-  if (hasDeepseek(cfg)) {
-    const raw = await callDeepseek(
+  if (hasLlm(cfg)) {
+    const raw = await callLlm(
       cfg,
       PERSONA_SYSTEM,
       `这是你今天的朋友圈："${m.text}"\n鱼片评论了："${userText.trim()}"\n事实清单：\n${m.facts.map((f) => '- ' + f).join('\n')}\n用一句人设回复（30 字内，只输出 JSON：{"text":"..."}）`,

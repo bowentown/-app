@@ -8,6 +8,7 @@
  * 把 token 当白饭吃、被叫胖会急。语气参考 dsh-plugin-moments 的人设文档。
  */
 import type { SleepRecord, UserProfile } from '../types/sleep';
+import { generatePetSayLinesLlm, getCachedLlmSay } from './petMoments';
 
 function gemma(): any | null {
   try {
@@ -173,19 +174,39 @@ export async function startPet(
   }
 }
 
-/** 只刷新词库，不改变开关状态。 */
+/**
+ * 只刷新词库，不改变开关状态。
+ * 语录融合：云端 LLM 刷的语录（每日缓存）优先，本地傲娇模板垫底——
+ * 两者都基于真实数据。缓存过期时先推本地、后台异步刷 LLM，刷到再推一次。
+ */
 export async function syncPet(
   records: SleepRecord[],
   profile: UserProfile,
 ): Promise<void> {
   const g = gemma();
   if (!g || !isPetEnabled()) return;
+  const cached = getCachedLlmSay();
+  const localLines = buildPetSayLines(records, profile);
+  const say = cached
+    ? [...cached, ...localLines.slice(0, 3)].join('\n')
+    : localLines.join('\n');
   try {
-    await g.petSync({
-      say: buildPetSayLines(records, profile).join('\n'),
-      bubbleEvery: getBubbleEvery(),
-    });
+    await g.petSync({ say, bubbleEvery: getBubbleEvery() });
   } catch { /* 桌宠没开或服务已停，忽略 */ }
+
+  if (!cached) {
+    void generatePetSayLinesLlm(records, profile)
+      .then((lines) => {
+        if (!lines || !g) return;
+        try {
+          void g.petSync({
+            say: [...lines, ...localLines.slice(0, 3)].join('\n'),
+            bubbleEvery: getBubbleEvery(),
+          });
+        } catch { /* ignore */ }
+      })
+      .catch(() => { /* LLM 失败静默保留本地词库 */ });
+  }
 }
 
 export async function stopPet(): Promise<void> {

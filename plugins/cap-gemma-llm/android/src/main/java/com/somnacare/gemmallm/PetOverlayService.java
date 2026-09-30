@@ -360,23 +360,36 @@ public class PetOverlayService extends Service {
         }
     }
 
+    private boolean fanOnRight;   // 按钮扇面在角色的哪一侧（镜像弧形偏移用）
+
+    /**
+     * 弧形按钮扇面（AutoJs6 式）：三颗 44dp 圆钮沿圆弧排布，
+     * 中间钮最贴身、上下两钮向外偏 14dp——窗口尺寸按内容收紧，
+     * 不留不可点死区。fanOnRight 决定弧的开口朝向。
+     */
     private FrameLayout buildFan() {
         FrameLayout wrap = new FrameLayout(this);
-        wrap.setPadding(dp(4), dp(4), dp(4), dp(4));   // 给回弹缩放留出窗口内的余量
-        LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.VERTICAL);   // 上下排列，贴在角色身侧
-        row.setGravity(Gravity.CENTER_HORIZONTAL);   // 竖向布局的水平居中用这个
+        int offSide = dp(14);        // 上下钮向外偏移
+        int btn = dp(44);
+        int wrapW = btn + offSide;
+        int wrapH = btn * 3 + dp(10) * 2;
+        wrap.setPadding(0, 0, 0, 0);
 
-        LinearLayout.LayoutParams p1 = new LinearLayout.LayoutParams(dp(44), dp(44));
-        row.addView(fanButton(true, "看播报", new View.OnClickListener() {
+        // 偏移基准：扇面在角色右侧 → 朝角色一侧是窗口左缘；在左侧 → 镜像
+        int nearX = fanOnRight ? 0 : offSide;
+        int farX = fanOnRight ? offSide : 0;
+
+        View b1 = fanButton(true, "看播报", new View.OnClickListener() {
             @Override public void onClick(View v) {
                 hideFan();
                 showBubble(nextSayLine(), BUBBLE_MS);
             }
-        }), p1);
+        });
+        FrameLayout.LayoutParams p1 = new FrameLayout.LayoutParams(btn, btn, Gravity.TOP | Gravity.START);
+        p1.leftMargin = nearX;           // 最贴身
+        p1.topMargin = 0;
+        wrap.addView(b1, p1);
 
-        LinearLayout.LayoutParams p2 = new LinearLayout.LayoutParams(dp(44), dp(44));
-        p2.topMargin = dp(10);
         eyeBtn = fanButton(false, "护眼滤镜", new View.OnClickListener() {
             @Override public void onClick(View v) {
                 toggleEyeCare();
@@ -390,30 +403,31 @@ public class PetOverlayService extends Service {
                 }, 600);
             }
         });
-        row.addView(eyeBtn, p2);
+        FrameLayout.LayoutParams p2 = new FrameLayout.LayoutParams(btn, btn, Gravity.TOP | Gravity.START);
+        p2.leftMargin = farX;            // 弧的中段向外鼓
+        p2.topMargin = btn + dp(10);
+        wrap.addView(eyeBtn, p2);
 
-        LinearLayout.LayoutParams p3 = new LinearLayout.LayoutParams(dp(44), dp(44));
-        p3.topMargin = dp(10);
-        row.addView(fanButton(R.drawable.pet_ic_minimize, "最小化", new View.OnClickListener() {
+        View b3 = fanButton(R.drawable.pet_ic_minimize, "最小化", new View.OnClickListener() {
             @Override public void onClick(View v) {
                 minimize();
             }
-        }), p3);
+        });
+        FrameLayout.LayoutParams p3 = new FrameLayout.LayoutParams(btn, btn, Gravity.TOP | Gravity.START);
+        p3.leftMargin = nearX;
+        p3.topMargin = (btn + dp(10)) * 2;
+        wrap.addView(b3, p3);
 
-        wrap.addView(row, new FrameLayout.LayoutParams(-2, -2));
+        wrap.setLayoutParams(new FrameLayout.LayoutParams(wrapW, wrapH));
         return wrap;
     }
 
-    /**
-     * 磨砂深色圆钮 + Material 官方矢量图标（Apache-2.0，res/drawable/pet_ic_*.xml）。
-     * emoji 各机型渲染差异大，自绘又不够精致；Material 图标所有设备渲染一致。
-     * 尺寸必须显式指定：按钮内容是 MATCH_PARENT 的 ImageView，
-     * wrap-content 会一路量到窗口（=整屏），把整个屏幕都变成按钮。
-     */
+    /** 布尔重载：消息/护眼钮共用图标选择。 */
     private FrameLayout fanButton(boolean chatIcon, String desc, View.OnClickListener click) {
         return fanButton(chatIcon ? R.drawable.pet_ic_chat : R.drawable.pet_ic_eye, desc, click);
     }
 
+    /** 磨砂深色圆钮 + Material 官方矢量图标；尺寸必须显式指定（内容是 MATCH_PARENT）。 */
     private FrameLayout fanButton(int iconRes, String desc, View.OnClickListener click) {
         FrameLayout btn = new FrameLayout(this);
         GradientDrawable g = new GradientDrawable();

@@ -80,16 +80,15 @@ export async function syncAlarmsToNative(alarms: CustomAlarmSetting[]): Promise<
   }
 
   try {
-    // 专用闹钟通知通道：IMPORTANCE_HIGH（息屏会响铃/震动）+ 30 秒渐弱钟声（res/raw/gentle_chime.wav）。
-    // Android 8+ 的声音属于通道而非通知，必须先建好通道再调度。
+    // 专用闹钟通知通道：IMPORTANCE_HIGH 但不出声——持续响铃由 AlarmRingService
+    // 的 MediaPlayer 循环负责，通知只出横幅（渠道出声会与服务叠放）。
+    // 注意：Android 渠道创建后不可变，旧安装需卸载重装才去掉原 30 秒铃声。
     try {
       await plugin.createChannel({
         id: 'somnacare-alarm',
         name: '极光睡眠闹钟',
         description: '定时睡眠唤醒（重要级，熄屏可响）',
         importance: 5,
-        sound: 'gentle_chime.wav',
-        vibration: true,
         visibility: 1,
       });
     } catch {
@@ -106,6 +105,7 @@ export async function syncAlarmsToNative(alarms: CustomAlarmSetting[]): Promise<
 
     const enabledAlarms = alarms.filter((a) => a.enabled);
     if (enabledAlarms.length === 0) {
+      try { await (cap.Plugins?.GemmaLLM as any)?.alarmRingCancel?.(); } catch { /* ignore */ }
       return { success: true, nativeScheduledCount: 0 };
     }
 
@@ -162,6 +162,22 @@ export async function syncAlarmsToNative(alarms: CustomAlarmSetting[]): Promise<
     if (notificationsToSchedule.length > 0) {
       await plugin.schedule({ notifications: notificationsToSchedule });
     }
+
+    // 持续响铃排程：熄屏循环铃声+振动直到用户关闭（最长 5 分钟）——
+    // Capacitor 通知只有渠道 30 秒铃声，播完即止，这就是"响一声就没"的根因
+    try {
+      await (cap.Plugins?.GemmaLLM as any)?.alarmRingSchedule?.({
+        alarmsJson: JSON.stringify(
+          enabledAlarms.map((a) => ({
+            id: a.id,
+            time: a.time,
+            repeatDays: a.repeatDays ?? [],
+            tone: a.tone,
+            label: a.label,
+          })),
+        ),
+      });
+    } catch { /* 响铃排程失败不阻断通知调度 */ }
 
     return { success: true, nativeScheduledCount: notificationsToSchedule.length };
   } catch (err) {

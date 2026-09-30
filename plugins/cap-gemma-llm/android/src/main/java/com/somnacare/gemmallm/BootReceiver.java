@@ -20,6 +20,9 @@ public class BootReceiver extends BroadcastReceiver {
             if (sp.getBoolean("bedtime_reminder_on", false)) {
                 GemmaLLMPlugin.scheduleBedtimeAlarm(context);
             }
+            // 闹钟响铃的精确闹钟同样不跨重启：按持久化的闹钟表重排
+            GemmaLLMPlugin.rescheduleRingAlarms(context,
+                    sp.getString("alarm_ring_alarms", "[]"));
         } catch (Exception ignored) {
         }
     }

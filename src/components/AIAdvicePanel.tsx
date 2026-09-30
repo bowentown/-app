@@ -54,15 +54,31 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
   });
 
   // Chat consultation state
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
-    {
-      id: 'welcome',
-      role: 'assistant',
-      content:
-        '您好，我是您的睡眠顾问。今晚有什么睡眠困扰？',
-      timestamp: '刚刚',
-    },
-  ]);
+  // 会话持久化：分区是条件渲染，切 Tab 即卸载——此前整段对话随组件销毁。
+  // 存 localStorage（上限 120 条），切 Tab 与重启都不丢
+  const CHAT_KEY = 'somnacare_chat_history';
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => {
+    try {
+      const saved = localStorage.getItem(CHAT_KEY);
+      if (saved) {
+        const list = JSON.parse(saved);
+        if (Array.isArray(list) && list.length > 0) return list.slice(-120);
+      }
+    } catch { /* 损坏则回到欢迎语 */ }
+    return [
+      {
+        id: 'welcome',
+        role: 'assistant',
+        content: '您好，我是您的睡眠顾问。今晚有什么睡眠困扰？',
+        timestamp: '刚刚',
+      },
+    ];
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(CHAT_KEY, JSON.stringify(chatMessages.slice(-120)));
+    } catch { /* 配额满时保内存即可 */ }
+  }, [chatMessages]);
   const [inputText, setInputText] = useState('');
   const [isSendingChat, setIsSendingChat] = useState(false);
   const [showAssessment, setShowAssessment] = useState(false);
