@@ -45,13 +45,27 @@ const addChunk = (chunk: string): void => {
   }
 };
 
+const violations: string[] = [];
+
 for (const f of listFiles(SRC, '.tsx')) {
   const src = readFileSync(f, 'utf-8');
-  // className="..." 与 className={'...'}
+  const rel = relative(SRC, f);
+  const lineAt = (idx: number) => src.slice(0, idx).split('\n').length;
+
+  // className="..."
   for (const m of src.matchAll(/className="([^"]+)"/g)) addChunk(m[1]);
+  // className={'...'} / className={cond ? '...' : '...'}：取引号内的字面量
+  for (const m of src.matchAll(/className=\{[^}]*\}/g)) {
+    for (const q of m[0].matchAll(/['"]([^'"]+)['"]/g)) addChunk(q[1]);
+  }
   // className={`...`}：取 ${...} 之外的字符串段
   for (const m of src.matchAll(/className=\{`([^`]+)`\}/g)) {
     addChunk(m[1].replace(/\$\{[^}]*\}/g, ' '));
+  }
+
+  // 拼接类名禁令：${...}/NN 透明度后缀（Tailwind 4 只认完整字面量，动态拼接永不生成）
+  for (const m of src.matchAll(/\$\{[^}]*\}\/\d+/g)) {
+    violations.push(`${rel}:${lineAt(m.index ?? 0)} 动态透明度后缀拼接 "${m[0]}" —— Tailwind 不生成，改用内联 style`);
   }
 }
 // 主题槽位值（拼接类名的源头都要在这里被核对到）；id/name/tag/desc 是标识符非类名
@@ -69,16 +83,33 @@ if (cssFiles.length === 0) {
 const css = cssFiles.map((f) => readFileSync(f, 'utf-8')).join('\n');
 
 // ── 比对 ──
+// 精确边界：此前子串匹配会放过"只带透明度修饰符出现过"的裸类名
+// （CSS 有 .bg-x\/40 时 token "bg-x" 被误判存在）；先去转义再按词边界匹配
+const cssUnescaped = css.replace(/\\/g, '');
 const missing: string[] = [];
 for (const tok of [...tokens].sort()) {
-  if (css.includes(escapeForCss(tok))) continue;
+  // 插值前缀截断（theme-）与三元条件字符串（user/assistant 等非类名）跳过；
+  // 无连字符的裸词不报——Tailwind 工具类绝大多数带连字符，核心目标
+  // （发明色阶/拼接类名）全部带连字符
+  if (!tok.includes('-') || tok.endsWith('-')) continue;
+  // 已知非类名字符串（模型名等出现在代码里的连字串）——扫描器按形态抓取，
+  // 无法语义区分；新增非类名连字串时在此登记
+  if (/^(deepseek-flash|deepseek-pro)$/.test(tok)) continue;
+  const re = new RegExp('\\.' + tok.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![a-zA-Z0-9_-])');
+  if (re.test(cssUnescaped)) continue;
   missing.push(tok);
 }
 
-if (missing.length > 0) {
-  console.error(`✗ verify-class-gen：${missing.length} 个类名在构建产物中不存在（写了也白写）：`);
-  for (const t of missing) console.error('  ' + t);
+if (missing.length > 0 || violations.length > 0) {
+  if (missing.length > 0) {
+    console.error(`✗ verify-class-gen：${missing.length} 个类名在构建产物中不存在（写了也白写）：`);
+    for (const t of missing) console.error('  ' + t);
+  }
+  if (violations.length > 0) {
+    console.error(`✗ verify-class-gen：${violations.length} 处动态拼接类名（Tailwind 永不生成）：`);
+    for (const v of violations) console.error('  ' + v);
+  }
   console.error('  → 改成字面量 / 修正色阶 / 用内联样式；禁止在 className 里对主题槽位做字符串运算');
   process.exit(1);
 }
-console.log(`✓ verify-class-gen：${tokens.size} 个类名 token 全部在产物 CSS 中生效`);
+console.log(`✓ verify-class-gen：${tokens.size} 个类名 token 全部在产物 CSS 中生效，无动态拼接`);

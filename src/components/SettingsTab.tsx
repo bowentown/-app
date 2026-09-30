@@ -33,6 +33,7 @@ import { getActiveModelLabel } from '../utils/localLlmEngine';
 import { toLocalDateString } from '../utils/dateUtils';
 import {
   buildPetSayLines,
+  getCachedLlmSay,
   getBubbleEvery,
   isPetEnabled,
   isPetNative,
@@ -80,8 +81,9 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     void petPermissionGranted().then(setPetGranted);
   }, [petNative]);
 
-  // 大肥鱼的傲娇播报词，随数据实时预览
-  const petSay = buildPetSayLines(records, userProfile);
+  // 大肥鱼的傲娇播报词：优先展示云端刷的语录（与桌宠实际念的一致），
+  // 未刷到时回退本地模板
+  const petSay = getCachedLlmSay(userProfile.aiConfig) ?? buildPetSayLines(records, userProfile);
 
   // 播报频率改动后立即推给桌宠（开着的话）
   const handlePetEveryChange = (next: number) => {
@@ -261,7 +263,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         {/* 播报词预览：点「消息」按钮看到的傲娇发言 */}
         <div className="rounded-2xl bg-slate-900/60 border border-slate-700/60 p-3.5 space-y-1.5">
           <p className="text-[10px] font-bold text-sky-300">🐋 蓝色大肥鱼 · 傲娇播报预览</p>
-          {petSay.slice(0, 3).map((line, i) => (
+          {petSay.slice(0, 3).map((line: string, i: number) => (
             <p key={i} className="text-[11px] text-slate-300 leading-relaxed">{line}</p>
           ))}
         </div>

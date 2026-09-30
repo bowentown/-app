@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
-  Moon,
+  Bell,
   CheckCircle2,
+  Moon,
 } from 'lucide-react';
 import { SleepRecord, UserProfile, DEFAULT_EYE_CARE } from './types/sleep';
 import { getInitialSleepLogs } from './utils/sleepScore';
@@ -15,6 +17,8 @@ import { ActiveSleepModal } from './components/ActiveSleepModal';
 import { ManualLogModal } from './components/ManualLogModal';
 import { APP_THEMES } from './utils/themeStyles';
 import { isNativePlatform, syncAlarmsToNative } from './utils/nativeAlarmScheduler';
+import { CustomAlarmSetting } from './types/sleep';
+import { sleepAudio } from './utils/audioSynth';
 import { applyEyeCare, eyeCareInAppStyles, isInEyeCareWindow } from './utils/eyeCare';
 import { consumePendingTab, syncPet } from './utils/petOverlay';
 import { LaunchSplash } from './components/LaunchSplash';
@@ -26,6 +30,12 @@ export const App: React.FC = () => {
   const [isActiveSleepOpen, setIsActiveSleepOpen] = useState(false);
   const [isManualLogOpen, setIsManualLogOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  // ── 闹钟响铃（App 层）：检测与横幅此前挂在【偏好】分区的 AlarmManager 内，
+  // 切分区横幅消失、应用内唯一停止入口也随之不可达。提升到根组件：
+  // 10s 检测 + 全局横幅，任何分区可见可停；声音 native 走 AlarmRingService
+  // （循环），web 走 Web Audio（5 分钟上限）
+  const [ringingAlarm, setRingingAlarm] = useState<CustomAlarmSetting | null>(null);
+  const lastFiredKeyRef = useRef<string>('');
   const [bedtimeReminder, setBedtimeReminder] = useState<BedtimeReminderPhase | null>(null);
   const [sleepStartSignal, setSleepStartSignal] = useState(0);
   const TAB_ORDER: NavTab[] = ['today', 'trends', 'coach', 'eyecare', 'settings'];
@@ -429,6 +439,57 @@ export const App: React.FC = () => {
     setTimeout(() => setToastMessage(null), 3200);
   };
 
+  // 响铃检测循环（每 10s 对表）
+  useEffect(() => {
+    const checkAlarm = () => {
+      const now = new Date();
+      const currentTimeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      const currentDay = now.getDay() === 0 ? 7 : now.getDay();
+      const alarms = userProfile.alarms || [];
+      for (const alarm of alarms) {
+        const fireKey = `${alarm.id}|${alarm.time}|${currentDay}`;
+        if (
+          alarm.enabled &&
+          alarm.time === currentTimeStr &&
+          (alarm.repeatDays.length === 0 || alarm.repeatDays.includes(currentDay)) &&
+          lastFiredKeyRef.current !== fireKey &&
+          !ringingAlarm
+        ) {
+          lastFiredKeyRef.current = fireKey;
+          setRingingAlarm(alarm);
+          // native：响铃由 AlarmRingService 循环负责（WebView 计时器息屏会被冻结）
+          if (!isNativePlatform()) sleepAudio.playAlarm(alarm.tone);
+          // "仅一次"：无重复日的闹钟响过即停用（原生侧同为单次调度）
+          if (alarm.repeatDays.length === 0) {
+            setUserProfile((prev) => ({
+              ...prev,
+              alarms: (prev.alarms || []).map((a) => (a.id === alarm.id ? { ...a, enabled: false } : a)),
+            }));
+          }
+          // web 档 5 分钟上限（native 由 AlarmRingService 自行 5 分钟收场）
+          if (!isNativePlatform()) {
+            window.setTimeout(() => {
+              sleepAudio.stop();
+              setRingingAlarm((cur) => (cur?.id === alarm.id ? null : cur));
+            }, 5 * 60 * 1000);
+          }
+          break;
+        }
+      }
+    };
+    const interval = window.setInterval(checkAlarm, 10000);
+    return () => window.clearInterval(interval);
+  }, [userProfile.alarms, ringingAlarm]);
+
+  const handleStopRinging = () => {
+    sleepAudio.stop();
+    try {
+      const cap = (window as any).Capacitor;
+      if (cap?.isNativePlatform?.()) void cap.Plugins?.GemmaLLM?.alarmRingStop?.();
+    } catch { /* ignore */ }
+    setRingingAlarm(null);
+  };
+
   const handleSaveActiveSleep = (newRecord: SleepRecord) => {
     setRecords((prev) => {
       const filtered = prev.filter((r) => r.date !== newRecord.date);
@@ -530,6 +591,28 @@ export const App: React.FC = () => {
       )}
 
       {/* Toast Notification */}
+      {/* 闹钟响铃横幅（App 层）：portal 到 body，任何分区/弹窗之上可见可停 */}
+      {ringingAlarm && createPortal(
+        <div className="fixed top-0 left-0 right-0 z-[300] p-4 bg-gradient-to-r from-amber-600 via-indigo-600 to-violet-600 text-white shadow-2xl animate-pulse flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-full bg-white/20 flex items-center justify-center">
+              <Bell className="w-6 h-6 animate-spin text-amber-200" />
+            </div>
+            <div>
+              <div className="text-xs font-bold text-amber-100">闹钟响铃中 · 晨安唤醒</div>
+              <h4 className="text-xl font-black">{ringingAlarm.time} {ringingAlarm.label}</h4>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleStopRinging}
+            className="px-5 py-2.5 bg-white text-slate-900 font-black text-sm rounded-xl shadow-lg active:scale-95 transition-all cursor-pointer"
+          >
+            停止响铃
+          </button>
+        </div>,
+        document.body,
+      )}
       {toastMessage && (
         <div className={`fixed top-5 left-1/2 -translate-x-1/2 z-[90] px-5 py-3 rounded-2xl ${currentTheme.accentBg.split(' ')[0]} ${currentTheme.accentFg} text-xs font-black shadow-2xl flex items-center gap-2.5 animate-bounce border border-white/10`}>
           <CheckCircle2 className="w-5 h-5 text-white/90" />

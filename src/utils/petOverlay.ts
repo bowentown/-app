@@ -9,6 +9,7 @@
  */
 import type { SleepRecord, UserProfile } from '../types/sleep';
 import { generatePetSayLinesLlm, getCachedLlmSay } from './petMoments';
+export { getCachedLlmSay };
 
 function gemma(): any | null {
   try {
@@ -185,7 +186,7 @@ export async function syncPet(
 ): Promise<void> {
   const g = gemma();
   if (!g || !isPetEnabled()) return;
-  const cached = getCachedLlmSay();
+  const cached = getCachedLlmSay(profile?.aiConfig);
   const localLines = buildPetSayLines(records, profile);
   const say = cached
     ? [...cached, ...localLines.slice(0, 3)].join('\n')

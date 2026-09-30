@@ -70,6 +70,28 @@ for (const f of listFiles(SRC)) {
     }
   }
 
+  // 规则 1b：开关式 <input type=checkbox/radio> 必须有 aria-label
+  // （此前 4 个 checkbox 里 1 个漏网——标签在兄弟 span 里，读屏念不出开关名）
+  for (let i = src.indexOf('<input'); i !== -1; i = src.indexOf('<input', i + 1)) {
+    const openEnd = tagEnd(src, i);
+    if (openEnd === -1) continue;
+    const tag2 = src.slice(i, openEnd);
+    if (!/type="(checkbox|radio)"/.test(tag2)) continue;
+    if (/aria-label|aria-labelledby/.test(tag2)) continue;
+    problems.push(`${rel}:${lineAt(i)} 开关式 <input> 缺 aria-label`);
+  }
+
+  // 规则 1c：onClick 的 <g>（可点击 SVG）必须有 role/tabIndex——
+  // 规则 2 只扫 div/span，SVG 天然漏检
+  for (let i = src.indexOf('<g '); i !== -1; i = src.indexOf('<g ', i + 1)) {
+    const openEnd = tagEnd(src, i);
+    if (openEnd === -1) continue;
+    const tag2 = src.slice(i, openEnd);
+    if (!/onClick/.test(tag2)) continue;
+    if (/role=|tabIndex|aria-hidden/.test(tag2)) continue;
+    problems.push(`${rel}:${lineAt(i)} 可点击 <g> 未声明 role/tabIndex`);
+  }
+
   // 规则 2：onClick 的 div/span
   for (const tag of ['<div', '<span']) {
     for (let i = src.indexOf(tag); i !== -1; i = src.indexOf(tag, i + 1)) {

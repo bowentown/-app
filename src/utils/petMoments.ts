@@ -116,10 +116,6 @@ export function buildSleepFacts(
   return facts;
 }
 
-function hasDeepseek(cfg: any): boolean {
-  return !!cfg && cfg.provider === 'deepseek' && !!cfg.deepseekApiKey;
-}
-
 async function callLlm(cfg: any, system: string, user: string): Promise<string | null> {
   try {
     const model = llmModel(cfg);
@@ -432,8 +428,9 @@ function numbersCheck(text: string, comments: MomentComment[], facts: string[]):
 const SAY_CACHE_KEY = 'somnacare_pet_say_llm';
 const SAY_CACHE_TTL_MS = 20 * 60 * 60 * 1000;   // 20 小时：一天一刷
 
-export function getCachedLlmSay(): string[] | null {
+export function getCachedLlmSay(cfg?: any): string[] | null {
   try {
+    if (cfg && !hasLlm(cfg)) return null;   // 撤掉 Key 后不再吃 20h 云端缓存
     const raw = localStorage.getItem(SAY_CACHE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as { at: number; lines: string[] };
@@ -497,7 +494,7 @@ export function likeMoment(id: string): Moment[] {
   m.liked = !m.liked;
   if (m.liked && !m.replies.some((r) => r.kind === 'like')) {
     m.replies.push({ friend: '蓝色大肥鱼', text: localLikeReply(), kind: 'like' });
-    m.replies = m.replies.slice(-20);   // 与 MAX_MOMENTS 同思路：回复也设上限
+    m.replies = m.replies.slice(-40);   // 回复上限（与评论路径一致）
   }
   saveMoments(list);
   return list;
