@@ -37,6 +37,16 @@ export function getBubbleEvery(): number {
   }
 }
 
+const PET_SKIN_KEY = 'somnacare_pet_skin';
+
+export function getPetSkin(): string {
+  try { return localStorage.getItem(PET_SKIN_KEY) || 'default'; } catch { return 'default'; }
+}
+
+export function setPetSkin(skin: string): void {
+  try { localStorage.setItem(PET_SKIN_KEY, skin); } catch { /* ignore */ }
+}
+
 export function setBubbleEvery(n: number): void {
   try {
     localStorage.setItem(BUBBLE_EVERY_KEY, String(Math.round(n)));
@@ -159,7 +169,7 @@ export async function startPet(
 ): Promise<{ ok: boolean; needPermission?: boolean }> {
   const g = gemma();
   if (!g) return { ok: false };
-  const payload = { say: buildPetSayLines(records, profile).join('\n'), bubbleEvery: getBubbleEvery() };
+  const payload = { say: buildPetSayLines(records, profile).join('\n'), bubbleEvery: getBubbleEvery(), skin: getPetSkin() };
   try {
     if (isPetEnabled()) await g.petSync(payload);
     else await g.petStart(payload);
@@ -192,7 +202,7 @@ export async function syncPet(
     ? [...cached, ...localLines.slice(0, 3)].join('\n')
     : localLines.join('\n');
   try {
-    await g.petSync({ say, bubbleEvery: getBubbleEvery() });
+    await g.petSync({ say, bubbleEvery: getBubbleEvery(), skin: getPetSkin() });
   } catch { /* 桌宠没开或服务已停，忽略 */ }
 
   let sayInFlight = false;   // 模块级在途标志（防并发重复调用）
@@ -206,6 +216,7 @@ export async function syncPet(
           void g.petSync({
             say: [...lines, ...localLines.slice(0, 3)].join('\n'),
             bubbleEvery: getBubbleEvery(),
+            skin: getPetSkin(),
           });
         } catch { /* ignore */ }
       })

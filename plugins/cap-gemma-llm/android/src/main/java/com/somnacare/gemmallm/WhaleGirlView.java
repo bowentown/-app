@@ -25,7 +25,8 @@ import java.util.Random;
  * 抱枕头/吃东西/玩耍/散步/工作…），每段几秒后回到 idle，避免"只会眨眼"。
  */
 public class WhaleGirlView extends View {
-    private static final String DIR = "pet/";
+    private static final String DIR_DEFAULT = "pet/";
+    private static final String DIR_SPORT = "pet-sport/";
     private static final long TICK_MS = 33; // ~30fps 重绘节拍
     private static final long BLINK_CYCLE_MS = 3400;
     // 小动作节奏：待机歇 25-60s 才来一段，一段播 6-12s——切换太频繁会显得怪异不流畅
@@ -106,7 +107,8 @@ public class WhaleGirlView extends View {
                         pick(cheers[rng.nextInt(cheers.length)]);
                         cheerUntil = now + 1800;
                     }
-                    ambientUntil = now + 1800;
+                    // 庆祝完后较短间隔接小动作（用户刚互动过，不要太冷清）
+                    ambientUntil = now + 8000 + rng.nextInt(8000);
                 } else {
                     // 待机歇够了 → 随机来一段小动作
                     Anim next = ambient[rng.nextInt(ambient.length)];
@@ -120,27 +122,30 @@ public class WhaleGirlView extends View {
         }
     };
 
-    public WhaleGirlView(Context c) {
-        super(c);
-        idle      = load(c, "idle", 3, 2, "blink", null);
-        joy       = load(c, "joy", 2, 5, "loop", null);
-        celebrate = load(c, "celebrate", 3, 4, "loop", null);
-        sleep     = load(c, "sleep", 2, 1, "loop", null);
-        drag      = load(c, "drag", 1, 5, "loop", "tilt");
-        welcome   = load(c, "welcome", 2, 3, "loop", null);
+    private final String dir;
 
-        headtilt  = load(c, "headtilt", 2, 2, "loop", null);
-        wait      = load(c, "wait", 1, 2, "loop", "wiggle");
-        think     = load(c, "think", 1, 2, "loop", "float");
-        reading   = load(c, "reading", 2, 2, "loop", null);
-        tea       = load(c, "tea", 3, 2, "loop", null);
-        pillow    = load(c, "pillow", 2, 1, "loop", null);
-        eat       = load(c, "eat", 3, 8, "loop", null);
-        play      = load(c, "play", 3, 4, "loop", null);
-        walk      = load(c, "walk", 3, 6, "pingpong", null);
-        party     = load(c, "party", 3, 4, "loop", null);
-        working   = load(c, "working", 3, 3, "loop", null);
-        nap       = load(c, "nap", 2, 1, "loop", null);
+    public WhaleGirlView(Context c, String skin) {
+        super(c);
+        this.dir = "sport".equals(skin) ? DIR_SPORT : DIR_DEFAULT;
+        idle      = load("idle", 3, 2, "blink", null);
+        joy       = load("joy", 2, 5, "loop", null);
+        celebrate = load("celebrate", 3, 4, "loop", null);
+        sleep     = load("sleep", 2, 1, "loop", null);
+        drag      = load("drag", 1, 5, "loop", "tilt");
+        welcome   = load("welcome", 2, 3, "loop", null);
+
+        headtilt  = load("headtilt", 2, 2, "loop", null);
+        wait      = load("wait", 1, 2, "loop", "wiggle");
+        think     = load("think", 1, 2, "loop", "float");
+        reading   = load("reading", 2, 2, "loop", null);
+        tea       = load("tea", 3, 2, "loop", null);
+        pillow    = load("pillow", 2, 1, "loop", null);
+        eat       = load("eat", 3, 8, "loop", null);
+        play      = load("play", 3, 4, "loop", null);
+        walk      = load("walk", 3, 6, "pingpong", null);
+        party     = load("party", 3, 4, "loop", null);
+        working   = load("working", 3, 3, "loop", null);
+        nap       = load("nap", 2, 1, "loop", null);
 
         ambient = buildPool(headtilt, wait, think, reading, tea, pillow, eat, play, walk, working, nap);
         cheers = buildPool(celebrate, party, joy);
@@ -159,8 +164,8 @@ public class WhaleGirlView extends View {
         return out;
     }
 
-    private static Anim load(Context c, String name, int frames, int fps, String playback, String motion) {
-        try (java.io.InputStream in = c.getAssets().open(DIR + name + ".png")) {
+    private Anim load(String name, int frames, int fps, String playback, String motion) {
+        try (java.io.InputStream in = getContext().getAssets().open(dir + name + ".png")) {
             Bitmap b = BitmapFactory.decodeStream(in);
             if (b == null) return null;
             return new Anim(b, frames, fps, playback, motion);

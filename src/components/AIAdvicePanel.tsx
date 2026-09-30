@@ -204,7 +204,7 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
       const cfg = userProfile.aiConfig;
       const customPersona =
         cfg?.systemPersona ||
-        '你是一位资深临床睡眠医学顾问。结合用户的睡眠打分与周期推演数据（模型估算值，非传感器实测），以关怀、科学、富有实操性的语气为用户答疑解惑，并如实说明估算边界。';
+        '你是一位资深临床睡眠医学顾问。结合用户的睡眠打分与周期推演数据（模型估算值，非传感器实测），以关怀、科学、富有实操性的语气为用户答疑解惑，并如实说明估算边界。回答务必简洁（150 字以内），不使用 markdown 格式符号（如 ** 或 *），直接用纯文本输出。';
 
       // 0. 危机/用药安全护栏：对所有档位（含云端 DeepSeek）统一短路——
       // 此前只挂在端侧档内，默认的云端档请求成功时热线保证不生效，
@@ -343,6 +343,7 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
           ? (cfg.customModelName || 'deepseek-chat')
           : (cfg.deepseekModel || 'deepseek-flash');
         setActiveProviderName(isCustom ? `自建 API (${modelToUse})` : `DeepSeek (${modelToUse})`);
+        // 简洁指令已由 customPersona 承载——此处不动 system 以保持前缀缓存稳定
 
         // 直连也走超时熔断：此前裸 fetch 挂起时 isSendingChat 永远为 true 且无停止入口
         const dsRes = await fetchWithTimeout(endpoint, {
@@ -365,7 +366,7 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
               ...(personalCtx ? [{ role: 'user' as const, content: `${personalCtx}\n\n（以上是我的真实睡眠数据，请结合它们回答我的问题）` }] : []),
             ],
             temperature: 0.7,
-            max_tokens: 400,
+            max_tokens: 600,
           }),
         });
 
@@ -379,7 +380,9 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
             console.log('[llm usage]', { hit, miss, hitRate: hit + miss > 0 ? (hit / (hit + miss)).toFixed(2) : 'n/a' });
           }
           // 空内容不再伪装成模型回答：落空则继续走本地兜底（那条路径是诚实的）
-          const replyText = dsData.choices?.[0]?.message?.content;
+          const rawContent = dsData.choices?.[0]?.message?.content;
+          // 去除 markdown 粗体/斜体星号（**bold** → bold），影响阅读
+          const replyText = rawContent?.replace(/\*\*/g, '').replace(/(?<![a-zA-Z])\*(?![a-zA-Z\s])/g, '');
           const aiReply: ChatMessage = {
             id: `ai-${Date.now()}`,
             role: 'assistant',

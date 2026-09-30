@@ -35,11 +35,13 @@ import {
   buildPetSayLines,
   getCachedLlmSay,
   getBubbleEvery,
+  getPetSkin,
   isPetEnabled,
   isPetNative,
   petOpenPermissionSettings,
   petPermissionGranted,
   setBubbleEvery,
+  setPetSkin,
   startPet,
   syncPet,
   stopPet,
@@ -75,6 +77,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   const [petGranted, setPetGranted] = useState(true);
   const [petBusy, setPetBusy] = useState(false);
   const [petEvery, setPetEvery] = useState(() => getBubbleEvery());
+  const [petSkin, setPetSkinState] = useState(() => getPetSkin());
 
   useEffect(() => {
     if (!petNative) return;
@@ -84,6 +87,13 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   // 大肥鱼的傲娇播报词：优先展示云端刷的语录（与桌宠实际念的一致），
   // 未刷到时回退本地模板
   const petSay = getCachedLlmSay(userProfile.aiConfig) ?? buildPetSayLines(records, userProfile);
+
+  // 换装（运动版 = pet-sport 资产目录）
+  const handlePetSkinChange = (skin: string) => {
+    setPetSkinState(skin);
+    setPetSkin(skin);
+    if (petOn) void syncPet(records, userProfile);
+  };
 
   // 播报频率改动后立即推给桌宠（开着的话）
   const handlePetEveryChange = (next: number) => {
@@ -266,6 +276,30 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           {petSay.slice(0, 3).map((line: string, i: number) => (
             <p key={i} className="text-[11px] text-slate-300 leading-relaxed">{line}</p>
           ))}
+        </div>
+
+        {/* 换装 */}
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-[11px] font-bold text-white">大肥鱼服装</p>
+            <p className="text-[10px] text-slate-500">运动装 = pet-sport 资产（来自 whale-girl-plus 的 whale-girl-sport）</p>
+          </div>
+          <div className="flex gap-1.5 shrink-0">
+            {['default', 'sport'].map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => handlePetSkinChange(s)}
+                className={`px-2.5 py-1 rounded-full text-[10px] font-bold border transition-all cursor-pointer active:scale-95 ${
+                  petSkin === s
+                    ? 'bg-sky-500/20 border-sky-400 text-sky-300'
+                    : 'bg-slate-800 border-slate-600 text-slate-400'
+                }`}
+              >
+                {s === 'default' ? '常服' : '运动'}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* 播报频率：每 N 次点击大肥鱼，她自动傲娇播报一次 */}

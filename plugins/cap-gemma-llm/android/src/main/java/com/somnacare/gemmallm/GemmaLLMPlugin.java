@@ -352,6 +352,7 @@ public class GemmaLLMPlugin extends Plugin {
         getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
                 .putString(PetOverlayService.K_PET_SAY, safe(call, "say", ""))
                 .putInt(PetOverlayService.K_BUBBLE_EVERY, every)
+                .putString("pet_skin", call.getString("skin", "default"))
                 .apply();
     }
 

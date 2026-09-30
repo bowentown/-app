@@ -184,7 +184,7 @@ public class PetOverlayService extends Service {
             android.content.SharedPreferences sp = getSharedPreferences(PREFS, Context.MODE_PRIVATE);
 
             petRoot = new FrameLayout(this);
-            whale = new WhaleGirlView(this);
+            whale = new WhaleGirlView(this, sp.getString("pet_skin", "default"));
             petRoot.addView(whale, new FrameLayout.LayoutParams(
                     FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
 
@@ -263,10 +263,6 @@ public class PetOverlayService extends Service {
                     if (whale != null) whale.setDragging(false);
                     dockToEdge();
                 } else if (whale != null) {
-                    if (minimized) {
-                        restore();      // 最小化态：点她恢复原尺寸
-                        return true;
-                    }
                     whale.cheer();
                     if (bubbleShown) {
                         hideBubble();   // 播报期间再点：先收气泡
@@ -315,7 +311,8 @@ public class PetOverlayService extends Service {
 
     private void showFan() {
         if (fanShown) return;
-        hideBubble();
+        // 不再 hideBubble：气泡在角色上方、按钮在侧面，位置不重叠，
+        // 强制收气泡会中断角色的说话姿态——两个窗口完全独立
         try {
             // 弧形镜像：角色中心在屏幕左半 → 扇面开在右侧（与 placeBeside 同判据）。
             // 必须在 buildFan 之前赋值——近/远侧偏移由它决定
@@ -424,11 +421,13 @@ public class PetOverlayService extends Service {
         p2.topMargin = btn + dp(10);
         wrap.addView(eyeBtn, p2);
 
-        View b3 = fanButton(R.drawable.pet_ic_minimize, "最小化", new View.OnClickListener() {
-            @Override public void onClick(View v) {
-                minimize();
-            }
-        });
+        View b3 = minimized
+            ? fanButton(R.drawable.pet_ic_restore, "还原大小", new View.OnClickListener() {
+                @Override public void onClick(View v) { restore(); }
+              })
+            : fanButton(R.drawable.pet_ic_minimize, "最小化", new View.OnClickListener() {
+                @Override public void onClick(View v) { minimize(); }
+              });
         FrameLayout.LayoutParams p3 = new FrameLayout.LayoutParams(btn, btn, Gravity.TOP | Gravity.START);
         p3.leftMargin = nearX;
         p3.topMargin = (btn + dp(10)) * 2;
