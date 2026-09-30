@@ -493,11 +493,11 @@ public class GemmaLLMPlugin extends Plugin {
                                 a.optString("label", ""), a.optString("time", ""), cal.getTimeInMillis());
                     }
                 }
+                } catch (Exception alarmErr) {
+                    android.util.Log.w("GemmaLLM", "跳过一条无法解析的闹钟", alarmErr);
+                }
             }
             sp.edit().putString("alarm_ring_codes", codes.toString()).apply();
-            } catch (Exception alarmErr) {
-                android.util.Log.w("GemmaLLM", "跳过一条无法解析的闹钟", alarmErr);
-            }
         } catch (Exception ignored) {
         }
     }
