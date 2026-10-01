@@ -76,6 +76,10 @@ public class PetOverlayService extends Service {
     private FrameLayout bubbleRoot;
     private WindowManager.LayoutParams bubbleLp;
     private boolean bubbleShown;
+    // 气泡序号：每次弹气泡自增。600ms 延迟反馈（护眼开关）据此让位给
+    // 排队期间用户主动要的气泡——单槽资源没有优先级，后到会无条件顶掉先到
+    private int bubbleSerial;
+    private int eyeSerialAtClick;
     private int tapCount;
     private int sayIdx;
     private final Runnable bubbleHide = new Runnable() {
@@ -85,6 +89,8 @@ public class PetOverlayService extends Service {
     private final Runnable eyeFeedback = new Runnable() {
         @Override public void run() {
             updateEyeButton();
+            // 排队期间用户主动看过别的播报 → 不再顶掉
+            if (bubbleSerial != eyeSerialAtClick) return;
             showBubble(EyeCareService.isActive()
                     ? "护眼滤镜给你开了哦～别再瞪着屏幕啦，鱼片。"
                     : "滤镜关掉了……哼，记得谢本鱼。", FEEDBACK_MS);
@@ -290,10 +296,13 @@ public class PetOverlayService extends Service {
                         tapCount++;
                         int every = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                                 .getInt(K_BUBBLE_EVERY, 8);
-                        if (every > 0 && tapCount % every == 0) {
-                            showBubble(nextSayLine(), BUBBLE_MS);
-                        } else if (fanShown) {
+                        // 「关」优先于「弹」：扇面开着时用户点角色是想收起它——
+                        // 若让"每 N 次弹气泡"插队，会出现"冒出一句话、菜单还开着"，
+                        // 要再点一下才能真正关上
+                        if (fanShown) {
                             hideFan();
+                        } else if (every > 0 && tapCount % every == 0) {
+                            showBubble(nextSayLine(), BUBBLE_MS);
                         } else {
                             showFan();
                         }
@@ -437,6 +446,9 @@ public class PetOverlayService extends Service {
             @Override public void onClick(View v) {
                 toggleEyeCare();
                 if (whale != null) whale.cheer();
+                // 记下点击时刻的气泡序号：600ms 排队期间用户若主动弹了气泡
+                // （如点了「看播报」），延迟反馈就让位，不覆盖用户要看的内容
+                eyeSerialAtClick = bubbleSerial;
                 // 服务异步生效，稍等一下再刷新状态点与气泡反馈
                 main.postDelayed(eyeFeedback, 600);
             }
@@ -567,13 +579,17 @@ public class PetOverlayService extends Service {
     // ================= 大肥鱼播报气泡 =================
 
     private void showBubble(String msg, long durationMs) {
+        // 停留时长随字数自适应：固定 7s 时最长的语录（60 字）看不完就消失；
+        // 中文舒适阅读约 60ms/字，60 字 ≈ 10.6s
+        final long dur = durationMs + msg.length() * 60L;
         try {
+            bubbleSerial++;
             if (bubbleShown && bubbleRoot != null) {
                 // 已经在播：只换词、重新计时，不闪窗
                 TextView body = bubbleRoot.findViewWithTag("pet_body");
                 if (body != null) body.setText(msg);
                 main.removeCallbacks(bubbleHide);
-                main.postDelayed(bubbleHide, durationMs);
+                main.postDelayed(bubbleHide, dur);
                 return;
             }
             DisplayInfo di = displayInfo();
@@ -597,7 +613,9 @@ public class PetOverlayService extends Service {
             int bw = dp(204);
             v.measure(View.MeasureSpec.makeMeasureSpec(bw, View.MeasureSpec.AT_MOST),
                     View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
-            bw = Math.max(v.getMeasuredWidth(), dp(140));
+            // 定位必须用真实宽度：抬到 140dp 会让短文案的气泡相对角色横向偏移、
+            // 尾巴尖对不上她（窗口是 WRAP_CONTENT，测量失败才兜底）
+            bw = v.getMeasuredWidth() > 0 ? v.getMeasuredWidth() : dp(140);
             int bh = v.getMeasuredHeight();
             int m = dp(4);
             int cx = petParams.x + petParams.width / 2;
@@ -633,7 +651,7 @@ public class PetOverlayService extends Service {
             v.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(230)
                     .setInterpolator(new android.view.animation.OvershootInterpolator(1.7f))
                     .start();
-            main.postDelayed(bubbleHide, durationMs);
+            main.postDelayed(bubbleHide, dur);
         } catch (Exception e) {
             // addView 之后的失败：移除已上屏窗口，并回滚角色的说话姿态
             if (bubbleRoot != null) {
@@ -693,6 +711,11 @@ public class PetOverlayService extends Service {
         TextView body = text(msg, 12f, 0xFFF2F7FD, false);
         body.setTag("pet_body");
         body.setLineSpacing(dp(2.5f), 1f);
+        // 超长文案封顶：204dp 约 14 字/行 × 5 行，超出省略——防 token 侧
+        // 意外长文案撑爆 WRAP_CONTENT 窗口、把尾巴挤出屏外
+        body.setMaxWidth(dp(204));
+        body.setMaxLines(5);
+        body.setEllipsize(android.text.TextUtils.TruncateAt.END);
         LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(-2, -2);
         blp.topMargin = dp(4);
         bubble.addView(body, blp);
