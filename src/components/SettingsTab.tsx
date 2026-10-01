@@ -125,15 +125,44 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     }
   };
 
-  const handleExportJSON = () => {
-    // Blob + objectURL：data: URL 在 2000 条记录（约 10MB）时会被 Android
-    // WebView 截断或不触发下载，而备份的静默失败是最糟的失败方式
+  const handleExportJSON = async () => {
+    const data = JSON.stringify(records, null, 2);
+    const name = `somnacare-sleep-backup-${toLocalDateString()}.json`;
+    // APK 内 <a download> 静默无效（Capacitor WebView 不支持 blob 下载，上游
+    // issue 5478/7292）：此前函数"成功"返回但磁盘上没有文件，用户以为已备份，
+    // 点了重置后记录就真丢了。原生改走 Filesystem 落盘 + 系统分享面板，
+    // 并且必须给成功/失败反馈
     try {
-      const blob = new Blob([JSON.stringify(records, null, 2)], { type: 'application/json' });
+      const cap = (window as any).Capacitor;
+      if (cap?.isNativePlatform?.()) {
+        const pl = cap.Plugins;
+        const res = await pl?.Filesystem?.writeFile({
+          path: name,
+          data,
+          directory: 'DOCUMENTS',
+          encoding: 'UTF8',
+          recursive: true,
+        });
+        if (!res?.uri) throw new Error('writeFile 未返回文件地址');
+        alert(`备份已生成：${name}\n即将打开分享面板，请选择"保存到文件"或网盘完成导出。`);
+        try {
+          await pl?.Share?.share({ title: '睡眠数据备份', url: res.uri, dialogTitle: '分享睡眠备份' });
+        } catch { /* 用户取消分享不算失败，文件已生成 */ }
+        return;
+      }
+    } catch (e) {
+      console.warn('[export] 原生备份失败', e);
+      alert('备份导出失败，请重试');
+      return;
+    }
+    // Web/PWA：Blob + objectURL。data: URL 在 2000 条记录（约 10MB）时会被
+    // Android WebView 截断或不触发下载，而备份的静默失败是最糟的失败方式
+    try {
+      const blob = new Blob([data], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const downloadAnchor = document.createElement('a');
       downloadAnchor.setAttribute('href', url);
-      downloadAnchor.setAttribute('download', `somnacare-sleep-backup-${toLocalDateString()}.json`);
+      downloadAnchor.setAttribute('download', name);
       document.body.appendChild(downloadAnchor);
       downloadAnchor.click();
       downloadAnchor.remove();
