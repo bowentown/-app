@@ -57,8 +57,8 @@ public class PetOverlayService extends Service {
 
     private static final int COLLAPSED_W_DP = 104;
     private static final int COLLAPSED_H_DP = 122;
-    private static final int MINI_DP = 40;   // 最小化态：缩成一颗小鲸鱼，点她恢复
-    private static final int FAN_BTN_DP = 46;
+    private static final int MINI_DP = 44;   // 最小化态：缩成一颗小鲸鱼，点她恢复（44dp 保底可点中）
+    private static final int FAN_BTN_DP = 48;   // Android 最小触摸目标 48dp
     private static final int FAN_GAP_DP = 12;
     private static final long BUBBLE_MS = 7000;
     private static final long FEEDBACK_MS = 3200;
@@ -312,6 +312,7 @@ public class PetOverlayService extends Service {
                 pg.setColor(0x2E7FD8FF);
                 pill.setBackground(pg);
                 pill.setPadding(dp(11), dp(7), dp(11), dp(7));
+                pill.setMinimumHeight(dp(44));   // 与扇面钮同标准：最小触摸目标
                 final String tab = z[1];
                 pill.setOnClickListener(v -> {
                     // 卡片刚弹出的 250ms 内不响应：长按原地松手时手指可能蹭到
@@ -446,10 +447,15 @@ public class PetOverlayService extends Service {
                     dockToEdge();
                 } else if (whale != null) {
                     petRoot.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY);
-                    whale.cheer();
-                    if (bubbleShown) {
+                    // 顺序不能反：hideBubble() 会 setTalking(false) → pick(idle)，
+                    // 若先庆祝，刚起的庆祝会被这一下顶掉（删掉 pendingCheer 后
+                    // 不再补，表现为"点了只有震动、没有动作"）
+                    final boolean wasBubble = bubbleShown;
+                    if (wasBubble) {
                         hideBubble();   // 播报期间再点：先收气泡
-                    } else {
+                    }
+                    whale.cheer();
+                    if (!wasBubble) {
                         tapCount++;
                         int every = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                                 .getInt(K_BUBBLE_EVERY, 8);
@@ -459,6 +465,7 @@ public class PetOverlayService extends Service {
                         if (fanShown) {
                             hideFan();
                         } else if (every > 0 && tapCount % every == 0) {
+                            // 播报气泡本身就是这次点击的回应（talking 动画接管庆祝）
                             showBubble(nextSayLine(), BUBBLE_MS);
                         } else {
                             showFan();
@@ -586,7 +593,7 @@ public class PetOverlayService extends Service {
     private FrameLayout buildFan() {
         FrameLayout wrap = new FrameLayout(this);
         int offSide = dp(14);        // 上下钮向外偏移
-        int btn = dp(44);
+        int btn = dp(FAN_BTN_DP);    // 尺寸收口在常量：48dp = Android 最小触摸目标
         int wrapW = btn + offSide;
         int wrapH = btn * 3 + dp(10) * 2;
         wrap.setPadding(0, 0, 0, 0);

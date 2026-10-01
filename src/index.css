@@ -10,19 +10,10 @@
   --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px; --sp-6: 24px;
   --r-md: 12px; --r-lg: 16px; --r-xl: 24px;
   --dur-fast: 150ms; --dur-base: 300ms; --dur-slow: 800ms;
-  /* 显示字体：仅用于时间与大数字（拉丁几何字体子集，CJK 回落系统字体） */
-  --font-display: 'Space Grotesk', ui-rounded, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
 
 html {
   background: #070a12; /* 冷启动与 WebView 首帧同色，消灭白屏闪现 */
-}
-
-/* 显示字体工具类：数字自动等宽 */
-.font-display {
-  font-family: var(--font-display);
-  font-feature-settings: 'tnum';
-  letter-spacing: -0.01em;
 }
 
 /* OLED 纯黑主题：阴影在纯黑上发灰，改由描边分层 */
@@ -70,42 +61,6 @@ html {
 }
 .animate-tab-fade-in {
   animation: tab-fade-in 180ms ease-out;
-}
-
-/* 极光渐变描边：品牌元素，缓慢流转、低透明度、夜间友好 */
-@property --aurora-angle {
-  syntax: '<angle>';
-  initial-value: 0deg;
-  inherits: false;
-}
-.aurora-ring {
-  position: relative;
-}
-.aurora-ring::before {
-  content: '';
-  position: absolute;
-  inset: -1px;
-  border-radius: inherit;
-  padding: 1px;
-  background: conic-gradient(
-    from var(--aurora-angle),
-    transparent 0deg,
-    var(--aurora, #818cf8) 35deg,
-    transparent 80deg,
-    transparent 180deg,
-    var(--aurora, #818cf8) 225deg,
-    transparent 270deg
-  );
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  mask-composite: exclude;
-  animation: aurora-rotate 12s linear infinite;
-  opacity: 0.55;
-  pointer-events: none;
-}
-@keyframes aurora-rotate {
-  to { --aurora-angle: 360deg; }
 }
 
 /* 品牌开屏三段式：水滴下落 / 涟漪扩散 / 月亮描边填充 / 极光浮现 / 文字上浮 */
@@ -158,10 +113,8 @@ html {
   .animate-moon-breathe,
   .animate-star-twinkle,
   .animate-tab-fade-in,
-  .animate-tab-from-right,
-  .animate-tab-from-left,
   .animate-cta-breathe,
-  .aurora-ring::before {
+  .animate-cta-breathe::after {
     animation: none;
   }
   /* 兜底：未逐一列举的 Tailwind 内置动画与 transition 一并静止
@@ -185,26 +138,26 @@ html {
     inset 0 1px 0 0 rgb(255 255 255 / 0.06);
 }
 
-/* ===== 主 CTA 呼吸光晕（currentColor 跟随主题文字强调色） ===== */
+/* ===== 主 CTA 呼吸光晕（currentColor 跟随主题文字强调色） =====
+   box-shadow 不是合成器属性，逐帧动画会每帧重绘整块按钮；
+   阴影保持静态，呼吸交给 ::after 的 transform/opacity（走 GPU） */
 @keyframes cta-breathe {
-  0%, 100% { box-shadow: 0 0 0 0 rgb(255 255 255 / 0), 0 10px 28px -10px currentColor; }
-  50% { box-shadow: 0 0 0 5px rgb(255 255 255 / 0.05), 0 10px 36px -6px currentColor; }
+  0%, 100% { transform: scale(1); opacity: 0; }
+  50% { transform: scale(1.045); opacity: 0.5; }
 }
 .animate-cta-breathe {
+  position: relative;
+  box-shadow: 0 10px 28px -10px currentColor;
+}
+.animate-cta-breathe::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: inherit;
+  box-shadow: 0 0 0 5px rgb(255 255 255 / 0.05), 0 10px 36px -6px currentColor;
+  pointer-events: none;
   animation: cta-breathe 3.4s ease-in-out infinite;
 }
-
-/* ===== 左右滑动切换分区的方向感过渡 ===== */
-@keyframes tab-slide-from-right {
-  from { opacity: 0; transform: translateX(32px); }
-  to { opacity: 1; transform: none; }
-}
-@keyframes tab-slide-from-left {
-  from { opacity: 0; transform: translateX(-32px); }
-  to { opacity: 1; transform: none; }
-}
-.animate-tab-from-right { animation: tab-slide-from-right 220ms ease-out; }
-.animate-tab-from-left { animation: tab-slide-from-left 220ms ease-out; }
 
 /* ===== 分区滑动轨道 =====
    轨道上刻意不设 touch-action。设 pan-y 会沿祖先链禁掉子元素的横向滚动
