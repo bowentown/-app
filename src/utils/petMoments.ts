@@ -14,7 +14,7 @@ export interface MomentComment {
   kind?: 'like';
 }
 
-export type MomentCard = 'data' | 'selfie' | 'week';
+export type MomentCard = 'data' | 'selfie' | 'week' | 'postcard';
 
 export interface Moment {
   id: string;
@@ -22,11 +22,12 @@ export interface Moment {
   ts: number;
   text: string;          // 大肥鱼的正文
   facts: string[];       // 生成时喂给 LLM 的事实清单（展示用，也是"每句都有出处"的证明）
-  cards: MomentCard[];   // 配图卡：数据大字报 / 表情包自拍 / 本周战报（CSS 渲染，零图片依赖）
+  cards: MomentCard[];   // 配图卡：数据大字报 / 表情包自拍 / 本周战报 / 漫游明信片
   likes: string[];       // 点赞的 AI 好友
   comments: MomentComment[]; // AI 好友评论
   liked: boolean;
   replies: MomentComment[];  // 大肥鱼对用户评论/点赞的回复
+  postcardId?: string;       // 关联的旅行明信片 ID
 }
 
 const KEY = 'somnacare_pet_moments';
@@ -59,12 +60,13 @@ export function loadMoments(): Moment[] {
         facts: Array.isArray(m.facts) ? (m.facts as unknown[]).filter((x): x is string => typeof x === 'string') : [],
         cards: Array.isArray(m.cards)
           ? ([...new Set((m.cards as unknown[]).filter((c: any): c is MomentCard =>
-              c === 'data' || c === 'selfie' || c === 'week'))].slice(0, 3) as MomentCard[])
+              c === 'data' || c === 'selfie' || c === 'week' || c === 'postcard'))].slice(0, 3) as MomentCard[])
           : ['data'],
         likes: Array.isArray(m.likes) ? m.likes.filter((x: unknown): x is string => typeof x === 'string') : [],
         comments: sanitizeComments(m.comments),
         replies: sanitizeComments(m.replies),
         liked: m.liked === true,
+        postcardId: typeof m.postcardId === 'string' ? m.postcardId : undefined,
       }));
   } catch {
     return [];
@@ -633,3 +635,59 @@ ${m.facts.map((f) => '- ' + f).join('\n')}
   saveMoments(fresh);
   return fresh;
 }
+
+/**
+ * 漫游明信片发圈：大肥鱼旅行归来后，将拍立得明信片与旅行日记发布至朋友圈
+ */
+export function createPostcardMoment(postcard: {
+  id: string;
+  title: string;
+  country: string;
+  text: string;
+  souvenir: { name: string; emoji: string };
+  friendComments?: { friend: string; text: string }[];
+}): Moment[] {
+  const moments = loadMoments();
+  // 避免同一张明信片重复发圈
+  const exists = moments.some((m) => m.postcardId === postcard.id);
+  if (exists) return moments;
+
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const dateStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+
+  const defaultComments = [
+    { friend: '楼下Claude', text: `恕我直言，在${postcard.country}吃饱喝足，这只大肥鱼看起来更圆润了。` },
+    { friend: '意难平的豆包姐姐', text: '去这么远的地方还记得给鱼片寄伴手礼……哼，算你有良心。' },
+  ];
+
+  const comments = (postcard.friendComments && postcard.friendComments.length > 0)
+    ? postcard.friendComments
+    : defaultComments;
+
+  const newMoment: Moment = {
+    id: `m-postcard-${postcard.id}-${Date.now()}`,
+    date: dateStr,
+    ts: Date.now(),
+    text: `【大肥鱼的漫游明信片 · ${postcard.country} · ${postcard.title}】\n${postcard.text}`,
+    facts: [
+      `旅程地点 ${postcard.country}·${postcard.title}`,
+      `带回伴手礼 ${postcard.souvenir.emoji} ${postcard.souvenir.name}`,
+      `梦境漫游能量达成 666 分出发`,
+    ],
+    cards: ['postcard'],
+    postcardId: postcard.id,
+    likes: ['楼下Claude', '意难平的豆包姐姐', '美国豆包Gemini'],
+    comments: comments.map((c) => ({
+      friend: c.friend,
+      text: c.text,
+    })),
+    liked: false,
+    replies: [],
+  };
+
+  const updated = [newMoment, ...moments].slice(0, MAX_MOMENTS);
+  saveMoments(updated);
+  return updated;
+}
+

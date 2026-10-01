@@ -11,6 +11,9 @@ import {
   type MomentCard,
 } from '../utils/petMoments';
 import { getPetSkin } from '../utils/petOverlay';
+import { PostcardCard } from './travel/PostcardCard';
+import { TravelCodexModal } from './travel/TravelCodexModal';
+import { getTravelProgress } from '../services/travelService';
 
 interface Props {
   records: SleepRecord[];
@@ -45,6 +48,13 @@ const SELFIE_SRC_SAKURA = `${import.meta.env.BASE_URL || '/'}whale-selfie-sport.
 
 /** 配图卡（CSS 渲染零依赖，致敬 dsh-plugin-moments 的九宫格混合图卡）。 */
 const CardView: React.FC<{ type: MomentCard; moment: Moment }> = ({ type, moment }) => {
+  if (type === 'postcard') {
+    return (
+      <div className="w-full py-1">
+        <PostcardCard postcardId={moment.postcardId} />
+      </div>
+    );
+  }
   if (type === 'selfie') {
     // 皮肤值只有 'default' / 'sakura'——此前判的是改名前的 'sport'，恒为
     // false，自拍卡永远不跟随服装。走 petOverlay 的单一真相源
@@ -108,7 +118,10 @@ export const MomentsOverlay: React.FC<Props> = ({ records, userProfile, onClose 
   const [commenting, setCommenting] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [note, setNote] = useState<string | null>(null);
+  const [showCodex, setShowCodex] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const travelProgress = getTravelProgress();
 
   const hasAi =
     (!!userProfile?.aiConfig?.provider === true &&
@@ -178,7 +191,15 @@ export const MomentsOverlay: React.FC<Props> = ({ records, userProfile, onClose 
             <p className="text-[9px] text-slate-500">蓝色大肥鱼 · 聪明但懒 · 事已至此，先吃饭吧</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setShowCodex(true)}
+            className="px-2.5 py-1.5 rounded-full bg-indigo-950/80 border border-indigo-700/60 text-[10px] font-bold text-indigo-200 flex items-center gap-1 cursor-pointer active:scale-95 transition-transform"
+          >
+            <span>🗺️</span>
+            <span>图鉴 {travelProgress.unlockedCount}/{travelProgress.totalCount}</span>
+          </button>
           <button
             type="button"
             onClick={() => void regenerate()}
@@ -221,9 +242,17 @@ export const MomentsOverlay: React.FC<Props> = ({ records, userProfile, onClose 
                 <p className="text-[11px] font-black text-sky-300">蓝色大肥鱼</p>
                 <p className="text-xs text-slate-100 leading-relaxed whitespace-pre-wrap">{m.text}</p>
 
-                {/* 配图卡：九宫格布局（1 张大图 / 2-3 张并排） */}
+                {/* 配图卡：九宫格布局（1 张大图 / 2-3 张并排 / 明信片独占） */}
                 {m.cards.length > 0 && (
-                  <div className={`grid gap-1 ${m.cards.length === 1 ? 'grid-cols-1 max-w-[190px]' : m.cards.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+                  <div className={`grid gap-1 ${
+                    m.cards.includes('postcard')
+                      ? 'grid-cols-1 w-full max-w-[280px]'
+                      : m.cards.length === 1
+                      ? 'grid-cols-1 max-w-[190px]'
+                      : m.cards.length === 2
+                      ? 'grid-cols-2'
+                      : 'grid-cols-3'
+                  }`}>
                     {m.cards.map((c, i) => (
                       <CardView key={i} type={c} moment={m} />
                     ))}
@@ -320,6 +349,9 @@ export const MomentsOverlay: React.FC<Props> = ({ records, userProfile, onClose 
             </div>
           ))}
         </div>
+
+      {showCodex && <TravelCodexModal onClose={() => setShowCodex(false)} />}
     </div>
   );
 };
+

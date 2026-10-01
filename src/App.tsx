@@ -24,12 +24,17 @@ import { consumePendingTab, syncPet } from './utils/petOverlay';
 import { LaunchSplash } from './components/LaunchSplash';
 import { BedtimeReminder, BedtimeReminderPhase } from './components/BedtimeReminder';
 import { sanitizeRecord } from './utils/recordSanitize';
+import { TripArrivalModal } from './components/travel/TripArrivalModal';
+import { processDailySleepScore, loadTravelState, clearPendingArrival } from './services/travelService';
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<NavTab>('today');
   const [isActiveSleepOpen, setIsActiveSleepOpen] = useState(false);
   const [isManualLogOpen, setIsManualLogOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [pendingPostcardId, setPendingPostcardId] = useState<string | null>(() => {
+    return loadTravelState().pendingArrival || null;
+  });
   // ── 闹钟响铃（App 层）：检测与横幅此前挂在【偏好】分区的 AlarmManager 内，
   // 切分区横幅消失、应用内唯一停止入口也随之不可达。提升到根组件：
   // 10s 检测 + 全局横幅，任何分区可见可停；声音 native 走 AlarmRingService
@@ -558,6 +563,12 @@ export const App: React.FC = () => {
         (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
       );
     });
+    // 注入梦境旅行能量（666分触发大肥鱼出发旅行）；带日期去重，
+    // 同一晚重跑/补录只按更高分计一次
+    const travelRes = processDailySleepScore(newRecord.sleepScore, newRecord.date);
+    if (travelRes.triggeredTrip && travelRes.newCard) {
+      setPendingPostcardId(travelRes.newCard.id);
+    }
     showToast(`🌙 记录已保存！本次睡眠记录时长 ${newRecord.durationMinutes < 60 ? `${newRecord.durationMinutes}分钟` : `${(newRecord.durationMinutes / 60).toFixed(1)}小时`}`);
   };
 
@@ -568,6 +579,12 @@ export const App: React.FC = () => {
         (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
       );
     });
+    // 注入梦境旅行能量（666分触发大肥鱼出发旅行）；带日期去重，
+    // 同一晚重跑/补录只按更高分计一次
+    const travelRes = processDailySleepScore(newRecord.sleepScore, newRecord.date);
+    if (travelRes.triggeredTrip && travelRes.newCard) {
+      setPendingPostcardId(travelRes.newCard.id);
+    }
     showToast(`📝 睡眠记录已保存！综合健康得分 ${newRecord.sleepScore} 分`);
   };
 
@@ -805,8 +822,26 @@ export const App: React.FC = () => {
         theme={currentTheme}
         targetDurationHours={userProfile.targetDurationHours}
       />
+
+      {/* 大肥鱼漫游明信片送达仪式弹窗 */}
+      {pendingPostcardId && (
+        <TripArrivalModal
+          postcardId={pendingPostcardId}
+          onClose={() => {
+            // 与"稍后再看"对齐：Esc/返回键关闭也清掉待收状态，
+            // 否则每次冷启动都会再弹一次
+            clearPendingArrival();
+            setPendingPostcardId(null);
+          }}
+          onOpenMoments={() => {
+            setPendingPostcardId(null);
+            setActiveTab('coach');
+          }}
+        />
+      )}
     </div>
   );
 };
 
 export default App;
+
