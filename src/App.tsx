@@ -185,9 +185,37 @@ export const App: React.FC = () => {
 
   // APK 启动时无条件同步一次闹钟到原生 AlarmManager（重启/重装后打开即恢复调度）
   useEffect(() => {
-    if (isNativePlatform()) {
-      syncAlarmsToNative(userProfile.alarms || []);
-    }
+    if (!isNativePlatform()) return;
+    void (async () => {
+      // "仅一次"闹钟的时刻已过且原生表里已无此条 → 已响过、被原生剔除，
+      // 这里在档案中停用；否则本次 enabled 全量同步会把它送回原生，
+      // 被按"今天已过则明天"续排——一次性闹钟变相成为永久每日闹钟
+      let nativeIds: Set<string> | null = null;
+      try {
+        const cap = (window as any).Capacitor;
+        const tbl = await cap?.Plugins?.GemmaLLM?.alarmRingTable?.();
+        nativeIds = new Set<string>((JSON.parse(tbl?.json || '[]') as Array<{ id?: string }>).map((x) => x.id || ''));
+      } catch { /* 读不到原生表时不动档案，只做常规同步 */ }
+      let alarms = userProfile.alarms || [];
+      if (nativeIds) {
+        const now = new Date();
+        let changed = false;
+        alarms = alarms.map((a) => {
+          if (!a.enabled || a.repeatDays.length !== 0 || nativeIds!.has(a.id)) return a;
+          const [h, m] = a.time.split(':').map(Number);
+          const t = new Date();
+          t.setHours(h, m, 0, 0);
+          if (t.getTime() <= now.getTime()) {
+            changed = true;
+            return { ...a, enabled: false };
+          }
+          return a;
+        });
+        if (changed) setUserProfile((prev) => ({ ...prev, alarms }));
+      }
+      syncAlarmsToNative(alarms);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // 鲸鱼娘速览卡点行后拉起 App：读取并清除原生写入的目标分区

@@ -42,6 +42,14 @@ import java.util.concurrent.Future;
 public class GemmaLLMPlugin extends Plugin {
 
     private LlmInference llmInference;
+    // unload/delete/load 与 BACKGROUND 上的生成跨线程竞争同一 native 实例：
+    // 直接 close() 正在 generateResponseAsync 的实例有 SIGSEGV 风险（native
+    // 崩溃不是 catch Exception 兜得住的）。生成进行中改为登记待关、由生成
+    // 线程收尾；活跃计数兜住"上一代 finally 与下一代排队之间"的间隙。
+    private final java.util.concurrent.atomic.AtomicInteger activeGens =
+            new java.util.concurrent.atomic.AtomicInteger();
+    private final Object unloadLock = new Object();
+    private final java.util.List<LlmInference> pendingCloses = new java.util.ArrayList<>();
     private volatile boolean downloadCancelled = false;
     private static final java.util.concurrent.ExecutorService BACKGROUND =
             java.util.concurrent.Executors.newSingleThreadExecutor();
@@ -431,6 +439,17 @@ public class GemmaLLMPlugin extends Plugin {
 
     /** 按闹钟表重排响铃闹钟；json 为空/格式坏时视为全取消。Boot 重排复用。 */
     public static void rescheduleRingAlarms(Context context, String alarmsJson) {
+        rescheduleRingAlarms(context, alarmsJson, null);
+    }
+
+    /**
+     * @param firedId 非空 = 由某条闹钟到点响铃触发（AlarmRingReceiver 传入）。
+     * "仅一次"条目此刻必须自我终结：此前响后无条件按"今天已过则明天"续排，
+     * 而唯一能停用它的 App 层逻辑又要求 App 恰在那一分钟存活（闹钟场景
+     * App 早被系统杀掉）——一次性闹钟于是变成永久每日闹钟。响后把它从
+     * 持久化表里剔掉，App 冷启动的 enabled 全量同步才不会把它带回来。
+     */
+    public static void rescheduleRingAlarms(Context context, String alarmsJson, String firedId) {
         android.app.AlarmManager am = (android.app.AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
         if (am == null) return;
         android.content.SharedPreferences sp =
@@ -449,6 +468,21 @@ public class GemmaLLMPlugin extends Plugin {
         if (alarmsJson == null || alarmsJson.isEmpty()) return;
         try {
             org.json.JSONArray arr = new org.json.JSONArray(alarmsJson);
+            if (firedId != null) {
+                // 剔除已消费的一次性条目：到点这条（旧版持久化广播无 id 时按时刻兜底），
+                // 以及所有时刻已过的一次性条目（错过即消费，不应改排到明天）
+                org.json.JSONArray kept = new org.json.JSONArray();
+                java.util.Calendar fireNow = java.util.Calendar.getInstance();
+                for (int i = 0; i < arr.length(); i++) {
+                    org.json.JSONObject a = arr.optJSONObject(i);
+                    if (a == null) continue;
+                    org.json.JSONArray d = a.optJSONArray("repeatDays");
+                    if (d != null && d.length() == 0 && isConsumedOneShot(a, firedId, fireNow)) continue;
+                    kept.put(a);
+                }
+                sp.edit().putString("alarm_ring_alarms", kept.toString()).apply();
+                arr = kept;
+            }
             org.json.JSONArray codes = new org.json.JSONArray();
             java.util.Calendar now = java.util.Calendar.getInstance();
             for (int i = 0; i < arr.length(); i++) {
@@ -503,11 +537,30 @@ public class GemmaLLMPlugin extends Plugin {
         }
     }
 
+    /** 一次性条目是否已被本次响铃消费：id 精确命中，或时刻已过（错过即消费）。 */
+    private static boolean isConsumedOneShot(org.json.JSONObject a, String firedId, java.util.Calendar now) {
+        if (firedId != null && firedId.equals(a.optString("id", ""))) return true;
+        try {
+            String[] hm = a.optString("time", "").split(":");
+            if (hm.length != 2) return false;
+            java.util.Calendar t = (java.util.Calendar) now.clone();
+            t.set(java.util.Calendar.HOUR_OF_DAY, Integer.parseInt(hm[0]));
+            t.set(java.util.Calendar.MINUTE, Integer.parseInt(hm[1]));
+            t.set(java.util.Calendar.SECOND, 0);
+            t.set(java.util.Calendar.MILLISECOND, 0);
+            return t.getTimeInMillis() <= now.getTimeInMillis();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     private static void scheduleOneRingAlarm(Context context, android.app.AlarmManager am,
             android.content.SharedPreferences sp, org.json.JSONArray codes,
             String id, int isoDay, String tone, String label, String time, long at) {
         int code = ringRequestCode(id, isoDay);
         Intent i = new Intent(context, AlarmRingReceiver.class);
+        // id 随广播带出：响铃触发重排时才能精确剔除"仅一次"条目
+        i.putExtra("id", id);
         i.putExtra("label", label);
         i.putExtra("time", time);
         i.putExtra("tone", tone);
@@ -572,6 +625,15 @@ public class GemmaLLMPlugin extends Plugin {
         ret.put("ringing", AlarmRingService.ringing);
         ret.put("time", AlarmRingService.ringTime != null ? AlarmRingService.ringTime : "");
         ret.put("label", AlarmRingService.ringLabel != null ? AlarmRingService.ringLabel : "");
+        call.resolve(ret);
+    }
+
+    /** 读原生侧当前响铃闹钟表（JSON 字符串）：App 冷启动判断"仅一次"闹钟是否已被消费 */
+    @PluginMethod
+    public void alarmRingTable(PluginCall call) {
+        JSObject ret = new JSObject();
+        ret.put("json", getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .getString("alarm_ring_alarms", "[]"));
         call.resolve(ret);
     }
 
@@ -832,6 +894,9 @@ public class GemmaLLMPlugin extends Plugin {
             call.reject("messages 必填");
             return;
         }
+        // 局部捕获 + 先计数：期间 unloadInternal 只会把它登记待关，不会就地 close
+        final LlmInference inf = llmInference;
+        activeGens.incrementAndGet();
         BACKGROUND.execute(() -> {
             StringBuilder full = new StringBuilder();
             LlmInferenceSession session = null;
@@ -842,7 +907,7 @@ public class GemmaLLMPlugin extends Plugin {
                                 .setTemperature(0.7f)
                                 .setTopK(40)
                                 .build();
-                session = LlmInferenceSession.createFromOptions(llmInference, sessionOptions);
+                session = LlmInferenceSession.createFromOptions(inf, sessionOptions);
 
                 for (Object o : messages.toList()) {
                     if (o instanceof JSObject) {
@@ -871,6 +936,20 @@ public class GemmaLLMPlugin extends Plugin {
                     if (session != null) session.close();
                 } catch (Exception ignored) {
                 }
+                activeGens.decrementAndGet();
+                // 生成期间被 unload/delete 登记的实例：此刻才真正能关
+                java.util.List<LlmInference> toClose = null;
+                synchronized (unloadLock) {
+                    if (activeGens.get() == 0 && !pendingCloses.isEmpty()) {
+                        toClose = new java.util.ArrayList<>(pendingCloses);
+                        pendingCloses.clear();
+                    }
+                }
+                if (toClose != null) {
+                    for (LlmInference pc : toClose) {
+                        try { pc.close(); } catch (Exception ignored) { }
+                    }
+                }
             }
         });
     }
@@ -882,11 +961,17 @@ public class GemmaLLMPlugin extends Plugin {
     }
 
     private void unloadInternal() {
-        try {
-            if (llmInference != null) llmInference.close();
-        } catch (Exception ignored) {
-        }
+        LlmInference old = llmInference;
         llmInference = null;
+        if (old == null) return;
+        synchronized (unloadLock) {
+            if (activeGens.get() > 0) {
+                // 该实例正被 BACKGROUND 上的生成使用：登记待关，生成结束时关闭
+                pendingCloses.add(old);
+            } else {
+                try { old.close(); } catch (Exception ignored) { }
+            }
+        }
     }
 
     @Override
