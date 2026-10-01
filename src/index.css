@@ -63,6 +63,15 @@ html {
   animation: tab-fade-in 180ms ease-out;
 }
 
+/* 通用弹层淡入（旅游系统的到达/图鉴详情弹层在用） */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.animate-fadeIn {
+  animation: fade-in 200ms ease-out;
+}
+
 /* 品牌开屏三段式：水滴下落 / 涟漪扩散 / 月亮描边填充 / 极光浮现 / 文字上浮 */
 @keyframes splash-drop {
   0% { transform: translateY(-180px) scale(0.6); opacity: 0; }
@@ -114,7 +123,8 @@ html {
   .animate-star-twinkle,
   .animate-tab-fade-in,
   .animate-cta-breathe,
-  .animate-cta-breathe::after {
+  .animate-cta-breathe::after,
+  .animate-fadeIn {
     animation: none;
   }
   /* 兜底：未逐一列举的 Tailwind 内置动画与 transition 一并静止
