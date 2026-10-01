@@ -36,6 +36,9 @@ export const App: React.FC = () => {
   // （循环），web 走 Web Audio（5 分钟上限）
   const [ringingAlarm, setRingingAlarm] = useState<CustomAlarmSetting | null>(null);
   const lastFiredKeyRef = useRef<string>('');
+  // 手动停止的时刻：原生 ACTION_STOP 异步收场，随后几秒内状态查询仍报 ringing，
+  // 据此窗口内不回弹横幅
+  const justStoppedRef = useRef(0);
   const [bedtimeReminder, setBedtimeReminder] = useState<BedtimeReminderPhase | null>(null);
   const [sleepStartSignal, setSleepStartSignal] = useState(0);
   const TAB_ORDER: NavTab[] = ['today', 'trends', 'coach', 'eyecare', 'settings'];
@@ -476,12 +479,42 @@ export const App: React.FC = () => {
           break;
         }
       }
+      // native：响铃由 AlarmRingService 独立负责（WebView 计时器息屏冻结），
+      // 分钟对表只在响铃那一分钟命中——错过就完全没有停止入口，像按键被删了。
+      // 每 10s 对表原生状态：正在响就弹横幅（应用内停止按钮常可达）；
+      // 已停（点通知/5 分钟自动收场）就把横幅收掉
+      if (isNativePlatform()) {
+        void (async () => {
+          try {
+            const cap = (window as any).Capacitor;
+            const st = await cap?.Plugins?.GemmaLLM?.alarmRingStatus?.();
+            if (!st) return;
+            if (st.ringing) {
+              if (Date.now() - justStoppedRef.current < 3000) return;
+              setRingingAlarm((cur) => cur ?? {
+                id: 'native-ring',
+                time: st.time || '',
+                label: st.label || '',
+                enabled: true,
+                repeatDays: [],
+                tone: 'gentle_chime',
+                vibrate: true,
+                smartWakeEnabled: false,
+                smartWakeWindowMinutes: 20,
+              });
+            } else {
+              setRingingAlarm((cur) => (cur ? null : cur));
+            }
+          } catch { /* 状态查询失败不打扰 */ }
+        })();
+      }
     };
     const interval = window.setInterval(checkAlarm, 10000);
     return () => window.clearInterval(interval);
   }, [userProfile.alarms, ringingAlarm]);
 
   const handleStopRinging = () => {
+    justStoppedRef.current = Date.now();
     sleepAudio.stop();
     try {
       const cap = (window as any).Capacitor;

@@ -565,6 +565,16 @@ public class GemmaLLMPlugin extends Plugin {
         call.resolve(ret);
     }
 
+    /** 查询原生是否正在响铃：App 打开时横幅对表用（错过响铃那一分钟也有停止入口） */
+    @PluginMethod
+    public void alarmRingStatus(PluginCall call) {
+        JSObject ret = new JSObject();
+        ret.put("ringing", AlarmRingService.ringing);
+        ret.put("time", AlarmRingService.ringTime != null ? AlarmRingService.ringTime : "");
+        ret.put("label", AlarmRingService.ringLabel != null ? AlarmRingService.ringLabel : "");
+        call.resolve(ret);
+    }
+
     /** 设定/更新提醒时间（'HH:MM'），并立即重排闹钟。 */
     @PluginMethod
     public void bedtimeReminderSchedule(PluginCall call) {

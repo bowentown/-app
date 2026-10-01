@@ -29,6 +29,12 @@ public class AlarmRingService extends Service {
     private static final String CHANNEL_ID = "somnacare-alarm-ring";
     private static final long AUTO_STOP_MS = 5 * 60 * 1000L;   // 最长响 5 分钟
 
+    // 响铃状态（同进程静态可达）：插件 alarmRingStatus 查询用——
+    // App 侧横幅只在响铃那一分钟对表才出，错过这一分钟打开 App 就没有停止入口
+    public static volatile boolean ringing = false;
+    public static volatile String ringTime = null;
+    public static volatile String ringLabel = null;
+
     private MediaPlayer player;
     private Vibrator vibrator;
     private PowerManager.WakeLock wakeLock;
@@ -80,12 +86,8 @@ public class AlarmRingService extends Service {
     }
 
     private void startRingForeground(String label, String time) {
-        NotificationManager nm = getSystemService(NotificationManager.class);
-        Intent launch = getPackageManager().getLaunchIntentForPackage(getPackageName());
-        PendingIntent pi = launch != null
-                ? PendingIntent.getActivity(this, 6, launch,
-                        PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE)
-                : null;
+        // 点通知的任何位置（本体或按钮）都=停铃：此前本体是「打开 App」的
+        // PendingIntent，早上点弹屏只会进 App、响铃照旧，像停止键被删了
         Intent stop = new Intent(this, AlarmRingService.class).setAction(ACTION_STOP);
         PendingIntent stopPi = PendingIntent.getService(this, 7, stop,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
@@ -96,13 +98,18 @@ public class AlarmRingService extends Service {
         Notification n = b.setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
                 .setContentTitle(time != null ? time + " 闹钟响铃中" : "闹钟响铃中")
                 .setContentText(label != null ? label + " · 点击停止响铃" : "点击停止响铃")
-                .setContentIntent(pi)
+                .setContentIntent(stopPi)
+                // 锁屏上也完整可见可点（闹钟类通知按惯例公开）
+                .setVisibility(Notification.VISIBILITY_PUBLIC)
                 .addAction(new Notification.Action.Builder(
                         null, "停止响铃", stopPi).build())
                 .setCategory(Notification.CATEGORY_ALARM)
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
                 .build();
+        ringing = true;
+        ringTime = time;
+        ringLabel = label;
         if (Build.VERSION.SDK_INT >= 34) {
             try {
                 startForeground(20260931, n,
@@ -181,6 +188,9 @@ public class AlarmRingService extends Service {
     }
 
     private void stopRing() {
+        ringing = false;
+        ringTime = null;
+        ringLabel = null;
         main.removeCallbacks(autoStop);
         releaseRingResources();
         stopForeground(STOP_FOREGROUND_REMOVE);
