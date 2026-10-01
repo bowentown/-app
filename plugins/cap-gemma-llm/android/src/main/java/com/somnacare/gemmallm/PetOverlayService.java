@@ -84,6 +84,7 @@ public class PetOverlayService extends Service {
     private FrameLayout pickerRoot;
     private WindowManager.LayoutParams pickerLp;
     private boolean pickerShown;
+    private long pickerShownAt;
     // 实测窗口尺寸：ACTION_OUTSIDE 按 raw 坐标筛落点用（LayoutParams 的
     // WRAP_CONTENT 不解析，拿不到真实宽高）
     private int bubbleW, bubbleH, fanW, fanH;
@@ -313,6 +314,9 @@ public class PetOverlayService extends Service {
                 pill.setPadding(dp(11), dp(7), dp(11), dp(7));
                 final String tab = z[1];
                 pill.setOnClickListener(v -> {
+                    // 卡片刚弹出的 250ms 内不响应：长按原地松手时手指可能蹭到
+                    // 胶囊——松手这个动作本身绝不能变成"跳进 App"
+                    if (android.os.SystemClock.uptimeMillis() - pickerShownAt < 250) return;
                     v.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY);
                     getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                             .edit().putString(K_PENDING_TAB, tab).apply();
@@ -357,6 +361,7 @@ public class PetOverlayService extends Service {
             wm.addView(wrap, pickerLp);
             pickerRoot = wrap;
             pickerShown = true;
+            pickerShownAt = android.os.SystemClock.uptimeMillis();
             wrap.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(160)
                     .setInterpolator(new android.view.animation.OvershootInterpolator(1.6f))
                     .start();
