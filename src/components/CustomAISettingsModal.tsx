@@ -609,6 +609,9 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
               placeholder="设定顾问身份与风格..."
               className={`w-full bg-[#0a0f1d] border border-slate-600 rounded-xl p-2.5 text-xs text-white placeholder-slate-500 focus:outline-none ${theme.focusRing} leading-relaxed`}
             />
+            <p className="text-[10px] text-slate-400 leading-relaxed">
+              回复篇幅与格式由应用统一约束（≤150 字、先结论后建议、纯文本），此处只需设定顾问身份与语气。
+            </p>
           </div>
 
           {/* Privacy & Key Security Notice */}

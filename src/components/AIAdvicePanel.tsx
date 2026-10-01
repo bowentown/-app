@@ -29,6 +29,20 @@ import { ThemeConfig } from '../utils/themeStyles';
 import { attachHScroll } from '../utils/hscroll';
 import { MomentsOverlay } from './MomentsOverlay';
 
+// 输出契约：固定追加在 persona 尾部、随 system 一起走前缀缓存（恒定段，
+// 不破坏 DeepSeek 前缀缓存）。篇幅约束同时压输出成本——输出是最贵的一项
+const OUTPUT_CONTRACT =
+  '\n\n【回答格式·必须遵守】每次回答不超过150字：先一句结论，再给至多2条可执行的建议；纯文本，不用任何markdown符号和序号列表；不寒暄、不复述我的问题；引用数字只用我提供的真实数据，没有就不编。';
+
+// 历史窗口"粘住"：slice(-8) 每轮左移会让 messages 第 2 条起全部 miss，
+// 实测前缀命中率塌缩到 35%。改为只在超过 HARD 时截断到 SOFT——两次
+// 截断之间窗口不动（纯追加），命中率回到 ~90%
+const HIST_HARD = 24;
+const HIST_SOFT = 8;
+function recentHistory<T>(h: T[]): T[] {
+  return h.length > HIST_HARD ? h.slice(-HIST_SOFT) : h;
+}
+
 interface AIAdvicePanelProps {
   records: SleepRecord[];
   userProfile: UserProfile;
@@ -204,7 +218,12 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
       const cfg = userProfile.aiConfig;
       const customPersona =
         cfg?.systemPersona ||
-        '你是一位资深临床睡眠医学顾问。结合用户的睡眠打分与周期推演数据（模型估算值，非传感器实测），以关怀、科学、富有实操性的语气为用户答疑解惑，并如实说明估算边界。回答务必简洁（150 字以内），不使用 markdown 格式符号（如 ** 或 *），直接用纯文本输出。';
+        '你是一位资深临床睡眠医学顾问。结合用户的睡眠打分与周期推演数据（模型估算值，非传感器实测），以关怀、科学、富有实操性的语气为用户答疑解惑，并如实说明估算边界。';
+      // 输出契约固定追加在 persona 尾部、随 system 一起走前缀缓存——
+      // 自设 persona 往往只写角色不写篇幅（设置页默认文案就没写），
+      // 回答动辄四五百字被 max_tokens 截断。放代码里而不是只放默认
+      // 文案里，用户自设 persona 也生效；字数约束同时压输出成本
+      const systemPrompt = customPersona + OUTPUT_CONTRACT;
 
       // 0. 危机/用药安全护栏：对所有档位（含云端 DeepSeek）统一短路——
       // 此前只挂在端侧档内，默认的云端档请求成功时热线保证不生效，
@@ -266,7 +285,7 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
           if (!gotFirstToken) localGenAbortRef.current?.abort();
         }, 60000);
         try {
-          const systemContent = `${customPersona}\n${personalCtx}\n回答保持简短（200字内），语气温和。`;
+          const systemContent = `${systemPrompt}\n${personalCtx}`;
           const history = newHistory.slice(-4).map((m) => ({
             role: m.role === 'assistant' ? ('assistant' as const) : ('user' as const),
             content: m.content,
@@ -343,7 +362,8 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
           ? (cfg.customModelName || 'deepseek-chat')
           : (cfg.deepseekModel || 'deepseek-flash');
         setActiveProviderName(isCustom ? `自建 API (${modelToUse})` : `DeepSeek (${modelToUse})`);
-        // 简洁指令已由 customPersona 承载——此处不动 system 以保持前缀缓存稳定
+        // 简洁契约固定追加在 persona 尾部（systemPrompt）——同为 system 恒定
+        // 前缀段，不破坏前缀缓存
 
         // 直连也走超时熔断：此前裸 fetch 挂起时 isSendingChat 永远为 true 且无停止入口
         const dsRes = await fetchWithTimeout(endpoint, {
@@ -355,14 +375,15 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
           body: JSON.stringify({
             model: isCustom ? modelToUse : modelToUse === 'deepseek-flash' ? 'deepseek-chat' : modelToUse === 'deepseek-pro' ? 'deepseek-reasoner' : modelToUse,
             // 成本三件套：
-            // ① system 只放恒定 persona——易变数据放 system（前缀第 0 段）会让
-            //    每次记一晚睡眠就作废全部历史缓存（cache miss 曾占 73%）
-            // ② 历史只带最近 8 条——此前发全量 120 条，平均单次 18.5k token
+            // ① system 只放恒定 persona+输出契约——易变数据放 system（前缀第 0 段）会
+            //    让每次记一晚睡眠就作废全部历史缓存（cache miss 曾占 73%）
+            // ② 历史窗口"粘住"：只在超过 24 条时截到 8 条——slice(-8) 每轮左移曾把
+            //    前缀命中率压到 35%；截断点不动时 messages 头部纯追加，命中率 ~90%
             // ③ 易变数据挪到尾部 user 消息——只作废尾部几十 token
-            // ④ max_tokens 400——输出是最贵的一项（¥8/M）
+            // ④ max_tokens 600 只是不被截断的上限——输出契约把实际字数压到 ~150 字
             messages: [
-              { role: 'system', content: customPersona },
-              ...newHistory.slice(-8).map((m) => ({ role: m.role, content: m.content })),
+              { role: 'system', content: systemPrompt },
+              ...recentHistory(newHistory).map((m) => ({ role: m.role, content: m.content })),
               ...(personalCtx ? [{ role: 'user' as const, content: `${personalCtx}\n\n（以上是我的真实睡眠数据，请结合它们回答我的问题）` }] : []),
             ],
             temperature: 0.7,
