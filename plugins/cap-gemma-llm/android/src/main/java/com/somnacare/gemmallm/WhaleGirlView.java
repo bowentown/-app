@@ -72,7 +72,6 @@ public class WhaleGirlView extends View {
     private long stateSince;
     private long cheerUntil;        // 庆祝播到这个时刻
     private long ambientUntil;      // 小动作播到这个时刻
-    private boolean pendingCheer;   // 点她时若在做小动作：等这一段播完再庆祝（不打断更自然）
     private boolean talking;
     private float drowsy;
     private boolean dragging;
@@ -100,15 +99,6 @@ public class WhaleGirlView extends View {
                     ambientUntil = now + IDLE_PAUSE_MIN + rng.nextInt(IDLE_PAUSE_VAR);
                 } else if (drowsy > 0.5f) {
                     ambientUntil = now + 15000;  // 深夜困倦时不折腾，安静睡觉
-                } else if (pendingCheer) {
-                    // 用户点过她：小动作这一段已播完，现在兑现庆祝
-                    pendingCheer = false;
-                    if (cheers.length > 0) {
-                        pick(cheers[rng.nextInt(cheers.length)]);
-                        cheerUntil = now + 1800;
-                    }
-                    // 庆祝完后较短间隔接小动作（用户刚互动过，不要太冷清）
-                    ambientUntil = now + 8000 + rng.nextInt(8000);
                 } else {
                     // 待机歇够了 → 随机来一段小动作
                     Anim next = ambient[rng.nextInt(ambient.length)];
@@ -195,11 +185,9 @@ public class WhaleGirlView extends View {
     /** 庆祝：点角色、开关注护眼时随机来一段，播约 1.8s 回常态。 */
     public void cheer() {
         if (cheers.length == 0) return;
-        // 正在做小动作时不打断：标记 pending，等这一段完整播完再庆祝
-        if (current != idle && current != sleep && ambientUntil > System.currentTimeMillis()) {
-            pendingCheer = true;
-            return;
-        }
+        // 点她的回应必须干脆：立即庆祝。此前在做小动作时只标记 pending，
+        // 要等这一段播完（最长十几秒）→ 回待机 → 才兑现——一次点击在随后
+        // 几十秒里串出两三个状态切换，用户体感"点一下做一串动作"
         pick(cheers[rng.nextInt(cheers.length)]);
         cheerUntil = System.currentTimeMillis() + 1800;
     }
@@ -255,7 +243,9 @@ public class WhaleGirlView extends View {
             // 庆祝到点回落常态
             if (cheerUntil != 0 && now > cheerUntil) {
                 cheerUntil = 0;
-                ambientUntil = 0;
+                // 庆祝后歇一段正常待机节奏——此前置 0 会让庆祝 500ms 内
+                // 又接一个小动作，点一下串出连场戏
+                ambientUntil = now + IDLE_PAUSE_MIN + rng.nextInt(IDLE_PAUSE_VAR);
                 pick(drowsy > 0.5f && sleep != null ? sleep : idle);
                 a = current;
             } else if (ambientUntil == 0 && a != idle && a != sleep

@@ -80,6 +80,13 @@ public class PetOverlayService extends Service {
     // 排队期间用户主动要的气泡——单槽资源没有优先级，后到会无条件顶掉先到
     private int bubbleSerial;
     private int eyeSerialAtClick;
+    // ---- 长按去向选择卡 ----
+    private FrameLayout pickerRoot;
+    private WindowManager.LayoutParams pickerLp;
+    private boolean pickerShown;
+    // 实测窗口尺寸：ACTION_OUTSIDE 按 raw 坐标筛落点用（LayoutParams 的
+    // WRAP_CONTENT 不解析，拿不到真实宽高）
+    private int bubbleW, bubbleH, fanW, fanH;
     private int tapCount;
     private int sayIdx;
     private final Runnable bubbleHide = new Runnable() {
@@ -132,6 +139,7 @@ public class PetOverlayService extends Service {
                     if (petRoot == null || petParams == null) return;
                     if (fanShown) hideFan();       // 按钮按旧屏宽摆位，先收避免错位
                     if (bubbleShown) hideBubble();
+                    if (pickerShown) hideZonePicker();
                     clampToScreen(petParams);
                     safeUpdate(petRoot, petParams);
                 }
@@ -186,6 +194,7 @@ public class PetOverlayService extends Service {
                 main.removeCallbacks(drowsyTick);
                 if (fanShown) hideFan();
                 if (bubbleShown) hideBubble();
+                if (pickerShown) hideZonePicker();
                 if (whale != null) { try { whale.stop(); } catch (Exception ignored) { } whale = null; }
                 if (petRoot != null) {
                     try { wm.removeViewImmediate(petRoot); } catch (Exception ignored) { }
@@ -257,32 +266,134 @@ public class PetOverlayService extends Service {
         }
     }
 
-    // ---- 长按桌宠：拉起 App 落到今日页 ----
-    // 消费链（petConsumePendingTab → App 冷启动/回前台换分区）早已就位，
-    // 此前没有写者——"点桌宠拉起 App"一直是死链路。长按与单击（扇面）、
-    // 拖拽（挪位置）互不打架：移动超 sloup 或抬手都会取消长按计时
+    // ---- 长按桌宠：弹去向选择卡，点分区胶囊才拉起 App ----
+    // 消费链（petConsumePendingTab → App 冷启动/回前台换分区）早已就位。
+    // 此前长按直接跳"今日"且无法选区，还把误长按变成"突然被拽进 App +
+    // 浮窗集体消失"；现在长按只弹卡，不点胶囊就什么都不发生，误触无害
     private static final long LONG_PRESS_MS = 550;   // 与系统长按节奏一致
-    private boolean longPressFired;
-    private final Runnable longPressOpen = new Runnable() {
+    private long downAt;
+    // 只负责长按到点的触感提示；去向卡在【抬手】时弹——若在按住期间弹卡，
+    // 随后抬手的 UP 会作为 ACTION_OUTSIDE 落到新卡上，卡片闪现即逝
+    private final Runnable longPressBuzz = new Runnable() {
         @Override public void run() {
-            if (dragging || petRoot == null) return;
-            longPressFired = true;
-            petRoot.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
-            getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                    .edit().putString(K_PENDING_TAB, "today").apply();
-            // SYSTEM_ALERT_WINDOW 应用豁免后台启动限制；服务在响铃/亮屏场景也能拉起
-            try {
-                Intent i = getPackageManager().getLaunchIntentForPackage(getPackageName());
-                if (i != null) {
-                    i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-                    startActivity(i);
-                }
-            } catch (Exception ignored) {
+            if (!dragging && petRoot != null) {
+                petRoot.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
             }
-            if (fanShown) hideFan();
-            if (bubbleShown) hideBubble();
         }
     };
+    // 五个分区：label → App.tsx TAB_ORDER 的分区名
+    private static final String[][] ZONE_TABS = {
+            {"今日", "today"}, {"趋势", "trends"}, {"顾问", "coach"}, {"护眼", "eyecare"}, {"设置", "settings"},
+    };
+
+    /** 去向选择卡：贴着角色弹出，五颗分区胶囊，点了写 pending tab 并拉起 App。 */
+    private void showZonePicker() {
+        if (pickerShown) return;
+        try {
+            DisplayInfo di = displayInfo();
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            GradientDrawable bg = new GradientDrawable(
+                    GradientDrawable.Orientation.TL_BR, new int[]{0xFF2E4470, 0xFF223457});
+            bg.setCornerRadius(dp(16));
+            bg.setStroke(dp(1), 0x36FFFFFF);
+            row.setBackground(bg);
+            row.setPadding(dp(9), dp(7), dp(9), dp(7));
+            for (String[] z : ZONE_TABS) {
+                TextView pill = new TextView(this);
+                pill.setText(z[0]);
+                pill.setTextSize(11f);
+                pill.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+                pill.setTextColor(0xFFCFE8FF);
+                pill.setGravity(Gravity.CENTER);
+                GradientDrawable pg = new GradientDrawable();
+                pg.setCornerRadius(dp(14));
+                pg.setColor(0x2E7FD8FF);
+                pill.setBackground(pg);
+                pill.setPadding(dp(11), dp(7), dp(11), dp(7));
+                final String tab = z[1];
+                pill.setOnClickListener(v -> {
+                    v.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY);
+                    getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                            .edit().putString(K_PENDING_TAB, tab).apply();
+                    hideZonePicker();
+                    launchApp();
+                });
+                LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(-2, -2);
+                plp.rightMargin = dp(5);
+                row.addView(pill, plp);
+            }
+            FrameLayout wrap = new FrameLayout(this);
+            wrap.addView(row);
+            wrap.setOnTouchListener((vv, e) -> {
+                if (e.getActionMasked() == MotionEvent.ACTION_OUTSIDE) hideZonePicker();
+                return false;
+            });
+
+            pickerLp = new WindowManager.LayoutParams(
+                    WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT,
+                    WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                            | WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
+                            | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                    PixelFormat.TRANSLUCENT);
+            pickerLp.gravity = Gravity.TOP | Gravity.START;
+            pickerLp.setTitle("大肥鱼去向");
+
+            wrap.measure(View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+                    View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
+            int pw = wrap.getMeasuredWidth(), ph = wrap.getMeasuredHeight();
+            int m = dp(4);
+            int cx = petParams.x + petParams.width / 2;
+            boolean above = petParams.y - ph - dp(6) >= m;
+            pickerLp.y = above ? petParams.y - ph - dp(2)
+                    : Math.min(di.height - ph - m, petParams.y + petParams.height + dp(2));
+            pickerLp.x = Math.max(m, Math.min(cx - pw / 2, di.width - pw - m));
+
+            // 首帧透明：同气泡，alpha 必须赶在 addView 之前
+            wrap.setAlpha(0f);
+            wrap.setScaleX(0.7f);
+            wrap.setScaleY(0.7f);
+            wm.addView(wrap, pickerLp);
+            pickerRoot = wrap;
+            pickerShown = true;
+            wrap.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(160)
+                    .setInterpolator(new android.view.animation.OvershootInterpolator(1.6f))
+                    .start();
+        } catch (Exception e) {
+            if (pickerRoot != null) {
+                try { wm.removeViewImmediate(pickerRoot); } catch (Exception ignored) { }
+            }
+            pickerRoot = null;
+            pickerShown = false;
+        }
+    }
+
+    private void hideZonePicker() {
+        final FrameLayout v = pickerRoot;
+        pickerRoot = null;
+        pickerShown = false;
+        if (v == null) return;
+        try { wm.removeViewImmediate(v); } catch (Exception ignored) { }
+    }
+
+    /** 从悬浮窗拉起主界面（落到 pending tab 指定的分区）。 */
+    private void launchApp() {
+        try {
+            Intent i = getPackageManager().getLaunchIntentForPackage(getPackageName());
+            if (i != null) {
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                startActivity(i);
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
+    /** 触点是否落在某个悬浮窗内：ACTION_OUTSIDE 的 raw 坐标筛选用。 */
+    private static boolean insideWindow(WindowManager.LayoutParams lp, int w, int h, float sx, float sy) {
+        return lp != null && w > 0 && h > 0
+                && sx >= lp.x && sx < lp.x + w && sy >= lp.y && sy < lp.y + h;
+    }
 
     private boolean handlePetTouch(MotionEvent e) {
         switch (e.getActionMasked()) {
@@ -292,21 +403,22 @@ public class PetOverlayService extends Service {
                 downWinX = petParams.x;
                 downWinY = petParams.y;
                 dragging = false;
-                longPressFired = false;
-                main.postDelayed(longPressOpen, LONG_PRESS_MS);
+                downAt = android.os.SystemClock.uptimeMillis();
+                main.postDelayed(longPressBuzz, LONG_PRESS_MS);
                 return true;
             case MotionEvent.ACTION_MOVE: {
                 int dx = (int) e.getRawX() - downRawX;
                 int dy = (int) e.getRawY() - downRawY;
                 if (!dragging && Math.hypot(dx, dy) > touchSlop) {
                     dragging = true;
-                    main.removeCallbacks(longPressOpen);   // 开始拖拽：长按作废
+                    main.removeCallbacks(longPressBuzz);   // 开始拖拽：长按作废
                     if (whale != null) whale.setDragging(true);
                 }
                 if (dragging) {
-                    // 拖到按钮/气泡开着时先收起，避免窗口错位
+                    // 拖到按钮/气泡/去向卡开着时先收起，避免窗口错位
                     if (fanShown) hideFan();
                     if (bubbleShown) hideBubble();
+                    if (pickerShown) hideZonePicker();
                     petParams.x = downWinX + dx;
                     petParams.y = downWinY + dy;
                     clampToScreen(petParams);
@@ -315,9 +427,14 @@ public class PetOverlayService extends Service {
                 return true;
             }
             case MotionEvent.ACTION_UP:
-                main.removeCallbacks(longPressOpen);
-                if (longPressFired) {
-                    return true;   // 长按已拉起 App：这一下不再是"点击"
+                main.removeCallbacks(longPressBuzz);
+                if (!dragging && whale != null
+                        && android.os.SystemClock.uptimeMillis() - downAt >= LONG_PRESS_MS) {
+                    // 长按：弹去向选择卡（不在按住期间弹——见 longPressBuzz 注释）
+                    if (fanShown) hideFan();
+                    if (bubbleShown) hideBubble();
+                    showZonePicker();
+                    return true;
                 }
                 if (dragging) {
                     if (whale != null) whale.setDragging(false);
@@ -345,7 +462,7 @@ public class PetOverlayService extends Service {
                 }
                 return true;
             case MotionEvent.ACTION_CANCEL:
-                main.removeCallbacks(longPressOpen);
+                main.removeCallbacks(longPressBuzz);
                 if (dragging) {
                     if (whale != null) whale.setDragging(false);
                     dockToEdge();
@@ -386,7 +503,11 @@ public class PetOverlayService extends Service {
             fanOnRight = (petParams.x + petParams.width / 2) < diPre.width / 2;
             v = buildFan();
             v.setOnTouchListener((vv, e) -> {
-                if (e.getActionMasked() == MotionEvent.ACTION_OUTSIDE) hideFan();
+                if (e.getActionMasked() == MotionEvent.ACTION_OUTSIDE) {
+                    // 落点在气泡上的外部触摸让气泡自己处理——否则点一下播报，
+                    // 扇面跟着一起消失，像"莫名其妙闪退"
+                    if (!insideWindow(bubbleLp, bubbleW, bubbleH, e.getRawX(), e.getRawY())) hideFan();
+                }
                 return false;
             });
             fanLp = new WindowManager.LayoutParams(
@@ -401,7 +522,9 @@ public class PetOverlayService extends Service {
 
             v.measure(View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
                     View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
-            placeBeside(v.getMeasuredWidth(), v.getMeasuredHeight());
+            fanW = v.getMeasuredWidth();
+            fanH = v.getMeasuredHeight();
+            placeBeside(fanW, fanH);
             // 首帧透明：初始 alpha/scale 在 addView 之前设好，避免闪一帧
             // 按钮 direct 挂在 wrap 上（弧形布局），遍历容器自身子视图——
             // 此前强转 LinearLayout 抛 CCE 被 catch 吞掉，按钮从未 addView
@@ -568,6 +691,7 @@ public class PetOverlayService extends Service {
         minimized = true;
         hideFan();       // 关闭后用户再点她 → 以"还原"图标重建扇面
         hideBubble();
+        hideZonePicker();
         petParams.width = dp(MINI_DP);
         petParams.height = dp(MINI_DP);
         clampToScreen(petParams);
@@ -583,6 +707,7 @@ public class PetOverlayService extends Service {
         minimized = false;
         hideFan();       // 同上：恢复后扇面重建为"最小化"图标
         hideBubble();
+        hideZonePicker();
         petParams.width = dp(COLLAPSED_W_DP);
         petParams.height = dp(COLLAPSED_H_DP);
         clampToScreen(petParams);
@@ -636,7 +761,11 @@ public class PetOverlayService extends Service {
             boolean above = petParams.y - dp(150) >= dp(4);   // 预估放得下就贴头上，否则贴脚下来
             FrameLayout v = buildBubble(msg, above);
             v.setOnTouchListener((vv, e) -> {
-                if (e.getActionMasked() == MotionEvent.ACTION_OUTSIDE) hideBubble();
+                if (e.getActionMasked() == MotionEvent.ACTION_OUTSIDE) {
+                    // 落点在扇面按钮上的外部触摸让扇面自己处理——
+                    // 点一个按钮不该把气泡也一起收掉
+                    if (!insideWindow(fanLp, fanW, fanH, e.getRawX(), e.getRawY())) hideBubble();
+                }
                 return false;
             });
             v.setOnClickListener(vv -> hideBubble());
@@ -657,6 +786,8 @@ public class PetOverlayService extends Service {
             // 尾巴尖对不上她（窗口是 WRAP_CONTENT，测量失败才兜底）
             bw = v.getMeasuredWidth() > 0 ? v.getMeasuredWidth() : dp(140);
             int bh = v.getMeasuredHeight();
+            bubbleW = bw;
+            bubbleH = bh;
             int m = dp(4);
             int cx = petParams.x + petParams.width / 2;
 
@@ -971,7 +1102,8 @@ public class PetOverlayService extends Service {
     public void onDestroy() {
         main.removeCallbacks(drowsyTick);
         main.removeCallbacks(eyeFeedback);
-        main.removeCallbacks(longPressOpen);
+        main.removeCallbacks(longPressBuzz);
+        hideZonePicker();
         try {
             android.hardware.display.DisplayManager dm =
                     (android.hardware.display.DisplayManager) getSystemService(DISPLAY_SERVICE);
