@@ -669,7 +669,8 @@ export function createPostcardMoment(postcard: {
     id: `m-postcard-${postcard.id}-${Date.now()}`,
     date: dateStr,
     ts: Date.now(),
-    text: `【大肥鱼的漫游明信片 · ${postcard.country} · ${postcard.title}】\n${postcard.text}`,
+    // 正文只做傲娇短配文——明信片全文在翻转卡背面，此前两处重复展示
+    text: `漫游明信片到货啦！本鱼跋山涉水去了${postcard.country}，票根都替你收好了——哼，才不是特意给你带的 💌 背面有亲笔信，看完就睡！`,
     facts: [
       `旅程地点 ${postcard.country}·${postcard.title}`,
       `带回伴手礼 ${postcard.souvenir.emoji} ${postcard.souvenir.name}`,

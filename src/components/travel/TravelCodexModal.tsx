@@ -1,6 +1,15 @@
 import React, { useState } from 'react';
 import { X, Lock, Compass, Sparkles, ChevronRight, Gift } from 'lucide-react';
 import type { ContinentType, TravelPostcard } from '../../types/travel';
+
+// 大洲标签：ready 与否由 ART_READY_CONTINENTS 驱动——补齐插画后把大洲加进
+// 数组即可，标签自动从「筹备中」变为计数，无需改这里
+const CONTINENT_TABS: { key: Exclude<TabFilter, 'all'>; emoji: string; label: string }[] = [
+  { key: 'asia', emoji: '🌸', label: '亚洲' },
+  { key: 'europe', emoji: '🏰', label: '欧洲' },
+  { key: 'americas', emoji: '🗽', label: '美洲' },
+  { key: 'africa', emoji: '🦁', label: '非洲' },
+];
 import { ALL_POSTCARDS, ART_READY_CONTINENTS, TRIP_POOL } from '../../data/travelPostcards';
 import { getTravelProgress, loadTravelState } from '../../services/travelService';
 import { useModalA11y } from '../../utils/modalA11y';
@@ -122,50 +131,27 @@ export const TravelCodexModal: React.FC<Props> = ({ onClose }) => {
           >
             全部 ({unlockedCount}/{totalCards})
           </button>
-          <button
-            type="button"
-            onClick={() => setTab('asia')}
-            className={`px-3 py-1.5 rounded-xl text-[10px] font-bold shrink-0 transition-colors cursor-pointer ${
-              tab === 'asia'
-                ? 'bg-sky-500 text-white shadow-sm'
-                : 'bg-slate-900/80 text-slate-400 hover:text-slate-200 border border-slate-800'
-            }`}
-          >
-            🌸 亚洲 ({unlockedCount}/{totalCards})
-          </button>
-          <button
-            type="button"
-            onClick={() => handleContinentTab('europe')}
-            className={`px-3 py-1.5 rounded-xl text-[10px] font-bold shrink-0 transition-colors cursor-pointer ${
-              tab === 'europe'
-                ? 'bg-sky-500 text-white shadow-sm'
-                : 'bg-slate-900/80 text-slate-400 hover:text-slate-200 border border-slate-800'
-            }`}
-          >
-            🏰 欧洲 · 筹备中
-          </button>
-          <button
-            type="button"
-            onClick={() => handleContinentTab('americas')}
-            className={`px-3 py-1.5 rounded-xl text-[10px] font-bold shrink-0 transition-colors cursor-pointer ${
-              tab === 'americas'
-                ? 'bg-sky-500 text-white shadow-sm'
-                : 'bg-slate-900/80 text-slate-400 hover:text-slate-200 border border-slate-800'
-            }`}
-          >
-            🗽 美洲 · 筹备中
-          </button>
-          <button
-            type="button"
-            onClick={() => handleContinentTab('africa')}
-            className={`px-3 py-1.5 rounded-xl text-[10px] font-bold shrink-0 transition-colors cursor-pointer ${
-              tab === 'africa'
-                ? 'bg-sky-500 text-white shadow-sm'
-                : 'bg-slate-900/80 text-slate-400 hover:text-slate-200 border border-slate-800'
-            }`}
-          >
-            🦁 非洲 · 筹备中
-          </button>
+          {CONTINENT_TABS.map(({ key, emoji, label }) => {
+            const ready = ART_READY_CONTINENTS.includes(key);
+            const poolCount = ALL_POSTCARDS.filter((c) => c.continent === key).length;
+            const got = ALL_POSTCARDS.filter((c) => c.continent === key && unlockedSet.has(c.id)).length;
+            const active = tab === key;
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => handleContinentTab(key)}
+                className={`px-3 py-1.5 rounded-xl text-[10px] font-bold shrink-0 transition-colors cursor-pointer ${
+                  active
+                    ? 'bg-sky-500 text-white shadow-sm'
+                    : 'bg-slate-900/80 text-slate-400 hover:text-slate-200 border border-slate-800'
+                }`}
+              >
+                {emoji} {label}
+                {ready ? ` (${got}/${poolCount})` : ' · 筹备中'}
+              </button>
+            );
+          })}
         </div>
 
         {tipMessage && (
