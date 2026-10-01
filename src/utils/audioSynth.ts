@@ -122,6 +122,9 @@ class SleepAudioSynthesizer {
     this.initContext();
     if (!this.ctx) return;
     if (this.layers.has(type)) return;
+    // 新会话推进纪元：同 playAlarm，作废 stop() 的 150ms 延迟回调——
+    // 否则 150ms 内快速开播的层会被回调判死，随机事件层全部静默
+    this.sessionEpoch++;
     const master = this.ensureMaster();
     const gain = this.ctx.createGain();
     gain.gain.setValueAtTime(0.0001, this.ctx.currentTime);
@@ -399,6 +402,10 @@ class SleepAudioSynthesizer {
     this.initContext();
     if (!this.ctx) return;
     this.stop();
+    // 新会话推进纪元：作废 stop() 留下的 150ms 延迟回调。否则该回调把刚开播
+    // 会话的 isPlaying 改回 false——Web 闹钟只响 2.6 秒、试听铃声只响一下
+    // 的根因（所有音符都过 `if (!this.isPlaying) return` 这道门）
+    this.sessionEpoch++;
 
     const master = this.ctx.createGain();
     master.gain.setValueAtTime(0.001, this.ctx.currentTime);
