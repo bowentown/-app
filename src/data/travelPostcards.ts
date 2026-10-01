@@ -407,7 +407,7 @@ export const ALL_POSTCARDS: TravelPostcard[] = [
     "country": "法国",
     "title": "塞纳河畔旧书摊与铁塔远眺",
     "imageUrl": "postcards/europe/card-europe-19.webp",
-    "text": "塞纳河边的绿色铁皮书箱里，藏着好多泛黄的童话手绘本。整点的时候，远处的埃菲尔铁塔像金色的仙女棒一样闪耀了整整五分钟。嚼着刚买的杏仁羊角包，巴黎的夜晚香甜得像梦一样。",
+    "text": "塞纳河边的绿色铁皮书箱里，藏着好多泛黄的童话手绘本。整点的时候，远处的埃菲尔铁塔像金色的仙女棒一样闪耀了整整五分钟。嚼着刚买的杏仁羊角包——才不会分你，鱼片梦里闻闻香气就行。巴黎的夜晚香甜得像梦一样。",
     "souvenir": {
       "name": "巴黎复古铜版画小明信片",
       "emoji": "🥐",
@@ -451,7 +451,7 @@ export const ALL_POSTCARDS: TravelPostcard[] = [
     "country": "荷兰",
     "title": "童话运河木桥与郁金香风车",
     "imageUrl": "postcards/europe/card-europe-21.webp",
-    "text": "这里居然没有马路，大家出门全都划小木船！河水干净得能看到水草在跳舞，两岸全是茅草顶的小木屋和彩色的郁金香花丛。风车慢悠悠地转着，转一下就像打一次哈欠~",
+    "text": "这里居然没有马路，大家出门全都划小木船！河水干净得能看到水草在跳舞，两岸全是茅草顶的小木屋和彩色的郁金香花丛。风车慢悠悠地转着，转一下就像打一次哈欠~ 本鱼和它一见如故：在这里，懒是符合本地风俗的。",
     "souvenir": {
       "name": "微型手绘荷兰小木鞋挂饰",
       "emoji": "🌷",
@@ -473,7 +473,7 @@ export const ALL_POSTCARDS: TravelPostcard[] = [
     "country": "意大利",
     "title": "叹息水巷暮色贡多拉",
     "imageUrl": "postcards/europe/card-europe-22.webp",
-    "text": "黑色的小贡多拉船在水巷里像摇篮一样轻轻摇摆。船夫大叔哼着低沉的威尼斯船歌，水浪‘咕噜噜’地拍着老石墙。被水波这么晃着晃着，眼皮真的会重重地沉下去呢……",
+    "text": "黑色的小贡多拉船在水巷里像摇篮一样轻轻摇摆。船夫大叔哼着低沉的威尼斯船歌，水浪‘咕噜噜’地拍着老石墙。被水波这么晃着晃着，眼皮真的会重重地沉下去呢……晚安，本鱼先睡为敬。",
     "souvenir": {
       "name": "威尼斯彩绘羽毛微型面具",
       "emoji": "🎭",
@@ -517,7 +517,7 @@ export const ALL_POSTCARDS: TravelPostcard[] = [
     "country": "瑞士",
     "title": "阿尔卑斯雪山红皮列车",
     "imageUrl": "postcards/europe/card-europe-24.webp",
-    "text": "红色的齿轨列车载着本鱼向雪山顶上开。车窗外是像绿色绒毯一样的草甸，草地上还有挂着大铜铃的奶牛在吃草。嚼着瑞士三角黑巧克力，本鱼觉得今天连呼吸都带着雪山薄荷的清香！",
+    "text": "红色的齿轨列车载着本鱼向雪山顶上开。车窗外是像绿色绒毯一样的草甸，草地上还有挂着大铜铃的奶牛在吃草。嚼着瑞士三角黑巧克力——只剩包装纸了，别问，问就是本鱼吃的。今晚早点睡，梦里的雪山更甜。",
     "souvenir": {
       "name": "阿尔卑斯纯铜小牛铃挂饰",
       "emoji": "🍫",
@@ -539,7 +539,7 @@ export const ALL_POSTCARDS: TravelPostcard[] = [
     "country": "希腊",
     "title": "伊亚悬崖蓝顶白房落日",
     "imageUrl": "postcards/europe/card-europe-25.webp",
-    "text": "白色的墙、蓝色的穹顶、粉金色的落日余晖。这里的白色小巷里到处躺着晒肚皮的胖猫咪，本鱼也挑了面矮墙趴着看了两个小时落日。生活就是要学会慢吞吞呀，鱼片！",
+    "text": "白色的墙、蓝色的穹顶、粉金色的落日余晖。这里的白色小巷里到处躺着晒肚皮的胖猫咪，本鱼也挑了面矮墙趴着看了两个小时落日。生活就是要学会慢吞吞呀，鱼片！……这项本领跟谁学的？跟你。哼，本鱼本来很勤快的。",
     "souvenir": {
       "name": "爱琴海传统蓝眼睛琉璃珠",
       "emoji": "🧿",
@@ -561,7 +561,7 @@ export const ALL_POSTCARDS: TravelPostcard[] = [
     "country": "挪威",
     "title": "峡湾雪原翡翠极光穹顶",
     "imageUrl": "postcards/europe/card-europe-26.webp",
-    "text": "极光就像绿色的丝绸裙摆在夜空里舒卷，整座雪山都被染成了淡淡的碧玉色。昨夜鱼片的深睡能量满满，本鱼才能飘到这么远的北极圈。把最亮的那一缕翡翠极光折成信纸寄给你啦！",
+    "text": "极光就像绿色的丝绸裙摆在夜空里舒卷，整座雪山都被染成了淡淡的碧玉色。昨夜鱼片的深睡能量满满，本鱼才能飘到这么远的北极圈。把最亮的那一缕翡翠极光折成信纸寄给你啦！运费本来要从你的睡眠分里扣——骗你的，谁让你昨晚睡得好。",
     "souvenir": {
       "name": "极光捕梦网手工挂件",
       "emoji": "🌌",
@@ -605,7 +605,7 @@ export const ALL_POSTCARDS: TravelPostcard[] = [
     "country": "西班牙",
     "title": "奎尔公园马赛克彩色长椅",
     "imageUrl": "postcards/europe/card-europe-28.webp",
-    "text": "高迪爷爷设计的彩色碎瓷砖长椅太神奇了，坐上去刚好贴合本鱼圆滚滚的背脊！像坐在彩虹的背上一样舒服。阳光晒得石砖暖暖的，海风里有柑橘的甜味，适合打个长长的午后盹。",
+    "text": "高迪爷爷设计的彩色碎瓷砖长椅太神奇了，坐上去刚好贴合本鱼圆滚滚的背脊！像坐在彩虹的背上一样舒服。阳光晒得石砖暖暖的，海风里有柑橘的甜味，适合打个长长的午后盹。本鱼替你试睡过了，五星好评——想谢就今晚早点闭眼。",
     "souvenir": {
       "name": "高迪彩色马赛克小蜥蜴磁贴",
       "emoji": "🦎",
@@ -649,7 +649,7 @@ export const ALL_POSTCARDS: TravelPostcard[] = [
     "country": "奥地利",
     "title": "湖畔木屋晨曦天鹅伴游",
     "imageUrl": "postcards/europe/card-europe-30.webp",
-    "text": "湖水像一块巨大的暗绿翡翠，清晨两只高贵的大白天鹅划过水面，竟然游到本鱼脚边讨面包吃！木屋的外墙上爬满了深红色的爬山虎。湖边的早晨静悄悄的，连呼吸都要放轻一点哦。",
+    "text": "湖水像一块巨大的暗绿翡翠，清晨两只高贵的大白天鹅划过水面，竟然游到本鱼脚边讨面包吃！木屋的外墙上爬满了深红色的爬山虎。湖边的早晨静悄悄的，连呼吸都要放轻一点哦。面包本鱼自己也馋……最后还是分了天鹅一半，夸夸本鱼大度！",
     "souvenir": {
       "name": "哈尔施塔特盐矿透明水晶盐块",
       "emoji": "🦢",
@@ -1067,7 +1067,7 @@ export const ALL_POSTCARDS: TravelPostcard[] = [
     "country": "纳米比亚",
     "title": "纳米布红沙丘与死亡谷枯木星空",
     "imageUrl": "postcards/africa/card-africa-49.webp",
-    "text": "全世界最古老的红色沙漠！沙丘高得像一座座红色的金字塔。晚上的星星亮得惊人，九百年前的枯树在星空下像雕塑一样挺立。在这片经历千万年的旷野里，所有的失眠与焦虑都会化为风中的细沙。",
+    "text": "全世界最古老的红色沙漠！沙丘高得像一座座红色的金字塔。晚上的星星亮得惊人，九百年前的枯树在星空下像雕塑一样挺立。在这片经历千万年的旷野里，所有的失眠与焦虑都会化为风中的细沙。……嘘，别告诉别人这里多好玩，本鱼想独占。",
     "souvenir": {
       "name": "纳米布亿年红砂晶莹小沙漏",
       "emoji": "🏜️",
@@ -1125,7 +1125,7 @@ export const AFRICA_POSTCARDS = ALL_POSTCARDS.filter((c) => c.continent === 'afr
  * 集齐全图鉴达成率永远停在 36%，欧/美/非标签是无法兑现的承诺。
  * 新大洲插画补齐后，把对应大洲加进本数组即可解锁（文案数据已在）。
  */
-export const ART_READY_CONTINENTS: readonly ContinentType[] = ['asia'];
+export const ART_READY_CONTINENTS: readonly ContinentType[] = ['asia', 'europe'];
 
 /** 当前可探索卡池（= 插画已就绪大洲的卡片） */
 export const TRIP_POOL: TravelPostcard[] = ALL_POSTCARDS.filter((c) =>

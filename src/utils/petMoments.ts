@@ -5,6 +5,7 @@
  *
  * 数据全部存 WebView localStorage；睡眠事实由 records/profile 实时计算。
  */
+import { TRIP_ENERGY_TARGET } from '../services/travelService';
 import type { SleepRecord, UserProfile } from '../types/sleep';
 
 export interface MomentComment {
@@ -674,7 +675,7 @@ export function createPostcardMoment(postcard: {
     facts: [
       `旅程地点 ${postcard.country}·${postcard.title}`,
       `带回伴手礼 ${postcard.souvenir.emoji} ${postcard.souvenir.name}`,
-      `梦境漫游能量达成 666 分出发`,
+      `梦境漫游能量达成 ${TRIP_ENERGY_TARGET} 分出发`,
     ],
     cards: ['postcard'],
     postcardId: postcard.id,

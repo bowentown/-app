@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Mail, Sparkles, Heart } from 'lucide-react';
 import type { TravelPostcard } from '../../types/travel';
 import { getPostcardById } from '../../data/travelPostcards';
-import { clearPendingArrival } from '../../services/travelService';
+import { clearPendingArrival, TRIP_ENERGY_TARGET } from '../../services/travelService';
 import { createPostcardMoment } from '../../utils/petMoments';
 import { useModalA11y } from '../../utils/modalA11y';
 import { PostcardCard } from './PostcardCard';
@@ -56,7 +56,7 @@ export const TripArrivalModal: React.FC<Props> = ({ postcardId, onClose, onOpenM
         <div className="space-y-1">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[10px] font-bold">
             <Sparkles className="w-3 h-3 text-amber-400" />
-            <span>梦境能量 666 分达成 · 旅途信函</span>
+            <span>梦境能量 {TRIP_ENERGY_TARGET} 分达成 · 旅途信函</span>
           </div>
           <h3 className="text-base font-black text-white">大肥鱼给你寄回了新明信片！</h3>
           <p className="text-[11px] text-slate-400">

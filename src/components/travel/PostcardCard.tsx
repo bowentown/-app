@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import type { TravelPostcard } from '../../types/travel';
 import { getPostcardById } from '../../data/travelPostcards';
 import { Sparkles, MapPin, RotateCw } from 'lucide-react';
+import { TRIP_ENERGY_TARGET } from '../../services/travelService';
 
 interface Props {
   postcardId?: string;
@@ -107,7 +108,7 @@ export const PostcardCard: React.FC<Props> = ({ postcardId, postcard: initialPos
               </div>
               <div className="w-9 h-11 border border-dashed border-amber-500/60 bg-amber-100/60 rounded flex flex-col items-center justify-center p-0.5 text-center">
                 <span className="text-sm leading-none">🐋</span>
-                <span className="text-[7px] text-amber-800 font-bold scale-90">666pt</span>
+                <span className="text-[7px] text-amber-800 font-bold scale-90">{TRIP_ENERGY_TARGET}pt</span>
               </div>
             </div>
 

@@ -3,10 +3,16 @@ import { TRIP_POOL, getPostcardById } from '../data/travelPostcards';
 
 const TRAVEL_STATE_KEY = 'somnacare_travel_state';
 
+/**
+ * 单次旅行所需梦境能量。测试期 80（每晚存一档基本能触发一次，方便真机
+ * 走完整链路）；正式发布前改回 666。展示端一律引用本常量，不要写死数字。
+ */
+export const TRIP_ENERGY_TARGET = 80;
+
 export function getInitialTravelState(): UserTravelState {
   return {
     currentEnergy: 0,
-    targetEnergy: 666,
+    targetEnergy: TRIP_ENERGY_TARGET,
     totalTrips: 0,
     unlockedCardIds: [],
     souvenirInventory: [],
@@ -34,7 +40,7 @@ export function loadTravelState(): UserTravelState {
     const parsed = JSON.parse(raw);
     return {
       currentEnergy: typeof parsed.currentEnergy === 'number' && Number.isFinite(parsed.currentEnergy) ? parsed.currentEnergy : 0,
-      targetEnergy: 666,
+      targetEnergy: TRIP_ENERGY_TARGET,
       totalTrips: typeof parsed.totalTrips === 'number' && Number.isFinite(parsed.totalTrips) ? parsed.totalTrips : 0,
       unlockedCardIds: Array.isArray(parsed.unlockedCardIds) ? parsed.unlockedCardIds.filter((x: unknown): x is string => typeof x === 'string') : [],
       souvenirInventory: Array.isArray(parsed.souvenirInventory) ? parsed.souvenirInventory.filter((x: unknown): x is string => typeof x === 'string') : [],
@@ -77,7 +83,7 @@ export function rollNextPostcard(
 }
 
 /**
- * 结算睡眠评分并注入旅行能量池（阈值恒为 666 分）。
+ * 结算睡眠评分并注入旅行能量池（阈值 TRIP_ENERGY_TARGET）。
  * @param sleepScore 睡眠得分 (0~100)
  * @param date 记录日期（YYYY-MM-DD）：同一晚重复保存/补录时按"取更高分"去重，
  *             此前每次保存都全额充能——重跑一次睡眠追踪能量就翻倍

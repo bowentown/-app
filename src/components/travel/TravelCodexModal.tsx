@@ -11,7 +11,7 @@ const CONTINENT_TABS: { key: Exclude<TabFilter, 'all'>; emoji: string; label: st
   { key: 'africa', emoji: '🦁', label: '非洲' },
 ];
 import { ALL_POSTCARDS, ART_READY_CONTINENTS, TRIP_POOL } from '../../data/travelPostcards';
-import { getTravelProgress, loadTravelState } from '../../services/travelService';
+import { getTravelProgress, loadTravelState, TRIP_ENERGY_TARGET } from '../../services/travelService';
 import { useModalA11y } from '../../utils/modalA11y';
 import { PostcardCard } from './PostcardCard';
 
@@ -91,7 +91,7 @@ export const TravelCodexModal: React.FC<Props> = ({ onClose }) => {
         </button>
       </div>
 
-      {/* 概览区：666能量进度 + 伴手礼宝库 */}
+      {/* 概览区：能量进度 + 伴手礼宝库 */}
       <div className="shrink-0 p-4 border-b border-slate-800/60 bg-gradient-to-b from-slate-900/60 to-transparent space-y-3">
         {/* 能量条 */}
         <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-3 flex items-center justify-between gap-3">
@@ -102,13 +102,13 @@ export const TravelCodexModal: React.FC<Props> = ({ onClose }) => {
                 梦境旅行能量
               </span>
               <span className="font-mono text-slate-400">
-                <strong className="text-sky-300 text-xs">{travelState.currentEnergy}</strong> / 666 分
+                <strong className="text-sky-300 text-xs">{travelState.currentEnergy}</strong> / {TRIP_ENERGY_TARGET} 分
               </span>
             </div>
             <div className="h-2 rounded-full bg-slate-800 overflow-hidden">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-sky-500 via-indigo-500 to-purple-500 transition-all duration-500"
-                style={{ width: `${Math.min(100, Math.round((travelState.currentEnergy / 666) * 100))}%` }}
+                style={{ width: `${Math.min(100, Math.round((travelState.currentEnergy / TRIP_ENERGY_TARGET) * 100))}%` }}
               />
             </div>
           </div>

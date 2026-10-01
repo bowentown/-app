@@ -563,7 +563,7 @@ export const App: React.FC = () => {
         (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
       );
     });
-    // 注入梦境旅行能量（666分触发大肥鱼出发旅行）；带日期去重，
+    // 注入梦境旅行能量（攒满 TRIP_ENERGY_TARGET 触发大肥鱼出发旅行）；带日期去重，
     // 同一晚重跑/补录只按更高分计一次
     const travelRes = processDailySleepScore(newRecord.sleepScore, newRecord.date);
     if (travelRes.triggeredTrip && travelRes.newCard) {
@@ -579,7 +579,7 @@ export const App: React.FC = () => {
         (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
       );
     });
-    // 注入梦境旅行能量（666分触发大肥鱼出发旅行）；带日期去重，
+    // 注入梦境旅行能量（攒满 TRIP_ENERGY_TARGET 触发大肥鱼出发旅行）；带日期去重，
     // 同一晚重跑/补录只按更高分计一次
     const travelRes = processDailySleepScore(newRecord.sleepScore, newRecord.date);
     if (travelRes.triggeredTrip && travelRes.newCard) {
