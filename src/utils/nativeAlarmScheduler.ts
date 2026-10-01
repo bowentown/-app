@@ -68,15 +68,15 @@ function hashStringToInt(str: string): number {
 /**
  * 将启用的闹钟集合全量同步到 Android 系统级通知调度队列
  */
-export async function syncAlarmsToNative(alarms: CustomAlarmSetting[]): Promise<{ success: boolean; nativeScheduledCount: number }> {
+export async function syncAlarmsToNative(alarms: CustomAlarmSetting[]): Promise<{ success: boolean; nativeScheduledCount: number; invalidCount: number }> {
   if (!isNativePlatform()) {
-    return { success: false, nativeScheduledCount: 0 };
+    return { success: false, nativeScheduledCount: 0, invalidCount: 0 };
   }
 
   const cap = getCapacitor();
   const plugin: CapacitorLocalNotificationsPlugin = cap?.Plugins?.LocalNotifications;
   if (!plugin) {
-    return { success: false, nativeScheduledCount: 0 };
+    return { success: false, nativeScheduledCount: 0, invalidCount: 0 };
   }
 
   try {
@@ -103,15 +103,18 @@ export async function syncAlarmsToNative(alarms: CustomAlarmSetting[]): Promise<
       });
     }
 
-    const enabledAlarms = alarms.filter((a) => a.enabled);
-    if (enabledAlarms.length === 0) {
+    // 坏时间条目（<input type="time"> 被清空后入库）会让 plugin.schedule 整批
+    // 被拒——原生重排是逐条容错，这里对齐：跳过坏值而不是拖垮全部闹钟
+    const validAlarms = alarms.filter((a) => a.enabled && /^([01]\d|2[0-3]):[0-5]\d$/.test(a.time || ''));
+    const invalidCount = alarms.filter((a) => a.enabled).length - validAlarms.length;
+    if (validAlarms.length === 0) {
       try { await (cap.Plugins?.GemmaLLM as any)?.alarmRingCancel?.(); } catch { /* ignore */ }
-      return { success: true, nativeScheduledCount: 0 };
+      return { success: true, nativeScheduledCount: 0, invalidCount };
     }
 
     const notificationsToSchedule: any[] = [];
 
-    for (const alarm of enabledAlarms) {
+    for (const alarm of validAlarms) {
       const [h, m] = alarm.time.split(':').map(Number);
       const baseId = hashStringToInt(alarm.id);
 
@@ -168,7 +171,7 @@ export async function syncAlarmsToNative(alarms: CustomAlarmSetting[]): Promise<
     try {
       await (cap.Plugins?.GemmaLLM as any)?.alarmRingSchedule?.({
         alarmsJson: JSON.stringify(
-          enabledAlarms.map((a) => ({
+          validAlarms.map((a) => ({
             id: a.id,
             time: a.time,
             repeatDays: a.repeatDays ?? [],
@@ -179,10 +182,10 @@ export async function syncAlarmsToNative(alarms: CustomAlarmSetting[]): Promise<
       });
     } catch { /* 响铃排程失败不阻断通知调度 */ }
 
-    return { success: true, nativeScheduledCount: notificationsToSchedule.length };
+    return { success: true, nativeScheduledCount: notificationsToSchedule.length, invalidCount };
   } catch (err) {
     console.error('[NativeAlarm] 同步原生闹钟失败:', err);
-    return { success: false, nativeScheduledCount: 0 };
+    return { success: false, nativeScheduledCount: 0, invalidCount: 0 };
   }
 }
 

@@ -11,7 +11,6 @@ import {
   Sparkles,
   Volume2,
   Check,
-  Sun,
   ShieldCheck,
 } from 'lucide-react';
 import { CustomAlarmSetting } from '../types/sleep';
@@ -53,7 +52,6 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
   const [newSmartWindow, setNewSmartWindow] = useState(20);
 
   const [testingTone, setTestingTone] = useState<string | null>(null);
-  const [activeRingingAlarm, setActiveRingingAlarm] = useState<CustomAlarmSetting | null>(null);
   const [nativeStatus, setNativeStatus] = useState<{ isNative: boolean; scheduledCount: number; exact?: ExactAlarmStatus }>({
     isNative: isNativePlatform(),
     scheduledCount: 0,
@@ -71,7 +69,14 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
     if (isNat) {
       syncAlarmsToNative(alarms).then(async (res) => {
         const exact = await getExactAlarmStatus();
+        // 此前 res.success 被完全忽略：坏时间条目让整批调度被拒时界面毫无表示
+        const failed = !res.success || res.invalidCount > 0;
         setNativeStatus({ isNative: true, scheduledCount: res.nativeScheduledCount, exact });
+        if (failed) {
+          setPermissionHint('系统闹钟同步失败：存在无效时间的闹钟或权限缺失，请检查闹钟列表后重试。');
+        } else {
+          setPermissionHint(null);
+        }
       });
     } else {
       setNativeStatus({ isNative: false, scheduledCount: 0 });
@@ -85,45 +90,9 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
     };
   }, []);
 
-  // Alarm clock monitor loop: checks every 10 seconds against system clock
-  React.useEffect(() => {
-    const checkAlarm = () => {
-      const now = new Date();
-      const currentHours = String(now.getHours()).padStart(2, '0');
-      const currentMinutes = String(now.getMinutes()).padStart(2, '0');
-      const currentTimeStr = `${currentHours}:${currentMinutes}`;
-      const currentDay = now.getDay() === 0 ? 7 : now.getDay(); // 1-7
-
-      alarms.forEach((alarm) => {
-        const fireKey = `${alarm.id}|${alarm.time}|${currentDay}`;
-        if (
-          alarm.enabled &&
-          alarm.time === currentTimeStr &&
-          (alarm.repeatDays.length === 0 || alarm.repeatDays.includes(currentDay)) &&
-          lastFiredKeyRef.current !== fireKey
-        ) {
-          if (!activeRingingAlarm) {
-            lastFiredKeyRef.current = fireKey;
-            setActiveRingingAlarm(alarm);
-            // native：响铃由 AlarmRingService 循环负责（WebView 计时器息屏会被冻结，
-            // Web Audio 曾只响一声就停）；web 才走 Web Audio
-            if (!isNativePlatform()) sleepAudio.playAlarm(alarm.tone);
-            // "仅一次"语义落地：无重复日的闹钟响过即停用（原生侧同为单次调度）
-            if (alarm.repeatDays.length === 0) {
-              onUpdateAlarms(alarms.map((a) => (a.id === alarm.id ? { ...a, enabled: false } : a)));
-            }
-          }
-        }
-      });
-    };
-
-    const interval = window.setInterval(checkAlarm, 10000);
-    return () => window.clearInterval(interval);
-  }, [alarms, activeRingingAlarm]);
-
-  // 同一分钟内已响过并被手动停止的闹钟不再重触发（此前停止后若仍在原分钟内，
-  // 下一轮 10s 检查会立即再次响铃）
-  const lastFiredKeyRef = React.useRef<string>('');
+  // 响铃检测与停止横幅统一在 App 层（全局横幅任何分区可见可停）——
+  // 本组件此前还有一套独立的 10s 检测循环与本地横幅，web 端同一闹钟
+  // 会连响两遍、"停止响铃"出现两个行为不一致的入口
 
   const handleTestTone = (tone: 'gentle_chime' | 'aurora_melody' | 'radar_beep') => {
     if (testingTone === tone) {
@@ -133,16 +102,6 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
       sleepAudio.playAlarm(tone);
       setTestingTone(tone);
     }
-  };
-
-  const handleStopRinging = () => {
-    sleepAudio.stop();
-    // 原生侧同步停掉持续响铃服务
-    try {
-      const cap = (window as any).Capacitor;
-      if (cap?.isNativePlatform?.()) void cap.Plugins?.GemmaLLM?.alarmRingStop?.();
-    } catch { /* ignore */ }
-    setActiveRingingAlarm(null);
   };
 
   // 原生环境下确保通知权限已授予 (Android 13+ POST_NOTIFICATIONS 为运行时权限，未授权则通知不显示)
@@ -191,6 +150,12 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
   };
 
   const handleSaveNewAlarm = async () => {
+    // <input type="time"> 被清空后保存会把坏时间入库：原生通知整批调度被拒
+    // （ Capacitor 校验不过 → 全部闹钟的横幅通知一起消失），且界面无任何提示
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(newTime)) {
+      setPermissionHint('请先选择有效的闹钟时间（时:分）');
+      return;
+    }
     const ok = await ensureAlarmPermissions();
     if (!ok) return;
     const created: CustomAlarmSetting = {
@@ -210,27 +175,7 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
 
   return (
     <div className="space-y-4">
-      {/* Active Ringing Overlay Notification Banner */}
-      {activeRingingAlarm && (
-        <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-600 via-indigo-600 to-violet-600 text-white shadow-2xl animate-pulse flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-full bg-white/20 flex items-center justify-center">
-              <Sun className="w-6 h-6 animate-spin text-amber-200" />
-            </div>
-            <div>
-              <div className="text-xs font-bold text-amber-100">闹钟响铃中 · 晨安唤醒</div>
-              <h4 className="text-xl font-black">{activeRingingAlarm.time} {activeRingingAlarm.label}</h4>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={handleStopRinging}
-            className="px-5 py-2.5 bg-white text-slate-900 font-black text-sm rounded-xl shadow-lg active:scale-95 transition-all cursor-pointer"
-          >
-            停止响铃
-          </button>
-        </div>
-      )}
+      {/* 响铃横幅已上移到 App 层全局渲染（含停止按钮），此处不再重复 */}
 
       {/* Header with Add Button & Native Platform Status */}
       <div className="space-y-1">
