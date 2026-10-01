@@ -94,6 +94,9 @@ public class PetOverlayService extends Service {
     private boolean fanShown;
     private boolean minimized;
     private int touchSlop;
+    // 桌宠当前上屏的皮肤：WhaleGirlView 的素材目录在构造时定死，
+    // 换装必须整个重建 View（ petStop→petStart 用户早就要手动做一遍）
+    private String currentSkin = "default";
 
     // ---- 拖拽状态 ----
     private int downRawX, downRawY, downWinX, downWinY;
@@ -169,10 +172,26 @@ public class PetOverlayService extends Service {
         if (petRoot == null) {
             showPet();
         } else {
-            // 幂等重启：屏幕尺寸可能已变（转屏/折叠/改显示尺寸），重夹一次位置
-            clampToScreen(petParams);
-            safeUpdate(petRoot, petParams);
-            if (fanShown) updateEyeButton();
+            String want = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                    .getString("pet_skin", "default");
+            if (!want.equals(currentSkin)) {
+                // 换装即时生效：偏好已变但屏幕上的 View 还是旧皮肤——
+                // 必须重建（素材目录构造时定死），此前只能关掉桌宠再开
+                main.removeCallbacks(drowsyTick);
+                if (fanShown) hideFan();
+                if (bubbleShown) hideBubble();
+                if (whale != null) { try { whale.stop(); } catch (Exception ignored) { } whale = null; }
+                if (petRoot != null) {
+                    try { wm.removeViewImmediate(petRoot); } catch (Exception ignored) { }
+                    petRoot = null;
+                }
+                showPet();
+            } else {
+                // 幂等重启：屏幕尺寸可能已变（转屏/折叠/改显示尺寸），重夹一次位置
+                clampToScreen(petParams);
+                safeUpdate(petRoot, petParams);
+                if (fanShown) updateEyeButton();
+            }
         }
         return START_STICKY;
     }
@@ -184,7 +203,8 @@ public class PetOverlayService extends Service {
             android.content.SharedPreferences sp = getSharedPreferences(PREFS, Context.MODE_PRIVATE);
 
             petRoot = new FrameLayout(this);
-            whale = new WhaleGirlView(this, sp.getString("pet_skin", "default"));
+            currentSkin = sp.getString("pet_skin", "default");
+            whale = new WhaleGirlView(this, currentSkin);
             petRoot.addView(whale, new FrameLayout.LayoutParams(
                     FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
 
@@ -313,12 +333,13 @@ public class PetOverlayService extends Service {
         if (fanShown) return;
         // 不再 hideBubble：气泡在角色上方、按钮在侧面，位置不重叠，
         // 强制收气泡会中断角色的说话姿态——两个窗口完全独立
+        FrameLayout v = null;
         try {
             // 弧形镜像：角色中心在屏幕左半 → 扇面开在右侧（与 placeBeside 同判据）。
             // 必须在 buildFan 之前赋值——近/远侧偏移由它决定
             DisplayInfo diPre = displayInfo();
             fanOnRight = (petParams.x + petParams.width / 2) < diPre.width / 2;
-            FrameLayout v = buildFan();
+            v = buildFan();
             v.setOnTouchListener((vv, e) -> {
                 if (e.getActionMasked() == MotionEvent.ACTION_OUTSIDE) hideFan();
                 return false;
@@ -359,6 +380,10 @@ public class PetOverlayService extends Service {
                         .start();
             }
         } catch (Exception e) {
+            // addView 半途失败会留下已挂上的孤儿窗口（与 showBubble 同款收尾）
+            if (v != null) {
+                try { wm.removeViewImmediate(v); } catch (Exception ignored) { }
+            }
             fanRoot = null;
             fanShown = false;
         }
