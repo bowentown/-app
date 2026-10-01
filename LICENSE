@@ -19,3 +19,21 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+--------------------------------------------------------------------------
+
+## 素材授权例外（Artwork License Exception）
+
+本仓库的**源代码**以上方 MIT 条款授权。
+
+但下列**角色美术素材不在 MIT 范围内**（MIT 中 "sublicense / sell copies"
+等授权不适用于它们），为**非商业使用**授权（须保留署名；素材作者要求时
+应下架）。授权条款与署名链见对应目录的 `NOTICE.md`：
+
+- `plugins/cap-gemma-llm/android/src/main/assets/pet/**`
+- `plugins/cap-gemma-llm/android/src/main/assets/pet-sport/**`
+- `public/whale-selfie*.png`
+
+这些素材源自鲸鱼娘角色创作社区（原作：上善；DeepSeek 女仆鲸鱼娘二次设计：
+ZipZipPipe；整理与重绘：Henryang777），仅随免费、离线、无广告的
+SomnaCare 应用分发。

@@ -126,4 +126,7 @@ cd android && ./gradlew assembleDebug
 
 ## 📄 License
 
-[MIT](LICENSE)
+代码为 [MIT](LICENSE)（含素材授权例外一节）。
+角色美术素材**不在 MIT 范围内**：非商业授权、须保留署名，署名链见
+`plugins/cap-gemma-llm/android/src/main/assets/pet/NOTICE.md`
+（樱花变体同源同条款，见 `pet-sport/NOTICE.md`）。

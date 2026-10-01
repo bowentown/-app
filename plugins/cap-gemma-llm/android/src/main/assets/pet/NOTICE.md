@@ -3,8 +3,8 @@
 本目录下的 `*.png` 精灵图取自
 [Henryang777/whale-girl-plus](https://github.com/Henryang777/whale-girl-plus)
 （`.dsh-plugin/assets/characters/whale-girl/`），按其 `NOTICE.md` 的条款
-**非商业使用、保留本署名、素材作者要求时下架**分发。仅取了悬浮窗用到的
-6 个状态，其余未包含。
+**非商业使用、保留本署名、素材作者要求时下架**分发。现随应用打包全部
+18 个状态（悬浮窗动画全集），与 `pet-sport/`（樱花配色变体）同源同条款。
 
 ## 署名链
 
