@@ -124,6 +124,11 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
 
   // 快捷提示词行：挂 JS 横滑（祖先 pane 的 touch-action: pan-y 会禁掉原生横滑）
   const promptRowRef = useRef<HTMLDivElement>(null);
+  // 聊天跟随滚动：流式输出时容器高度持续增长，没有自动跟随的话新回复
+  // "长在屏幕外"，要手动滑。用户主动上滑看历史时暂停跟随，滚回底部即恢复
+  const chatScrollRef = useRef<HTMLDivElement>(null);
+  const chatStickRef = useRef(true);
+  const chatInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     const el = promptRowRef.current;
     if (!el) return;
@@ -167,6 +172,11 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
   }, [records, insights]);
   const [localStage, setLocalStage] = useState<'loading' | 'generating' | null>(null);
   const localGenAbortRef = useRef<AbortController | null>(null);
+  // 新消息/流式 token 到来时跟随滚到底部（仅当用户本就停在底部附近）
+  useEffect(() => {
+    const el = chatScrollRef.current;
+    if (el && chatStickRef.current) el.scrollTop = el.scrollHeight;
+  }, [chatMessages, isSendingChat, localStage]);
 
   const fetchAIAnalysis = async () => {
     setIsLoadingAnalysis(true);
@@ -211,6 +221,7 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
     const newHistory = [...chatMessages, userMsg];
     setChatMessages(newHistory);
     setInputText('');
+    chatInputRef.current?.focus();   // 连续追问时键盘不掉
     setIsSendingChat(true);
 
     try {
@@ -577,7 +588,14 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
         {/* 消息流：嵌套纵向滚动容器。
             swipe-nested 让浏览器不再为它单独做滚动方向判定，横滑立刻透给分区轨道
             （否则内层容器的滚动仲裁会延迟 pointer 事件，真机上表现为"框内滑不动"）。*/}
-        <div className="flex-1 overflow-y-auto py-2 space-y-3 pr-1 text-xs no-scrollbar swipe-nested">
+        <div
+          ref={chatScrollRef}
+          onScroll={(e) => {
+            const el = e.currentTarget;
+            chatStickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
+          }}
+          className="flex-1 overflow-y-auto py-2 space-y-3 pr-1 text-xs no-scrollbar swipe-nested"
+        >
           {chatMessages.length <= 1 && (
             <div className="flex flex-col items-center justify-center py-7 gap-3 select-none" aria-hidden>
               <div className="relative">
@@ -655,6 +673,7 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
         {/* Chat input box */}
         <div className="pt-2.5 border-t border-slate-700/50 flex items-center gap-2 shrink-0">
           <input
+            ref={chatInputRef}
             type="text"
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}

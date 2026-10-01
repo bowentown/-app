@@ -257,6 +257,33 @@ public class PetOverlayService extends Service {
         }
     }
 
+    // ---- 长按桌宠：拉起 App 落到今日页 ----
+    // 消费链（petConsumePendingTab → App 冷启动/回前台换分区）早已就位，
+    // 此前没有写者——"点桌宠拉起 App"一直是死链路。长按与单击（扇面）、
+    // 拖拽（挪位置）互不打架：移动超 sloup 或抬手都会取消长按计时
+    private static final long LONG_PRESS_MS = 550;   // 与系统长按节奏一致
+    private boolean longPressFired;
+    private final Runnable longPressOpen = new Runnable() {
+        @Override public void run() {
+            if (dragging || petRoot == null) return;
+            longPressFired = true;
+            petRoot.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+            getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                    .edit().putString(K_PENDING_TAB, "today").apply();
+            // SYSTEM_ALERT_WINDOW 应用豁免后台启动限制；服务在响铃/亮屏场景也能拉起
+            try {
+                Intent i = getPackageManager().getLaunchIntentForPackage(getPackageName());
+                if (i != null) {
+                    i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                    startActivity(i);
+                }
+            } catch (Exception ignored) {
+            }
+            if (fanShown) hideFan();
+            if (bubbleShown) hideBubble();
+        }
+    };
+
     private boolean handlePetTouch(MotionEvent e) {
         switch (e.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
@@ -265,12 +292,15 @@ public class PetOverlayService extends Service {
                 downWinX = petParams.x;
                 downWinY = petParams.y;
                 dragging = false;
+                longPressFired = false;
+                main.postDelayed(longPressOpen, LONG_PRESS_MS);
                 return true;
             case MotionEvent.ACTION_MOVE: {
                 int dx = (int) e.getRawX() - downRawX;
                 int dy = (int) e.getRawY() - downRawY;
                 if (!dragging && Math.hypot(dx, dy) > touchSlop) {
                     dragging = true;
+                    main.removeCallbacks(longPressOpen);   // 开始拖拽：长按作废
                     if (whale != null) whale.setDragging(true);
                 }
                 if (dragging) {
@@ -285,10 +315,15 @@ public class PetOverlayService extends Service {
                 return true;
             }
             case MotionEvent.ACTION_UP:
+                main.removeCallbacks(longPressOpen);
+                if (longPressFired) {
+                    return true;   // 长按已拉起 App：这一下不再是"点击"
+                }
                 if (dragging) {
                     if (whale != null) whale.setDragging(false);
                     dockToEdge();
                 } else if (whale != null) {
+                    petRoot.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY);
                     whale.cheer();
                     if (bubbleShown) {
                         hideBubble();   // 播报期间再点：先收气泡
@@ -310,6 +345,7 @@ public class PetOverlayService extends Service {
                 }
                 return true;
             case MotionEvent.ACTION_CANCEL:
+                main.removeCallbacks(longPressOpen);
                 if (dragging) {
                     if (whale != null) whale.setDragging(false);
                     dockToEdge();
@@ -487,7 +523,11 @@ public class PetOverlayService extends Service {
         g.setColor(0xF0162036);
         g.setStroke(dp(1), 0x667FD8FF);
         btn.setBackground(g);
-        btn.setOnClickListener(click);
+        // 按压手感：performHapticFeedback 跟随系统触感开关，不需要 VIBRATE 权限
+        btn.setOnClickListener(v -> {
+            v.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY);
+            click.onClick(v);
+        });
         btn.setContentDescription(desc);
 
         ImageView iv = new ImageView(this);
@@ -931,6 +971,7 @@ public class PetOverlayService extends Service {
     public void onDestroy() {
         main.removeCallbacks(drowsyTick);
         main.removeCallbacks(eyeFeedback);
+        main.removeCallbacks(longPressOpen);
         try {
             android.hardware.display.DisplayManager dm =
                     (android.hardware.display.DisplayManager) getSystemService(DISPLAY_SERVICE);
