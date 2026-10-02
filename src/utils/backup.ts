@@ -1,0 +1,153 @@
+/**
+ * 全量备份（schema 2）：旧版导出只含睡眠记录——卸载/换机会丢掉
+ * 图鉴收集、朋友圈、AI 配置与聊天。本模块把可再生的排除（会话态
+ * 标记）、敏感的默认排除（API 密钥/HF token 不进文件——备份文件
+ * 会离开设备，不应当凭据）、设备指纹级刻意排除（使用行为数据），
+ * 其余全部纳入。
+ *
+ * 兼容：导入端自动识别旧版（纯 records 数组）与新版（schema 2）。
+ */
+
+export const BACKUP_SCHEMA = 2;
+
+export interface FullBackup {
+  app: 'somnacare';
+  schema: number;
+  exportedAt: string;
+  records: unknown[];
+  profile: Record<string, unknown> | null;
+  travel: Record<string, unknown> | null;
+  moments: unknown[];
+  chat: unknown[];
+  petPrefs: { skin?: string; bubbleEvery?: number };
+}
+
+const KEYS = {
+  records: 'somnacare_sleep_records',
+  profile: 'somnacare_user_profile',
+  travel: 'somnacare_travel_state',
+  moments: 'somnacare_pet_moments',
+  chat: 'somnacare_chat_history',
+  skin: 'somnacare_pet_skin',
+  bubble: 'somnacare_pet_bubble_every',
+} as const;
+
+/** 这些 profile 字段是凭据，默认不进备份文件。 */
+const SENSITIVE_PROFILE_KEYS = ['deepseekApiKey', 'customApiKey'];
+const SENSITIVE_TOP_KEYS = ['somnacare_hf_token'];
+
+function readJson(key: string): unknown {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function buildFullBackup(): FullBackup {
+  let profile = readJson(KEYS.profile);
+  if (profile && typeof profile === 'object' && !Array.isArray(profile)) {
+    // 凭据剥离（深拷贝，不动原对象）
+    profile = JSON.parse(JSON.stringify(profile));
+    const ai = (profile as Record<string, any>).aiConfig;
+    if (ai && typeof ai === 'object') {
+      for (const k of SENSITIVE_PROFILE_KEYS) delete ai[k];
+    }
+  } else {
+    profile = null;
+  }
+
+  let travel = readJson(KEYS.travel);
+  if (!travel || typeof travel !== 'object' || Array.isArray(travel)) travel = null;
+
+  const moments = readJson(KEYS.moments);
+  const chat = readJson(KEYS.chat);
+  const records = readJson(KEYS.records);
+
+  const skin = localStorage.getItem(KEYS.skin);
+  const bubbleRaw = localStorage.getItem(KEYS.bubble);
+  const bubbleEvery = bubbleRaw !== null ? Number(bubbleRaw) : NaN;
+
+  return {
+    app: 'somnacare',
+    schema: BACKUP_SCHEMA,
+    exportedAt: new Date().toISOString(),
+    records: Array.isArray(records) ? records : [],
+    profile: profile as Record<string, unknown> | null,
+    travel: travel as Record<string, unknown> | null,
+    moments: Array.isArray(moments) ? moments : [],
+    chat: Array.isArray(chat) ? chat : [],
+    petPrefs: {
+      skin: skin || undefined,
+      bubbleEvery: Number.isFinite(bubbleEvery) ? bubbleEvery : undefined,
+    },
+  };
+}
+
+export type ParsedBackup =
+  | { kind: 'full'; data: FullBackup }
+  | { kind: 'records-only'; records: unknown[] };
+
+/** 识别备份类型：schema 2 全量 / 旧版纯记录数组。解析失败抛错。 */
+export function parseBackup(raw: string): ParsedBackup {
+  const parsed: unknown = JSON.parse(raw);
+  if (Array.isArray(parsed)) return { kind: 'records-only', records: parsed };
+  if (parsed && typeof parsed === 'object') {
+    const o = parsed as Record<string, unknown>;
+    if (o.app === 'somnacare' && o.schema === BACKUP_SCHEMA) {
+      return { kind: 'full', data: o as unknown as FullBackup };
+    }
+    throw new Error('unknown-schema');
+  }
+  throw new Error('not-a-backup');
+}
+
+/** 落盘全量恢复（各数据域沿用读取端已有的逐字段清洗，坏数据自然回退默认）。 */
+export function restoreFullBackup(data: FullBackup): {
+  records: number; moments: number; chat: number; travel: boolean; profile: boolean;
+} {
+  // records：保留原始数组，读取端 App.tsx 已有逐条 sanitize + 过滤
+  localStorage.setItem(KEYS.records, JSON.stringify(Array.isArray(data.records) ? data.records : []));
+
+  // profile：合并回填（凭据字段不在备份里，保留导入设备上已有的值）
+  if (data.profile && typeof data.profile === 'object') {
+    let existing: Record<string, any> = {};
+    try {
+      const cur = localStorage.getItem(KEYS.profile);
+      if (cur) existing = JSON.parse(cur) ?? {};
+    } catch { /* ignore */ }
+    const merged = { ...existing, ...(data.profile as object) };
+    const restoredAi = { ...((data.profile as any).aiConfig ?? {}) };
+    const currentAi = existing.aiConfig ?? {};
+    // 凭据回填：备份里没有（空/缺失）→ 保留本机已有值
+    for (const k of SENSITIVE_PROFILE_KEYS) {
+      if (!restoredAi[k]) restoredAi[k] = (currentAi as any)[k] ?? '';
+    }
+    merged.aiConfig = restoredAi;
+    localStorage.setItem(KEYS.profile, JSON.stringify(merged));
+  }
+
+  if (data.travel && typeof data.travel === 'object') {
+    localStorage.setItem(KEYS.travel, JSON.stringify(data.travel));
+  }
+  if (Array.isArray(data.moments)) {
+    localStorage.setItem(KEYS.moments, JSON.stringify(data.moments));
+  }
+  if (Array.isArray(data.chat)) {
+    localStorage.setItem(KEYS.chat, JSON.stringify(data.chat));
+  }
+  if (data.petPrefs?.skin) localStorage.setItem(KEYS.skin, data.petPrefs.skin);
+  if (typeof data.petPrefs?.bubbleEvery === 'number') {
+    localStorage.setItem(KEYS.bubble, String(data.petPrefs.bubbleEvery));
+  }
+  // 敏感 top-level key（HF token）不在备份里 → 不动本机值
+
+  return {
+    records: Array.isArray(data.records) ? data.records.length : 0,
+    moments: Array.isArray(data.moments) ? data.moments.length : 0,
+    chat: Array.isArray(data.chat) ? data.chat.length : 0,
+    travel: !!data.travel,
+    profile: !!data.profile,
+  };
+}

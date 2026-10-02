@@ -50,6 +50,7 @@ import {
 
 // 逐条清洗在 utils/recordSanitize.ts——启动加载路径共用同一条防线
 import { sanitizeRecord } from '../utils/recordSanitize';
+import { buildFullBackup, parseBackup, restoreFullBackup } from '../utils/backup';
 
 interface SettingsTabProps {
   records: SleepRecord[];
@@ -126,8 +127,10 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   };
 
   const handleExportJSON = async () => {
-    const data = JSON.stringify(records, null, 2);
-    const name = `somnacare-sleep-backup-${toLocalDateString()}.json`;
+    // 全量备份（schema 2）：记录 + 档案 + 图鉴 + 朋友圈 + 聊天 + 桌宠偏好。
+    // API 密钥/HF token 默认剥离——备份文件会离开设备，不应当凭据
+    const data = JSON.stringify(buildFullBackup(), null, 2);
+    const name = `somnacare-full-backup-${toLocalDateString()}.json`;
     // APK 内 <a download> 静默无效（Capacitor WebView 不支持 blob 下载，上游
     // issue 5478/7292）：此前函数"成功"返回但磁盘上没有文件，用户以为已备份，
     // 点了重置后记录就真丢了。原生改走 Filesystem 落盘 + 系统分享面板，
@@ -179,24 +182,37 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
-        const parsed: unknown = JSON.parse(event.target?.result as string);
-        if (!Array.isArray(parsed)) throw new Error('not-array');
-        // 逐条清洗：此前只校验 Array.isArray，导入 [1,2,3] 会让首页直接崩
-        const cleaned = parsed
-          .map((r) => sanitizeRecord(r))
-          .filter((r): r is SleepRecord => r !== null);
-        if (cleaned.length === 0) {
-          alert('导入失败：文件里没有可识别的睡眠记录');
+        const parsedRaw = event.target?.result as string;
+        const parsed = parseBackup(parsedRaw);
+        if (parsed.kind === 'records-only') {
+          // 旧版（仅记录）：逐条清洗——此前只校验 Array.isArray，导入 [1,2,3] 会让首页直接崩
+          const cleaned = parsed.records
+            .map((r) => sanitizeRecord(r))
+            .filter((r): r is SleepRecord => r !== null);
+          if (cleaned.length === 0) {
+            alert('导入失败：文件里没有可识别的睡眠记录');
+            return;
+          }
+          if (onImportRecords) {
+            onImportRecords(cleaned);
+            if (cleaned.length < parsed.records.length) {
+              alert(`已导入 ${cleaned.length} 条记录，另有 ${parsed.records.length - cleaned.length} 条格式无效已跳过`);
+            }
+          }
           return;
         }
-        if (onImportRecords) {
-          onImportRecords(cleaned);
-          if (cleaned.length < parsed.length) {
-            alert(`已导入 ${cleaned.length} 条记录，另有 ${parsed.length - cleaned.length} 条格式无效已跳过`);
-          }
-        }
+        // 全量（schema 2）
+        const skipped = confirm(
+          `全量备份导入将覆盖当前的睡眠记录、朋友圈与聊天历史（图鉴与档案按文件内容恢复）。\n` +
+          `包含：记录 ${parsed.data.records.length} 条 · 朋友圈 ${parsed.data.moments.length} 条 · 聊天 ${parsed.data.chat.length} 条。\n` +
+          `API 密钥不包含在备份中，将保留本机已填写的值。继续？`,
+        );
+        if (!skipped) return;
+        const r = restoreFullBackup(parsed.data);
+        alert(`已恢复全量备份：记录 ${r.records} 条 · 朋友圈 ${r.moments} 条 · 聊天 ${r.chat} 条${r.travel ? ' · 图鉴进度' : ''}${r.profile ? ' · 档案' : ''}。页面即将刷新。`);
+        window.location.reload();   // 全量覆盖后整树重挂，让所有读取端拿到新数据
       } catch {
-        alert('导入失败：不是合法的睡眠备份 JSON 文件');
+        alert('导入失败：不是合法的备份 JSON 文件');
       }
     };
     reader.readAsText(file);
