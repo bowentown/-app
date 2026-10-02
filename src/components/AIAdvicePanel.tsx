@@ -26,6 +26,7 @@ import {
   getLocalLlmCacheState,
 } from '../utils/localLlmEngine';
 import { ThemeConfig } from '../utils/themeStyles';
+import { stripMd } from '../utils/markdown';
 import { attachHScroll } from '../utils/hscroll';
 import { MomentsOverlay } from './MomentsOverlay';
 
@@ -34,9 +35,6 @@ import { MomentsOverlay } from './MomentsOverlay';
 const OUTPUT_CONTRACT =
   '\n\n【回答格式·必须遵守】每次回答不超过150字：先一句结论，再给至多2条可执行的建议；纯文本，不用任何markdown符号和序号列表；不寒暄、不复述我的问题；引用数字只用我提供的真实数据，没有就不编。';
 
-// 本地规则引擎的模板自带 ** 加粗标记，但气泡是纯文本渲染——
-// 在【渲染出口】统一清洗，任何回复来源（本地/直连/代理/兜底）都不会漏
-const stripMd = (s: string) => s.replace(/\*\*/g, '').replace(/(?<![a-zA-Z])\*(?![a-zA-Z\s])/g, '');
 
 // 历史窗口"粘住"：slice(-8) 每轮左移会让 messages 第 2 条起全部 miss，
 // 实测前缀命中率塌缩到 35%。改为只在超过 HARD 时截断到 SOFT——两次

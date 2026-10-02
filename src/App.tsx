@@ -50,8 +50,10 @@ export const App: React.FC = () => {
   const [sleepStartSignal, setSleepStartSignal] = useState(0);
   const TAB_ORDER: NavTab[] = ['today', 'trends', 'coach', 'eyecare', 'settings'];
   const trackRef = useRef<HTMLDivElement>(null);
-  // 最近一次划动抬手的时刻：swallowClick 的时间窗判定用
-  const lastSwipeAtRef = useRef(0);
+  // 最近一次划动抬手的时刻：swallowClick 的时间窗判定用。
+  // 初值必须取 -Infinity——0 会与 performance.now() 的加载后前 350ms 撞车，
+  // 那段窗口里所有点击（含底栏切换）都会被当成"刚划完"而吞掉
+  const lastSwipeAtRef = useRef(-Infinity);
   const idxRef = useRef(0);
   const snapMsRef = useRef(300);
   const dragRef = useRef<{

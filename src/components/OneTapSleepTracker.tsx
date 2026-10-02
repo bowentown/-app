@@ -204,29 +204,30 @@ export const OneTapSleepTracker: React.FC<OneTapSleepTrackerProps> = ({ onSaveRe
               <button
                 type="button"
                 onClick={handleCancelSession}
-                className="text-slate-400 hover:text-white text-xs underline cursor-pointer"
+                className="text-slate-400 hover:text-white text-xs underline cursor-pointer py-2 -my-2"
               >
                 取消记录
               </button>
             </div>
 
+            {/* 两行布局：一行 flex 塞不下"图标+文案+CTA"三块，硬塞会把副标题挤折行 */}
             <button
               type="button"
               onClick={handleWakeUp}
-              className="w-full py-3.5 px-5 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black flex items-center justify-between active:scale-[0.99] transition-all cursor-pointer shadow-xl"
+              className="w-full py-3.5 px-5 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black flex flex-col gap-2.5 active:scale-[0.99] transition-all cursor-pointer shadow-xl"
             >
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-black/10 flex items-center justify-center">
+                <div className="w-9 h-9 rounded-xl bg-black/10 flex items-center justify-center shrink-0">
                   <Sun className="w-5 h-5 text-slate-950 fill-current" />
                 </div>
-                <div className="text-left">
+                <div className="text-left min-w-0">
                   <span className="text-sm font-black tracking-wide block text-slate-950">
                     已醒来 · 记录本次实际时长
                   </span>
                   <span className="text-[11px] text-slate-800 font-bold">按实际入睡分钟数精准结算</span>
                 </div>
               </div>
-              <span className="text-xs font-black bg-black/10 px-3 py-1.5 rounded-xl text-slate-950 shrink-0 whitespace-nowrap">
+              <span className="text-xs font-black bg-black/10 px-3 py-2 rounded-xl text-slate-950 text-center">
                 完成本次睡眠 →
               </span>
             </button>

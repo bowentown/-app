@@ -122,7 +122,7 @@ export const TripArrivalModal: React.FC<Props> = ({ postcardId, onClose, onOpenM
                 onClick={handleFinish}
                 className="w-full py-2.5 rounded-xl bg-[#0ea5e9] hover:bg-[#38bdf8] text-[#0b1026] text-xs font-bold flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition-transform cursor-pointer"
               >
-                <Heart className="w-3.5 h-3.5 fill-white" />
+                <Heart className="w-3.5 h-3.5 fill-current" />
                 收下明信片并去朋友圈点赞
               </button>
               <button

@@ -11,6 +11,7 @@ import {
   type MomentCard,
 } from '../utils/petMoments';
 import { getPetSkin } from '../utils/petOverlay';
+import { stripMd } from '../utils/markdown';
 import { PostcardCard } from './travel/PostcardCard';
 import { TravelCodexModal } from './travel/TravelCodexModal';
 import { getTravelProgress } from '../services/travelService';
@@ -240,7 +241,7 @@ export const MomentsOverlay: React.FC<Props> = ({ records, userProfile, onClose 
               </div>
               <div className="flex-1 min-w-0 space-y-1.5">
                 <p className="text-[11px] font-black text-sky-300">蓝色大肥鱼</p>
-                <p className="text-xs text-slate-100 leading-relaxed whitespace-pre-wrap">{m.text}</p>
+                <p className="text-xs text-slate-100 leading-relaxed whitespace-pre-wrap">{stripMd(m.text)}</p>
 
                 {/* 配图卡：九宫格布局（1 张大图 / 2-3 张并排 / 明信片独占） */}
                 {m.cards.length > 0 && (
@@ -310,13 +311,13 @@ export const MomentsOverlay: React.FC<Props> = ({ records, userProfile, onClose 
                         {m.comments.map((c, i) => (
                           <p key={`c${i}`} className="text-[10px] leading-relaxed">
                             <span className="text-sky-400 font-bold">{c.friend}：</span>
-                            <span className="text-slate-300">{c.text}</span>
+                            <span className="text-slate-300">{stripMd(c.text)}</span>
                           </p>
                         ))}
                         {m.replies.map((r, i) => (
                           <p key={`r${i}`} className="text-[10px] leading-relaxed">
                             <span className={`font-bold ${r.friend === '鱼片' ? 'text-emerald-400' : 'text-sky-400'}`}>{r.friend}：</span>
-                            <span className="text-slate-300">{r.text}</span>
+                            <span className="text-slate-300">{stripMd(r.text)}</span>
                           </p>
                         ))}
                       </div>

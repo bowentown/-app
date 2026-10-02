@@ -194,7 +194,7 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
             <button
               type="button"
               onClick={() => setIsOpen(!isOpen)}
-              className={`p-1.5 rounded-lg ${theme?.cardInnerBg || 'bg-slate-800'} ${theme?.accentText} cursor-pointer`}
+              className={`w-10 h-10 rounded-lg ${theme?.cardInnerBg || 'bg-slate-800'} ${theme?.accentText} cursor-pointer`}
               aria-label={isOpen ? '收起闹钟列表' : '展开闹钟列表'}
             >
               {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -210,7 +210,7 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
             }
             setIsAdding(!isAdding);
           }}
-          className={`px-3 py-1.5 rounded-xl ${accentBg} ${accentFg} text-xs font-black flex items-center gap-1.5 transition-colors cursor-pointer shadow-md whitespace-nowrap`}
+          className={`px-3 py-2 rounded-xl ${accentBg} ${accentFg} text-xs font-black flex items-center gap-1.5 transition-colors cursor-pointer shadow-md whitespace-nowrap`}
         >
           {isAdding ? '取消' : <><Plus className="w-3.5 h-3.5 stroke-[3]" /><span>添加闹钟</span></>}
         </button>

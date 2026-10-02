@@ -248,7 +248,7 @@ export const EyeCareTab: React.FC<EyeCareTabProps> = ({ userProfile, onUpdatePro
                 setHue(hexToHue(c));
                 patch({ preset: 'custom', warmColor: c });
               }}
-              className={`w-7 h-7 rounded-full cursor-pointer transition-transform active:scale-90 border ${
+              className={`w-10 h-10 rounded-full cursor-pointer transition-transform active:scale-90 border ${
                 cfg.warmColor.toUpperCase() === c ? 'border-white scale-110 shadow-md' : 'border-white/10'
               }`}
               style={{ background: c }}
@@ -367,7 +367,7 @@ export const EyeCareTab: React.FC<EyeCareTabProps> = ({ userProfile, onUpdatePro
             className="relative inline-flex items-center cursor-pointer shrink-0"
           >
             <span
-              className={`block w-10 h-5 rounded-full transition-colors relative ${
+              className={`block w-10 h-9 rounded-full transition-colors relative ${
                 cfg.auto ? 'bg-orange-500' : 'bg-slate-600'
               }`}
             >

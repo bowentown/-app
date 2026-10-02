@@ -420,7 +420,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           <button
             type="button"
             onClick={() => setIsAIConfigOpen(true)}
-            className={`px-4 py-2 rounded-xl ${theme.accentBg} ${theme.accentFg} font-black text-xs shadow-md active:scale-95 transition-all cursor-pointer whitespace-nowrap`}
+            className={`px-4 py-2.5 rounded-xl ${theme.accentBg} ${theme.accentFg} font-black text-xs shadow-md active:scale-95 transition-all cursor-pointer whitespace-nowrap`}
           >
             配置与探查
           </button>

@@ -74,7 +74,7 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
             <button
               type="button"
               onClick={() => setViewMode('quality')}
-              className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+              className={`px-3 py-2 rounded-lg font-bold transition-all cursor-pointer ${
                 viewMode === 'quality'
                   ? accentBg + ' ' + accentFg + ' shadow'
                   : 'text-slate-400 hover:text-white'
@@ -85,7 +85,7 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
             <button
               type="button"
               onClick={() => setViewMode('stages')}
-              className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+              className={`px-3 py-2 rounded-lg font-bold transition-all cursor-pointer ${
                 viewMode === 'stages'
                   ? accentBg + ' ' + accentFg + ' shadow'
                   : 'text-slate-400 hover:text-white'
@@ -96,7 +96,7 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
             <button
               type="button"
               onClick={() => setViewMode('circadian')}
-              className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+              className={`px-3 py-2 rounded-lg font-bold transition-all cursor-pointer ${
                 viewMode === 'circadian'
                   ? accentBg + ' ' + accentFg + ' shadow'
                   : 'text-slate-400 hover:text-white'
@@ -346,7 +346,7 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
         <button
           type="button"
           onClick={() => setIsHistoryExpanded(!isHistoryExpanded)}
-          className="w-full flex items-center justify-between text-left cursor-pointer group"
+          className="w-full flex items-center justify-between text-left cursor-pointer group py-2 -my-2"
         >
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold text-white">历史记录</span>
