@@ -137,18 +137,10 @@ public class AlarmRingService extends Service {
                 player.setDataSource(afd.getFileDescriptor(), afd.getStartOffset(), afd.getLength());
                 afd.close();
             } else {
-                // 应用 res/raw 不存在时兜底：从插件 assets 复制到内部存储再播
-                java.io.File out = new java.io.File(getFilesDir(), "alarm_chime.wav");
-                if (!out.exists() || out.length() == 0) {
-                    java.io.InputStream in = getAssets().open("alarm/" + toneRes + ".wav");
-                    java.io.FileOutputStream fout = new java.io.FileOutputStream(out);
-                    byte[] buf = new byte[8192];
-                    int n;
-                    while ((n = in.read(buf)) > 0) fout.write(buf, 0, n);
-                    in.close();
-                    fout.close();
-                }
-                player.setDataSource(out.getAbsolutePath());
+                // res/raw 缺铃声资源时诚实静音并留日志。旧兜底从 assets/alarm/
+                // 复制播放——该目录从不存在，真走到只会 FileNotFoundException
+                // 被吞成静默无声，是个假路径
+                android.util.Log.w("AlarmRing", "铃声资源缺失: raw/" + toneRes);
             }
             player.setLooping(true);
             player.prepare();
