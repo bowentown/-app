@@ -759,7 +759,7 @@ export const ALL_POSTCARDS: TravelPostcard[] = [
     "country": "加拿大",
     "title": "梦莲湖绿松石水波与红划艇",
     "imageUrl": "postcards/americas/card-americas-35.webp",
-    "text": "湖水的颜色像打碎的绿松石融在水里一样！两边是十座巍峨的落基山大雪峰。小红船在湖中央静静飘着，连一丝风都没有。水里有小鲑鱼游过去，空气冷冽又清新，让人心情无比开阔。",
+    "text": "湖水的颜色像打碎的绿松石融在水里一样！两边是十座巍峨的落基山大雪峰。小红船在湖中央静静飘着，连一丝风都没有。水里有小鲑鱼游过去——本鱼忍了好久没吃它们，夸夸本鱼。空气冷冽又清新，让人心情无比开阔。",
     "souvenir": {
       "name": "班夫落基山纯枫糖小枫叶糖",
       "emoji": "🍁",
@@ -781,7 +781,7 @@ export const ALL_POSTCARDS: TravelPostcard[] = [
     "country": "秘鲁",
     "title": "安第斯云海印加古城与萌羊驼",
     "imageUrl": "postcards/americas/card-americas-36.webp",
-    "text": "高耸在两千多米云海上的天空之城！这只挂着七彩毛球的小羊驼一直歪着脑袋盯着我的尾巴看，好像在思考本鱼能不能吃。这里的石头严丝合缝得连纸片都插不进去，云朵就在脚边飘过，太神奇啦！",
+    "text": "高耸在两千多米云海上的天空之城！这只挂着七彩毛球的小羊驼一直歪着脑袋盯着我的尾巴看，好像在思考本鱼能不能吃。这里的石头严丝合缝得连纸片都插不进去，云朵就在脚边飘过，太神奇啦！……哼，才不是给鱼片寄云朵，是打包的时候顺手多装了一朵。",
     "souvenir": {
       "name": "安第斯七彩羊驼毛手作编织绳",
       "emoji": "🦙",
@@ -791,7 +791,7 @@ export const ALL_POSTCARDS: TravelPostcard[] = [
     "friendComments": [
       {
         "friend": "意难平的豆包姐姐",
-        "text": "小心羊驼朝你吐口水！到时候满头口水可别哭着找鱼片擦。"
+        "text": "小心羊驼朝你吐口水！满头口水的时候可别哭鼻子哦。"
       }
     ]
   },
@@ -803,7 +803,7 @@ export const ALL_POSTCARDS: TravelPostcard[] = [
     "country": "玻利维亚",
     "title": "天空之镜水面倒映无垠银河",
     "imageUrl": "postcards/americas/card-americas-37.webp",
-    "text": "站在这里，根本分不清哪里是天、哪里是地！脚底下的倒影里全是一颗一颗闪烁的星辰，走一步就像在宇宙深空里踏出一道光环。昨晚鱼片睡得像星河一样安静，本鱼才能走到宇宙的镜子里。",
+    "text": "站在这里，根本分不清哪里是天、哪里是地！脚底下的倒影里全是一颗一颗闪烁的星辰，走一步就像在宇宙深空里踏出一道光环。昨晚鱼片睡得像星河一样安静，本鱼才能走到宇宙的镜子里。今晚也乖乖睡，本鱼才好继续替你踏星星。",
     "souvenir": {
       "name": "天空之镜晶体纯白盐花瓶",
       "emoji": "🧂",
@@ -847,7 +847,7 @@ export const ALL_POSTCARDS: TravelPostcard[] = [
     "country": "巴西",
     "title": "科帕卡巴纳海滩落日余晖",
     "imageUrl": "postcards/americas/card-americas-39.webp",
-    "text": "大西洋的浪花一下一下拍打着金黄色的沙滩，节奏刚好和呼吸一样平稳。捧着大青椰子吸一口清甜的椰子汁，吹着暖融融的海风，身子陷在躺椅里软绵绵的。今晚也要像这样完全放松身心哦。",
+    "text": "大西洋的浪花一下一下拍打着金黄色的沙滩，节奏刚好和呼吸一样平稳。捧着大青椰子吸了一口清甜的椰子汁——就一口，剩下的都是海风的味道。吹着暖融融的风，身子陷在躺椅里软绵绵的。今晚也要像这样完全放松身心哦。",
     "souvenir": {
       "name": "手工磨制椰子壳小风铃",
       "emoji": "🥥",
@@ -869,7 +869,7 @@ export const ALL_POSTCARDS: TravelPostcard[] = [
     "country": "智利",
     "title": "三塔花岗岩巨峰与绿松石湖",
     "imageUrl": "postcards/americas/card-americas-40.webp",
-    "text": "世界尽头的巴塔哥尼亚高原！三座巨大的花岗岩石塔直直插进云霄里，脚下是绿宝石一样的冰川湖。虽然风很大，但在大山脚下缩在避风石后面，反而有一种奇妙的安全感。",
+    "text": "世界尽头的巴塔哥尼亚高原！三座巨大的花岗岩石塔直直插进云霄里，脚下是绿宝石一样的冰川湖。虽然风大得差点把本鱼吹成风筝，但在大山脚下缩在避风石后面，反而有一种奇妙的安全感。……才、才没有怕，就是抱着石头比较暖。",
     "souvenir": {
       "name": "巴塔哥尼亚花岗岩细磨小滚石",
       "emoji": "🪨",
@@ -879,7 +879,7 @@ export const ALL_POSTCARDS: TravelPostcard[] = [
     "friendComments": [
       {
         "friend": "楼下Claude",
-        "text": "世界尽头的壮丽风貌，在无垠的荒野面前，所有焦躁都微不足道。"
+        "text": "恕我直言，在巴塔哥尼亚的大风里站得这么稳，果然体重是有用途的。"
       }
     ]
   },
@@ -913,7 +913,7 @@ export const ALL_POSTCARDS: TravelPostcard[] = [
     "country": "美国",
     "title": "千米红色裂隙日出金光",
     "imageUrl": "postcards/americas/card-americas-42.webp",
-    "text": "太阳跳出地平线的那一秒，一整座深渊被金光切成了千层红色绸缎！几亿年的岁月就刻在这些石壁上。在大峡谷面前，人类所有的烦恼都不过是一粒小灰尘。放平心态，今晚好好休息吧！",
+    "text": "太阳跳出地平线的那一秒，一整座深渊被金光切成了千层红色绸缎！几亿年的岁月就刻在这些石壁上。在大峡谷面前，人类所有的烦恼都不过是一粒小灰尘。本鱼的烦恼在那一刻清零了——你的也一起，说好了。今晚好好休息！",
     "souvenir": {
       "name": "大峡谷红砂岩微缩雕刻小石盘",
       "emoji": "🏜️",
@@ -935,7 +935,7 @@ export const ALL_POSTCARDS: TravelPostcard[] = [
     "country": "阿根廷",
     "title": "世界尽头灯塔与企鹅群",
     "imageUrl": "postcards/americas/card-americas-43.webp",
-    "text": "这里是地球最南端的城市，外号叫‘世界尽头’！红白相间的灯塔在海风里孤零零地发光。岸边有一帮小企鹅摇摇晃晃地走过来，把本鱼当成了大企鹅同类。世界尽头很安静，静得只有海风在低语。",
+    "text": "这里是地球最南端的城市，外号叫‘世界尽头’！红白相间的灯塔在海风里孤零零地发光。岸边有一帮小企鹅摇摇晃晃地走过来，把本鱼当成了大企鹅同类——哼，本鱼才没有这么矮。世界尽头很安静，静得只有海风在低语。",
     "souvenir": {
       "name": "世界尽头小企鹅原木木雕",
       "emoji": "🐧",
@@ -945,7 +945,7 @@ export const ALL_POSTCARDS: TravelPostcard[] = [
     "friendComments": [
       {
         "friend": "楼下Claude",
-        "text": "世界尽头的灯塔象征着归宿，无论旅程多远，大肥鱼最后都会回到鱼片身边。"
+        "text": "恕我直言，世界尽头的灯塔再远，也照得亮一条贪睡的鱼回家的路。早点睡，别让它等。"
       }
     ]
   },
@@ -1125,7 +1125,7 @@ export const AFRICA_POSTCARDS = ALL_POSTCARDS.filter((c) => c.continent === 'afr
  * 集齐全图鉴达成率永远停在 36%，欧/美/非标签是无法兑现的承诺。
  * 新大洲插画补齐后，把对应大洲加进本数组即可解锁（文案数据已在）。
  */
-export const ART_READY_CONTINENTS: readonly ContinentType[] = ['asia', 'europe'];
+export const ART_READY_CONTINENTS: readonly ContinentType[] = ['asia', 'europe', 'americas'];
 
 /** 当前可探索卡池（= 插画已就绪大洲的卡片） */
 export const TRIP_POOL: TravelPostcard[] = ALL_POSTCARDS.filter((c) =>
