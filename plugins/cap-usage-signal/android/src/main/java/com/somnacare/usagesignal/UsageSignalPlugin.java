@@ -78,8 +78,9 @@ public class UsageSignalPlugin extends Plugin {
     /** 单夜聚合桶。dateKey = 放下手机那一夜的"日期"（跨午夜归前一天）。 */
     private static final class NightAgg {
         String dateKey;
-        long lastActive = -1;    // 最后一次"屏幕灭"
-        long firstActive = -1;   // 晨窗第一次达标的"亮屏"
+        long lastActive = -1;      // 最后一次"屏幕灭"
+        long firstActive = -1;     // 晨窗第一次亮屏（早上第一次拿起手机）
+        long lastPickupAt = -1;    // 去重：一次拿起常同时产生亮屏+解锁两事件
         int nightPickups = 0;
     }
 
