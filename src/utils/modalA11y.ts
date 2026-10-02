@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 
 /**
- * 弹窗键盘/读屏支持（一次解决四件事，接入方式见文件尾注释）：
+ * 弹窗键盘/读屏支持（一次解决五件事，接入方式见文件尾注释）：
  *
  * 1. 焦点进入：打开时把焦点移进弹窗容器（此前焦点留在背景，读屏用户
  *    根本不知道弹窗出现了；Tab 也会在遮住的背景里游走）
@@ -9,7 +9,16 @@ import { useEffect, useRef } from 'react';
  * 3. 焦点环路：Tab/Shift+Tab 在弹窗内循环，不会跑到遮罩背后
  * 4. 焦点归还：关闭时把焦点还给打开弹窗前的元素，否则焦点掉到 body，
  *    键盘用户要重新 Tab 一整遍
+ * 5. 弹窗栈：多层弹窗叠开时只有【栈顶】响应 Escape——此前每个实例都在
+ *    document 上挂 capture keydown，同 target 的多个监听器会全部执行
+ *    （stopPropagation 只拦跨节点传播，拦不住同节点后续监听器），按一次
+ *    Escape 会把整个弹窗栈全关掉；换 stopImmediatePropagation 也不对，
+ *    执行的会是最先注册的【最外层】，关的还是错的
  */
+
+// 模块级弹窗栈：按打开顺序记录存活实例（symbol 每实例唯一）
+const modalStack: symbol[] = [];
+
 export function useModalA11y(
   open: boolean,
   onClose: () => void,
@@ -18,6 +27,7 @@ export function useModalA11y(
 ) {
   const ref = useRef<HTMLDivElement>(null);
   const closeOnEscape = opts?.closeOnEscape !== false;
+  const idRef = useRef<symbol>(Symbol('modal'));
   // onClose 每次渲染都是新引用；用 ref 转发，避免 effect 因依赖变化反复重跑
   // （重跑会先执行 cleanup 里的 prev?.focus()，把焦点偷还给背景）
   const onCloseRef = useRef(onClose);
@@ -27,10 +37,14 @@ export function useModalA11y(
     if (!open) return;
     const root = ref.current;
     if (!root) return;
+    const id = idRef.current;
+    modalStack.push(id);
     const prev = document.activeElement as HTMLElement | null;
     root.focus({ preventScroll: true });
 
     const onKey = (e: KeyboardEvent) => {
+      // 非栈顶（被其它弹窗盖住）不响应任何键盘语义
+      if (modalStack[modalStack.length - 1] !== id) return;
       if (closeOnEscape && e.key === 'Escape') {
         e.stopPropagation();
         onCloseRef.current();
@@ -55,6 +69,8 @@ export function useModalA11y(
     document.addEventListener('keydown', onKey, true);
     return () => {
       document.removeEventListener('keydown', onKey, true);
+      const i = modalStack.lastIndexOf(id);
+      if (i >= 0) modalStack.splice(i, 1);
       prev?.focus?.();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

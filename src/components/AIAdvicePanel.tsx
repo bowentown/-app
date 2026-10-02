@@ -47,12 +47,19 @@ interface AIAdvicePanelProps {
   records: SleepRecord[];
   userProfile: UserProfile;
   theme: ThemeConfig;
+  /** 递增信号：外部（如明信片送达弹窗）请求打开朋友圈，+1 即开一次 */
+  openMomentsSignal?: number;
 }
 
-export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfile, theme }) => {
+export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfile, theme, openMomentsSignal }) => {
   const [analysis, setAnalysis] = useState<SleepAnalysisResult | null>(null);
   const [isLoadingAnalysis, setIsLoadingAnalysis] = useState(false);
   const [showMoments, setShowMoments] = useState(false);
+  // 朋友圈此前只有本组件内部能打开——送达弹窗的"去朋友圈点赞"承诺了
+  // 却做不到（只切到顾问分区）。用递增信号接收外部的打开请求
+  useEffect(() => {
+    if (openMomentsSignal) setShowMoments(true);
+  }, [openMomentsSignal]);
   const [activeProviderName, setActiveProviderName] = useState<string>(() => {
     // 初始标签反映用户已保存的档位，而非写死的默认值
     switch (userProfile.aiConfig?.provider) {

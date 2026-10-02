@@ -1135,3 +1135,9 @@ export const TRIP_POOL: TravelPostcard[] = ALL_POSTCARDS.filter((c) =>
 export function getPostcardById(id: string): TravelPostcard | undefined {
   return ALL_POSTCARDS.find((c) => c.id === id);
 }
+
+/** 图鉴网格缩略图（360×480 webp，构建时与原图同名 + .sm 后缀出图）。
+ *  网格显示宽度 ~170px，此前直接加载 896×1200 原图，逛一遍图鉴要拉 ~5.7MB */
+export function thumbUrlOf(imageUrl: string): string {
+  return imageUrl.replace(/\.webp$/, '.sm.webp');
+}

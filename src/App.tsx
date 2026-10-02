@@ -32,6 +32,8 @@ export const App: React.FC = () => {
   const [isActiveSleepOpen, setIsActiveSleepOpen] = useState(false);
   const [isManualLogOpen, setIsManualLogOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  // 朋友圈打开信号：递增触发 AIAdvicePanel 打开朋友圈（送达弹窗 CTA 用）
+  const [momentsSignal, setMomentsSignal] = useState(0);
   const [pendingPostcardId, setPendingPostcardId] = useState<string | null>(() => {
     return loadTravelState().pendingArrival || null;
   });
@@ -760,7 +762,7 @@ export const App: React.FC = () => {
                   )}
 
                   {id === 'coach' && (
-                    <AIAdvicePanel records={records} userProfile={userProfile} theme={currentTheme} />
+                    <AIAdvicePanel records={records} userProfile={userProfile} theme={currentTheme} openMomentsSignal={momentsSignal} />
                   )}
 
                   {id === 'eyecare' && (
@@ -838,6 +840,7 @@ export const App: React.FC = () => {
           onOpenMoments={() => {
             setPendingPostcardId(null);
             setActiveTab('coach');
+            setMomentsSignal((v) => v + 1);   // 真正打开朋友圈，兑现按钮承诺
           }}
         />
       )}

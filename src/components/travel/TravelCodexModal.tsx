@@ -10,7 +10,7 @@ const CONTINENT_TABS: { key: Exclude<TabFilter, 'all'>; emoji: string; label: st
   { key: 'americas', emoji: '🗽', label: '美洲' },
   { key: 'africa', emoji: '🦁', label: '非洲' },
 ];
-import { ALL_POSTCARDS, ART_READY_CONTINENTS, TRIP_POOL } from '../../data/travelPostcards';
+import { ALL_POSTCARDS, ART_READY_CONTINENTS, TRIP_POOL, thumbUrlOf } from '../../data/travelPostcards';
 import { getTravelProgress, loadTravelState, TRIP_ENERGY_TARGET } from '../../services/travelService';
 import { useModalA11y } from '../../utils/modalA11y';
 import { PostcardCard } from './PostcardCard';
@@ -26,6 +26,13 @@ export const TravelCodexModal: React.FC<Props> = ({ onClose }) => {
   const [tab, setTab] = useState<TabFilter>('all');
   const [selectedCard, setSelectedCard] = useState<TravelPostcard | null>(null);
   const [tipMessage, setTipMessage] = useState<string | null>(null);
+  // 详情层此前是手写 role="dialog"，焦点不移入、读屏不知道弹层出现，
+  // 也不在弹窗栈里（Escape 会穿透）。接上同一 hook 获得一致行为
+  const detailA11y = useModalA11y(
+    !!selectedCard,
+    () => setSelectedCard(null),
+    `明信片详情：${selectedCard?.title ?? ''}`,
+  );
   // tip 计时器收口：连点时先清旧定时器，第二条提示才不会被第一条提前收掉
   const tipTimerRef = useRef<number>(0);
   const showTip = (msg: string) => {
@@ -199,7 +206,7 @@ export const TravelCodexModal: React.FC<Props> = ({ onClose }) => {
                 {isUnlocked ? (
                   <div className="relative w-full flex-1 rounded-xl overflow-hidden bg-[#020617]">
                     <img
-                      src={card.imageUrl}
+                      src={thumbUrlOf(card.imageUrl)}
                       alt={card.title}
                       loading="lazy"
                       className="w-full h-full object-cover"
@@ -251,25 +258,25 @@ export const TravelCodexModal: React.FC<Props> = ({ onClose }) => {
         </div>
       </div>
 
-      {/* 伴手礼藏宝盒展示 */}
-      {travelState.souvenirInventory.length > 0 && (
-        <div className="shrink-0 px-4 py-2 border-t border-slate-800/80 bg-slate-900/60 flex items-center justify-between text-[10px]">
-          <div className="flex items-center gap-1.5 text-[#94a3b8]">
-            <Gift className="w-3.5 h-3.5 text-[#fbbf24]" />
-            <span>伴手礼行囊：</span>
-            <span className="font-bold text-[#fcd34d]">{travelState.souvenirInventory.length} 件特产</span>
-          </div>
-          <span className="text-[9px] text-[#64748b]">点击卡片背面可重温手写日记</span>
+      {/* 底栏常驻："翻面看日记"的提示对还没拿到伴手礼的新玩家更重要，
+          此前整条栏挂在 inventory > 0 上，恰好把最需要提示的人排除 */}
+      <div className="shrink-0 px-4 py-2 border-t border-slate-800/80 bg-slate-900/60 flex items-center justify-between text-[10px]">
+        <div className="flex items-center gap-1.5 text-[#94a3b8]">
+          <Gift className="w-3.5 h-3.5 text-[#fbbf24]" />
+          {travelState.souvenirInventory.length > 0 ? (
+            <span>伴手礼行囊：<span className="font-bold text-[#fcd34d]">{travelState.souvenirInventory.length} 件特产</span></span>
+          ) : (
+            <span>伴手礼行囊：还没有特产，攒能量出发就有了</span>
+          )}
         </div>
-      )}
+        <span className="text-[9px] text-[#64748b]">点击卡片背面可重温手写日记</span>
+      </div>
 
       {/* 详情放大模态层（3D 翻转卡片） */}
       {selectedCard && (
         <div
-          role="dialog"
-          aria-modal="true"
-          aria-label={`明信片详情：${selectedCard.title}`}
-          tabIndex={-1}
+          ref={detailA11y.ref}
+          {...detailA11y.dialogProps}
           className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-md flex flex-col items-center justify-center p-4 animate-fadeIn"
         >
           <div className="w-full max-w-xs space-y-4">
