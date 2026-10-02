@@ -122,8 +122,11 @@ public class AlarmRingService extends Service {
 
     private void startSound(String tone) {
         try {
-            // 原生资源当前仅 gentle_chime；aurora_melody/radar_beep 待补资源后按 tone 映射
-            int resId = getResources().getIdentifier("gentle_chime", "raw", getPackageName());
+            // 按 tone 映射铃声资源：三个 wav 与 App 内"试听"（audioSynth.playAlarm）
+            // 的音符结构一致——此前只有一份 gentle_chime，选什么铃声早上都响同一个
+            String toneRes = "gentle_chime".equals(tone) || "aurora_melody".equals(tone)
+                    || "radar_beep".equals(tone) ? tone : "gentle_chime";
+            int resId = getResources().getIdentifier(toneRes, "raw", getPackageName());
             player = new MediaPlayer();
             player.setAudioAttributes(new AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_ALARM)
@@ -137,7 +140,7 @@ public class AlarmRingService extends Service {
                 // 应用 res/raw 不存在时兜底：从插件 assets 复制到内部存储再播
                 java.io.File out = new java.io.File(getFilesDir(), "alarm_chime.wav");
                 if (!out.exists() || out.length() == 0) {
-                    java.io.InputStream in = getAssets().open("alarm/gentle_chime.wav");
+                    java.io.InputStream in = getAssets().open("alarm/" + toneRes + ".wav");
                     java.io.FileOutputStream fout = new java.io.FileOutputStream(out);
                     byte[] buf = new byte[8192];
                     int n;
