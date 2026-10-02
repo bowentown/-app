@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Mail, Sparkles, Heart } from 'lucide-react';
+import { Sparkles, Heart } from 'lucide-react';
 import type { TravelPostcard } from '../../types/travel';
 import { getPostcardById } from '../../data/travelPostcards';
 import { clearPendingArrival, TRIP_ENERGY_TARGET } from '../../services/travelService';
@@ -51,36 +51,49 @@ export const TripArrivalModal: React.FC<Props> = ({ postcardId, onClose, onOpenM
       className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-fadeIn"
       style={{ backgroundColor: 'rgba(2, 6, 23, 0.92)' }}
     >
-      <div className="w-full max-w-sm bg-gradient-to-b from-slate-900 to-slate-950 border border-slate-800 rounded-3xl p-5 shadow-2xl flex flex-col items-center text-center space-y-4">
+      <div
+        className="w-full max-w-sm border border-[#1e293b] rounded-3xl p-5 shadow-2xl flex flex-col items-center text-center space-y-4"
+        style={{ background: 'linear-gradient(180deg, #0f172a, #020617)' }}
+      >
         {/* 顶部标题与徽章 */}
         <div className="space-y-1">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[10px] font-bold">
-            <Sparkles className="w-3 h-3 text-amber-400" />
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/40 text-[#fcd34d] text-[10px] font-bold">
+            <Sparkles className="w-3 h-3 text-[#fbbf24]" />
             <span>梦境能量 {TRIP_ENERGY_TARGET} 分达成 · 旅途信函</span>
           </div>
           <h3 className="text-base font-black text-white">大肥鱼给你寄回了新明信片！</h3>
-          <p className="text-[11px] text-slate-400">
+          <p className="text-[11px] text-[#94a3b8]">
             她在【{card.country} · {card.title}】度过了一个美好的夜晚。
           </p>
         </div>
 
         {!opened ? (
-          /* 未拆信封界面 */
-          <div className="py-6 space-y-6 w-full flex flex-col items-center">
-            <div className="relative w-36 h-28 bg-amber-100 rounded-2xl shadow-xl border-2 border-amber-300 flex items-center justify-center group transform transition-transform hover:scale-105">
-              <div className="absolute top-2 right-2 w-8 h-10 border border-dashed border-rose-400 bg-rose-50/80 rounded flex items-center justify-center text-xs">
-                🏮
+          /* 未拆信封界面：奶油信封 + 火漆印，单一风格（此前线性信封图标
+             与 emoji 邮票混搭、角标文字压边框，真机上观感很糟） */
+          <div className="py-6 space-y-5 w-full flex flex-col items-center">
+            <div className="relative w-44 h-28 rounded-2xl bg-[#fdf6e3] border border-[#e2cf9f] shadow-lg">
+              {/* 邮票位：右上角虚线小票 */}
+              <div className="absolute top-2 right-2 w-8 h-10 border border-dashed border-[#c9a96a] bg-[#f7ead0] rounded-sm flex flex-col items-center justify-center gap-0.5">
+                <span className="text-sm leading-none">🐋</span>
+                <span className="text-[7px] leading-none text-[#a8813d] font-bold">DREAM</span>
               </div>
-              <Mail className="w-12 h-12 text-amber-700 animate-bounce" />
-              <div className="absolute -bottom-2 px-2.5 py-0.5 rounded-full bg-rose-600 text-white text-[9px] font-bold shadow-md">
-                来自远方的来信
+              {/* 收件人手写线 */}
+              <div className="absolute left-3 top-7 space-y-2">
+                <div className="w-16 h-px bg-[#d9c9a3]" />
+                <div className="w-11 h-px bg-[#d9c9a3]" />
+              </div>
+              {/* 火漆印：点它的姿态（整封可点，火漆是视觉锚点） */}
+              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-[#c2554f] border-2 border-[#9e423d] shadow-md flex items-center justify-center text-white text-base">
+                🐋
               </div>
             </div>
+            <p className="text-[11px] text-[#94a3b8] font-medium">来自远方的来信 · 等你拆开</p>
 
             <button
               type="button"
               onClick={handleOpenEnvelope}
-              className="w-full py-3 rounded-2xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white text-xs font-bold shadow-lg shadow-sky-500/25 active:scale-95 transition-transform cursor-pointer"
+              style={{ background: 'linear-gradient(90deg, #0ea5e9, #4f46e5)' }}
+              className="w-full py-3 rounded-2xl text-white text-xs font-bold shadow-lg active:scale-95 transition-transform cursor-pointer"
             >
               ✉️ 拆开信封并查看
             </button>
@@ -90,15 +103,15 @@ export const TripArrivalModal: React.FC<Props> = ({ postcardId, onClose, onOpenM
           <div className="w-full space-y-4 animate-fadeIn">
             <PostcardCard postcard={card} />
 
-            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3 text-left flex items-center justify-between">
+            <div className="bg-slate-900/90 border border-[#1e293b] rounded-2xl p-3 text-left flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="text-2xl">{card.souvenir.emoji}</span>
                 <div>
-                  <p className="text-[10px] text-slate-400">大肥鱼带回的伴手礼</p>
-                  <p className="text-xs font-bold text-amber-300">{card.souvenir.name}</p>
+                  <p className="text-[10px] text-[#94a3b8]">大肥鱼带回的伴手礼</p>
+                  <p className="text-xs font-bold text-[#fcd34d]">{card.souvenir.name}</p>
                 </div>
               </div>
-              <span className="text-[9px] text-emerald-400 font-bold bg-emerald-950/80 px-2 py-1 rounded-lg border border-emerald-800/60">
+              <span className="text-[9px] text-[#34d399] font-bold bg-emerald-950/80 px-2 py-1 rounded-lg border border-emerald-800/60">
                 已收入行囊
               </span>
             </div>
@@ -107,7 +120,7 @@ export const TripArrivalModal: React.FC<Props> = ({ postcardId, onClose, onOpenM
               <button
                 type="button"
                 onClick={handleFinish}
-                className="w-full py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition-transform cursor-pointer"
+                className="w-full py-2.5 rounded-xl bg-[#0284c7] hover:bg-[#0ea5e9] text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition-transform cursor-pointer"
               >
                 <Heart className="w-3.5 h-3.5 fill-white" />
                 收下明信片并去朋友圈点赞
@@ -118,7 +131,7 @@ export const TripArrivalModal: React.FC<Props> = ({ postcardId, onClose, onOpenM
                   clearPendingArrival();
                   onClose();
                 }}
-                className="w-full py-2 rounded-xl text-slate-400 hover:text-slate-200 text-[11px] font-medium transition-colors cursor-pointer"
+                className="w-full py-2 rounded-xl text-[#94a3b8] hover:text-[#e2e8f0] text-[11px] font-medium transition-colors cursor-pointer"
               >
                 稍后再看
               </button>

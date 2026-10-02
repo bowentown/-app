@@ -64,18 +64,21 @@ export const TravelCodexModal: React.FC<Props> = ({ onClose }) => {
     <div
       ref={modalA11y.ref}
       {...modalA11y.dialogProps}
-      className="fixed inset-0 z-[95] flex flex-col bg-slate-950 text-slate-100"
+      className="fixed inset-0 z-[95] flex flex-col bg-[#020617] text-[#f1f5f9]"
       style={{ backgroundColor: '#020617' }}
     >
       {/* 顶栏 */}
       <div className="shrink-0 flex items-center justify-between px-4 pt-3 pb-2.5 border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md">
         <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-sky-500 flex items-center justify-center text-lg shadow-md">
+          <div
+            className="w-9 h-9 rounded-xl flex items-center justify-center text-lg shadow-md"
+            style={{ background: 'linear-gradient(135deg, #6366f1, #0ea5e9)' }}
+          >
             🗺️
           </div>
           <div>
             <h2 className="text-xs font-black text-white leading-tight">大肥鱼的漫游图鉴</h2>
-            <p className="text-[9px] text-slate-400">
+            <p className="text-[9px] text-[#94a3b8]">
               已收集 {unlockedCount} / {totalCards} 张 · 达成率 {percentage}%
             </p>
           </div>
@@ -85,36 +88,42 @@ export const TravelCodexModal: React.FC<Props> = ({ onClose }) => {
           type="button"
           aria-label="关闭图鉴"
           onClick={onClose}
-          className="w-8 h-8 rounded-full bg-slate-800/80 border border-slate-700 text-slate-300 hover:text-white flex items-center justify-center cursor-pointer active:scale-90 transition-transform"
+          className="w-8 h-8 rounded-full bg-slate-800/80 border border-[#334155] text-[#cbd5e1] hover:text-white flex items-center justify-center cursor-pointer active:scale-90 transition-transform"
         >
           <X className="w-4 h-4" />
         </button>
       </div>
 
       {/* 概览区：能量进度 + 伴手礼宝库 */}
-      <div className="shrink-0 p-4 border-b border-slate-800/60 bg-gradient-to-b from-slate-900/60 to-transparent space-y-3">
+      <div
+        className="shrink-0 p-4 border-b border-slate-800/60 space-y-3"
+        style={{ background: 'linear-gradient(180deg, rgba(15,23,42,0.6), transparent)' }}
+      >
         {/* 能量条 */}
-        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-3 flex items-center justify-between gap-3">
+        <div className="bg-slate-900/80 border border-[#1e293b] rounded-2xl p-3 flex items-center justify-between gap-3">
           <div className="space-y-1 flex-1">
             <div className="flex items-center justify-between text-[10px]">
-              <span className="font-bold text-sky-300 flex items-center gap-1">
-                <Compass className="w-3.5 h-3.5 text-sky-400" />
+              <span className="font-bold text-[#7dd3fc] flex items-center gap-1">
+                <Compass className="w-3.5 h-3.5 text-[#38bdf8]" />
                 梦境旅行能量
               </span>
-              <span className="font-mono text-slate-400">
-                <strong className="text-sky-300 text-xs">{travelState.currentEnergy}</strong> / {TRIP_ENERGY_TARGET} 分
+              <span className="font-mono text-[#94a3b8]">
+                <strong className="text-[#7dd3fc] text-xs">{travelState.currentEnergy}</strong> / {TRIP_ENERGY_TARGET} 分
               </span>
             </div>
-            <div className="h-2 rounded-full bg-slate-800 overflow-hidden">
+            <div className="h-2 rounded-full bg-[#1e293b] overflow-hidden">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-sky-500 via-indigo-500 to-purple-500 transition-all duration-500"
-                style={{ width: `${Math.min(100, Math.round((travelState.currentEnergy / TRIP_ENERGY_TARGET) * 100))}%` }}
+                className="h-full rounded-full transition-all duration-500"
+                style={{
+                  width: `${Math.min(100, Math.round((travelState.currentEnergy / TRIP_ENERGY_TARGET) * 100))}%`,
+                  background: 'linear-gradient(90deg, #0ea5e9, #6366f1, #a855f7)',
+                }}
               />
             </div>
           </div>
-          <div className="shrink-0 text-right pl-2 border-l border-slate-800">
-            <p className="text-[9px] text-slate-400">旅行出发</p>
-            <p className="text-xs font-black text-amber-300">{travelState.totalTrips} 次</p>
+          <div className="shrink-0 text-right pl-2 border-l border-[#1e293b]">
+            <p className="text-[9px] text-[#94a3b8]">旅行出发</p>
+            <p className="text-xs font-black text-[#fcd34d]">{travelState.totalTrips} 次</p>
           </div>
         </div>
 
@@ -125,8 +134,8 @@ export const TravelCodexModal: React.FC<Props> = ({ onClose }) => {
             onClick={() => setTab('all')}
             className={`px-3 py-1.5 rounded-xl text-[10px] font-bold shrink-0 transition-colors cursor-pointer ${
               tab === 'all'
-                ? 'bg-sky-500 text-white shadow-sm'
-                : 'bg-slate-900/80 text-slate-400 hover:text-slate-200 border border-slate-800'
+                ? 'bg-[#0ea5e9] text-white shadow-sm'
+                : 'bg-slate-900/80 text-[#94a3b8] hover:text-[#e2e8f0] border border-[#1e293b]'
             }`}
           >
             全部 ({unlockedCount}/{totalCards})
@@ -143,8 +152,8 @@ export const TravelCodexModal: React.FC<Props> = ({ onClose }) => {
                 onClick={() => handleContinentTab(key)}
                 className={`px-3 py-1.5 rounded-xl text-[10px] font-bold shrink-0 transition-colors cursor-pointer ${
                   active
-                    ? 'bg-sky-500 text-white shadow-sm'
-                    : 'bg-slate-900/80 text-slate-400 hover:text-slate-200 border border-slate-800'
+                    ? 'bg-[#0ea5e9] text-white shadow-sm'
+                    : 'bg-slate-900/80 text-[#94a3b8] hover:text-[#e2e8f0] border border-[#1e293b]'
                 }`}
               >
                 {emoji} {label}
@@ -155,8 +164,8 @@ export const TravelCodexModal: React.FC<Props> = ({ onClose }) => {
         </div>
 
         {tipMessage && (
-          <div className="p-2 rounded-xl bg-indigo-950/70 border border-indigo-700/50 text-[10px] text-indigo-200 flex items-center gap-1.5 animate-fadeIn">
-            <Sparkles className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+          <div className="p-2 rounded-xl bg-indigo-950/70 border border-indigo-700/50 text-[10px] text-[#e0e7ff] flex items-center gap-1.5 animate-fadeIn">
+            <Sparkles className="w-3.5 h-3.5 text-[#818cf8] shrink-0" />
             <span>{tipMessage}</span>
           </div>
         )}
@@ -177,13 +186,13 @@ export const TravelCodexModal: React.FC<Props> = ({ onClose }) => {
                 onClick={() => handleCardClick(card)}
                 className={`relative aspect-[3/4] rounded-2xl p-2 text-left flex flex-col justify-between overflow-hidden cursor-pointer transition-transform active:scale-95 ${
                   isUnlocked
-                    ? 'bg-slate-900 border-2 border-slate-700/80 hover:border-sky-500/80 shadow-lg'
+                    ? 'bg-[#0f172a] border-2 border-slate-700/80 hover:border-sky-500/80 shadow-lg'
                     : 'bg-slate-900/40 border border-slate-800/80 opacity-60'
                 }`}
               >
                 {/* 缩略图 or 锁孔剪影 */}
                 {isUnlocked ? (
-                  <div className="relative w-full flex-1 rounded-xl overflow-hidden bg-slate-950">
+                  <div className="relative w-full flex-1 rounded-xl overflow-hidden bg-[#020617]">
                     <img
                       src={card.imageUrl}
                       alt={card.title}
@@ -191,13 +200,13 @@ export const TravelCodexModal: React.FC<Props> = ({ onClose }) => {
                       className="w-full h-full object-cover"
                     />
                     {stars > 0 && (
-                      <span className="absolute top-1 right-1 px-1.5 py-0.5 rounded-full bg-amber-500/90 text-[8px] font-black text-slate-950">
+                      <span className="absolute top-1 right-1 px-1.5 py-0.5 rounded-full bg-amber-500/90 text-[8px] font-black text-[#020617]">
                         ★ {stars + 1}
                       </span>
                     )}
                   </div>
                 ) : (
-                  <div className="w-full flex-1 rounded-xl bg-slate-950/80 border border-slate-800/50 flex flex-col items-center justify-center gap-1.5 text-slate-600">
+                  <div className="w-full flex-1 rounded-xl bg-slate-950/80 border border-slate-800/50 flex flex-col items-center justify-center gap-1.5 text-[#475569]">
                     <Lock className="w-5 h-5" />
                     <span className="text-[9px] font-mono font-bold tracking-wider">LOCKED</span>
                   </div>
@@ -206,8 +215,8 @@ export const TravelCodexModal: React.FC<Props> = ({ onClose }) => {
                 {/* 底部信息栏 */}
                 <div className="pt-2 px-0.5 space-y-0.5">
                   <div className="flex items-center justify-between text-[8px]">
-                    <span className="font-mono text-slate-400">No.{String(card.index).padStart(2, '0')}</span>
-                    <span className="text-slate-400">{card.country}</span>
+                    <span className="font-mono text-[#94a3b8]">No.{String(card.index).padStart(2, '0')}</span>
+                    <span className="text-[#94a3b8]">{card.country}</span>
                   </div>
                   <p className="text-[10px] font-bold text-white truncate">
                     {isUnlocked ? card.title : '待探索梦境'}
@@ -226,7 +235,7 @@ export const TravelCodexModal: React.FC<Props> = ({ onClose }) => {
           {/* 更多大洲占位：诚实的"敬请期待"，而不是永远抽不到的锁卡 */}
           <div
             aria-hidden
-            className="aspect-[3/4] rounded-2xl border border-dashed border-slate-700/70 bg-slate-900/30 flex flex-col items-center justify-center gap-1.5 text-slate-500"
+            className="aspect-[3/4] rounded-2xl border border-dashed border-slate-700/70 bg-slate-900/30 flex flex-col items-center justify-center gap-1.5 text-[#64748b]"
           >
             <Compass className="w-5 h-5" />
             <span className="text-[9px] font-bold">更多大洲</span>
@@ -238,12 +247,12 @@ export const TravelCodexModal: React.FC<Props> = ({ onClose }) => {
       {/* 伴手礼藏宝盒展示 */}
       {travelState.souvenirInventory.length > 0 && (
         <div className="shrink-0 px-4 py-2 border-t border-slate-800/80 bg-slate-900/60 flex items-center justify-between text-[10px]">
-          <div className="flex items-center gap-1.5 text-slate-400">
-            <Gift className="w-3.5 h-3.5 text-amber-400" />
+          <div className="flex items-center gap-1.5 text-[#94a3b8]">
+            <Gift className="w-3.5 h-3.5 text-[#fbbf24]" />
             <span>伴手礼行囊：</span>
-            <span className="font-bold text-amber-300">{travelState.souvenirInventory.length} 件特产</span>
+            <span className="font-bold text-[#fcd34d]">{travelState.souvenirInventory.length} 件特产</span>
           </div>
-          <span className="text-[9px] text-slate-500">点击卡片背面可重温手写日记</span>
+          <span className="text-[9px] text-[#64748b]">点击卡片背面可重温手写日记</span>
         </div>
       )}
 
@@ -258,7 +267,7 @@ export const TravelCodexModal: React.FC<Props> = ({ onClose }) => {
         >
           <div className="w-full max-w-xs space-y-4">
             <div className="flex items-center justify-between text-white">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-sky-300">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-[#7dd3fc]">
                 <span>🏮</span>
                 <span>{selectedCard.country} · {selectedCard.title}</span>
               </div>
