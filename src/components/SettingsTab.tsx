@@ -266,11 +266,14 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         )}
       </div>
 
-      {/* 4. 大肥鱼桌宠悬浮窗 */}
+      {/* 4. 大肥鱼桌宠悬浮窗（配色跟主题走——纯黑主题下是天蓝会很刺眼） */}
       <div className={`${theme.cardBg} rounded-3xl p-5 border ${theme.cardBorder} shadow-xl space-y-3`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-2xl bg-sky-500/20 text-sky-300 flex items-center justify-center border border-sky-400">
+            <div
+              className={`w-9 h-9 rounded-2xl ${theme.accentText} flex items-center justify-center border ${theme.accentBorder}`}
+              style={{ background: `${theme.accentHex}1f` }}
+            >
               <Fish className="w-5 h-5" />
             </div>
             <div>
@@ -294,14 +297,16 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 onChange={(e) => void handlePetToggle(e.target.checked)}
                 className="sr-only peer"
               />
-              <div className="w-11 h-6 bg-slate-600 peer-checked:bg-sky-500 rounded-full transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:transition-transform peer-checked:after:translate-x-5" />
+              {/* 开关选中色用主题 accentBg（themeStyles 里的字面类会被 Tailwind 生成）：
+                  受控组件直接按 petOn 切换，不再依赖 peer-checked 的固定色 */}
+              <div className={`w-11 h-6 rounded-full transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:transition-transform ${petOn ? theme.accentBg : 'bg-slate-600'} ${petOn ? 'after:translate-x-5' : ''}`} />
             </label>
           )}
         </div>
 
         {/* 播报词预览：折叠 */}
         <details className="rounded-2xl bg-slate-900/60 border border-slate-700/60 p-3.5">
-          <summary className="text-[10px] font-bold text-sky-300 cursor-pointer select-none">
+          <summary className={`text-[10px] font-bold ${theme.accentText} cursor-pointer select-none`}>
             傲娇播报预览（{petSay.length} 条）
           </summary>
           <div className="space-y-1.5 pt-2">
@@ -324,9 +329,10 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 onClick={() => handlePetSkinChange(s)}
                 className={`px-2.5 py-1 rounded-full text-[10px] font-bold border transition-all cursor-pointer active:scale-95 ${
                   petSkin === s
-                    ? 'bg-sky-500/20 border-sky-400 text-sky-300'
+                    ? `${theme.accentText} border ${theme.accentBorder}`
                     : 'bg-slate-800 border-slate-600 text-slate-400'
                 }`}
+                style={petSkin === s ? { background: `${theme.accentHex}26` } : undefined}
               >
                 {s === 'default' ? '常服' : '樱花'}
               </button>
@@ -352,7 +358,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             >
               −
             </button>
-            <span className="w-6 text-center text-xs font-black text-sky-300">{petEvery}</span>
+            <span className={`w-6 text-center text-xs font-black ${theme.accentText}`}>{petEvery}</span>
             <button
               type="button"
               aria-label="增加播报频率"
@@ -369,7 +375,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           <button
             type="button"
             onClick={() => void petOpenPermissionSettings()}
-            className="w-full py-2.5 rounded-xl bg-sky-500/20 border border-sky-400 text-sky-200 text-xs font-bold cursor-pointer active:scale-[0.98] transition-transform"
+            className={`w-full py-2.5 rounded-xl ${theme.accentText} border ${theme.accentBorder} text-xs font-bold cursor-pointer active:scale-[0.98] transition-transform`}
+            style={{ background: `${theme.accentHex}1a` }}
           >
             需要悬浮窗权限 · 前往系统设置授权
           </button>
