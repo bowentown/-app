@@ -11,7 +11,7 @@
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
     "verify": "tsx tools/verify-wiring.mts && tsx tools/verify-theme-classes.mts && tsx tools/verify-contrast.mts && tsx tools/verify-a11y.mts && tsx tools/verify-css-usage.mts",
-    "verify:css": "tsx tools/verify-class-gen.mts"
+    "verify:css": "tsx tools/verify-class-gen.mts && tsx tools/verify-no-oklch.mts"
   },
   "dependencies": {
     "@capacitor/filesystem": "^8.1.3",

@@ -40,8 +40,10 @@ export const PostcardCard: React.FC<Props> = ({ postcardId, postcard: initialPos
             transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
           }}
         >
-          {/* 正面：拍立得全彩照片 + 邮戳 */}
+          {/* 正面：拍立得全彩照片。翻到背面时从无障碍树隐藏——
+              backface-visibility 只是视觉属性，读屏仍会念到两张脸 */}
           <div
+            aria-hidden={isFlipped}
             className="absolute inset-0 rounded-2xl overflow-hidden bg-[#0f172a] border-4 border-white/90 p-2 flex flex-col justify-between shadow-2xl"
             style={{
               backfaceVisibility: 'hidden',
@@ -80,6 +82,7 @@ export const PostcardCard: React.FC<Props> = ({ postcardId, postcard: initialPos
 
           {/* 反面：复古旅行手写信纸 + 大肥鱼日记 */}
           <div
+            aria-hidden={!isFlipped}
             className="absolute inset-0 rounded-2xl overflow-hidden bg-[#fffbeb] border-4 border-amber-100/90 p-4 flex flex-col justify-between shadow-2xl text-[#1e293b]"
             style={{
               backfaceVisibility: 'hidden',

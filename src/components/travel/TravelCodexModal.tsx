@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { X, Lock, Compass, Sparkles, ChevronRight, Gift } from 'lucide-react';
 import type { ContinentType, TravelPostcard } from '../../types/travel';
 
@@ -26,6 +26,13 @@ export const TravelCodexModal: React.FC<Props> = ({ onClose }) => {
   const [tab, setTab] = useState<TabFilter>('all');
   const [selectedCard, setSelectedCard] = useState<TravelPostcard | null>(null);
   const [tipMessage, setTipMessage] = useState<string | null>(null);
+  // tip 计时器收口：连点时先清旧定时器，第二条提示才不会被第一条提前收掉
+  const tipTimerRef = useRef<number>(0);
+  const showTip = (msg: string) => {
+    setTipMessage(msg);
+    window.clearTimeout(tipTimerRef.current);
+    tipTimerRef.current = window.setTimeout(() => setTipMessage(null), 3500);
+  };
 
   const travelState = loadTravelState();
   const unlockedSet = new Set(travelState.unlockedCardIds);
@@ -46,8 +53,7 @@ export const TravelCodexModal: React.FC<Props> = ({ onClose }) => {
       return;
     }
     const label = c === 'europe' ? '欧洲' : c === 'americas' ? '美洲' : '非洲';
-    setTipMessage(`🗺️ ${label}旅行插画筹备中，敬请期待大肥鱼的下一波远行～`);
-    setTimeout(() => setTipMessage(null), 3500);
+    showTip(`🗺️ ${label}旅行插画筹备中，敬请期待大肥鱼的下一波远行～`);
   };
 
   const handleCardClick = (card: TravelPostcard) => {
@@ -55,8 +61,7 @@ export const TravelCodexModal: React.FC<Props> = ({ onClose }) => {
       setSelectedCard(card);
       setTipMessage(null);
     } else {
-      setTipMessage(`【${card.continentLabel} · No.${String(card.index).padStart(2, '0')}】尚未探索。今晚按时睡眠积攒能量，大肥鱼就会去这里旅行啦！`);
-      setTimeout(() => setTipMessage(null), 3500);
+      showTip(`【${card.continentLabel} · No.${String(card.index).padStart(2, '0')}】尚未探索。今晚按时睡眠积攒能量，大肥鱼就会去这里旅行啦！`);
     }
   };
 

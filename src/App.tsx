@@ -164,13 +164,11 @@ export const App: React.FC = () => {
       const trimmed = sortedList.slice(0, Math.floor(MAX_RECORDS / 2));
       try {
         localStorage.setItem('somnacare_sleep_records', JSON.stringify(trimmed));
-        setToastMessage('本地存储已满，已保留最近的记录，建议在【偏好】中导出备份');
-        window.setTimeout(() => setToastMessage(null), 6000);
+        showToast('本地存储已满，已保留最近的记录，建议在【偏好】中导出备份', 6000);
         return true;
       } catch (e2) {
         console.warn('[storage] 裁剪后仍写入失败', e2);
-        setToastMessage('本地存储写入失败，请导出备份后清理空间');
-        window.setTimeout(() => setToastMessage(null), 6000);
+        showToast('本地存储写入失败，请导出备份后清理空间', 6000);
         return false;
       }
     }
@@ -470,9 +468,13 @@ export const App: React.FC = () => {
     applyTrack(-idx * (paneWRef.current || window.innerWidth), true, snapMsRef.current);
   }, [activeTab]);
 
-  const showToast = (msg: string) => {
+  // toast 计时器收口：先清旧定时器再设新的——并存的两条定时器互不知情，
+  // 后弹的短提示会被先前长提示的回调提前收掉
+  const toastTimerRef = useRef<number>(0);
+  const showToast = (msg: string, durationMs = 3200) => {
     setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3200);
+    window.clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = window.setTimeout(() => setToastMessage(null), durationMs);
   };
 
   // 响铃检测循环（每 10s 对表）

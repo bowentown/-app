@@ -3,6 +3,103 @@
 @import "@fontsource/space-grotesk/500.css";
 @import "@fontsource/space-grotesk/700.css";
 
+/* ===== 旧 WebView 兼容：调色板覆盖为字面 hex =====
+   Tailwind v4 默认调色板是 oklch()，Chrome <111 的 WebView 解析失败，
+   纯色背景/文字/边框会整体失效（背景透明、文字继承父色）。
+   这里把项目实际用到的调色板全部覆盖为 sRGB hex，使 var(--color-*)
+   在任何内核都落到字面值。新增用色后跑 npm run verify:css 里的
+   verify-no-oklch 护栏，它会扫产物强制为零 oklch。 */
+@theme {
+  --color-amber-100: #fef3c6;
+  --color-amber-200: #fee685;
+  --color-amber-300: #ffd230;
+  --color-amber-400: #ffb900;
+  --color-amber-50: #fffbeb;
+  --color-amber-500: #fe9a00;
+  --color-amber-600: #e17100;
+  --color-amber-800: #973c00;
+  --color-amber-900: #7b3306;
+  --color-amber-950: #461901;
+  --color-blue-600: #155dfc;
+  --color-blue-900: #1c398e;
+  --color-blue-950: #162456;
+  --color-cyan-200: #a2f4fd;
+  --color-cyan-300: #53eafd;
+  --color-cyan-400: #00d3f2;
+  --color-cyan-50: #ecfeff;
+  --color-cyan-500: #00b8db;
+  --color-cyan-600: #0092b8;
+  --color-cyan-800: #005f78;
+  --color-cyan-900: #104e64;
+  --color-cyan-950: #053345;
+  --color-emerald-300: #5ee9b5;
+  --color-emerald-400: #00d492;
+  --color-emerald-500: #00bc7d;
+  --color-emerald-600: #009966;
+  --color-emerald-700: #007a55;
+  --color-emerald-800: #006045;
+  --color-emerald-900: #004f3b;
+  --color-emerald-950: #002c22;
+  --color-indigo-200: #c6d2ff;
+  --color-indigo-300: #a3b3ff;
+  --color-indigo-400: #7c86ff;
+  --color-indigo-500: #615fff;
+  --color-indigo-600: #4f39f6;
+  --color-indigo-700: #432dd7;
+  --color-indigo-900: #312c85;
+  --color-indigo-950: #1e1a4d;
+  --color-neutral-950: #0a0a0a;
+  --color-orange-200: #ffd6a7;
+  --color-orange-300: #ffb86a;
+  --color-orange-400: #ff8904;
+  --color-orange-500: #ff6900;
+  --color-orange-900: #7e2a0c;
+  --color-orange-950: #441306;
+  --color-purple-800: #6e11b0;
+  --color-purple-950: #3c0366;
+  --color-red-950: #460809;
+  --color-rose-200: #ffccd3;
+  --color-rose-300: #ffa1ad;
+  --color-rose-400: #ff637e;
+  --color-rose-500: #ff2056;
+  --color-rose-800: #a50036;
+  --color-rose-950: #4d0218;
+  --color-sky-200: #b8e6fe;
+  --color-sky-300: #74d4ff;
+  --color-sky-400: #00bcff;
+  --color-sky-500: #00a6f4;
+  --color-sky-600: #0084d1;
+  --color-sky-800: #00598a;
+  --color-sky-900: #024a70;
+  --color-slate-100: #f1f5f9;
+  --color-slate-200: #e2e8f0;
+  --color-slate-300: #cad5e2;
+  --color-slate-400: #90a1b9;
+  --color-slate-500: #62748e;
+  --color-slate-600: #45556c;
+  --color-slate-700: #314158;
+  --color-slate-800: #1d293d;
+  --color-slate-900: #0f172b;
+  --color-slate-950: #020618;
+  --color-stone-900: #1c1917;
+  --color-teal-200: #96f7e4;
+  --color-teal-300: #46ecd5;
+  --color-teal-400: #00d5be;
+  --color-teal-500: #00bba7;
+  --color-teal-600: #009689;
+  --color-teal-900: #0b4f4a;
+  --color-teal-950: #022f2e;
+  --color-violet-300: #c4b4ff;
+  --color-violet-400: #a684ff;
+  --color-violet-600: #7f22fe;
+  --color-zinc-200: #e4e4e7;
+  --color-zinc-400: #9f9fa9;
+  --color-zinc-500: #71717b;
+  --color-zinc-700: #3f3f46;
+  --color-zinc-800: #27272a;
+}
+
+
 /* 页面本身即为暗色主题：禁用 WebView Force Dark 的二次压暗（Android/国产 ROM 深色模式） */
 :root {
   color-scheme: dark;
@@ -209,3 +306,12 @@ html {
   touch-action: pan-y;
   overscroll-behavior: contain;
 }
+
+/* ===== 旧 WebView 兼容：渐变去 oklab 插值 =====
+   bg-gradient-to-* 的位置变量带 "in oklab"（Chrome <111 不支持，整条
+   渐变失效）。同名选择器在此后重新声明，按层叠顺序覆盖为无插值写法
+   （sRGB 插值与 oklab 对本项目的浅色渐变视觉无差）。 */
+.bg-gradient-to-b { --tw-gradient-position: to bottom; }
+.bg-gradient-to-br { --tw-gradient-position: to bottom right; }
+.bg-gradient-to-r { --tw-gradient-position: to right; }
+.bg-gradient-to-tr { --tw-gradient-position: to top right; }
