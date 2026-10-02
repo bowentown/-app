@@ -226,7 +226,7 @@ export const OneTapSleepTracker: React.FC<OneTapSleepTrackerProps> = ({ onSaveRe
                   <span className="text-[11px] text-slate-800 font-bold">按实际入睡分钟数精准结算</span>
                 </div>
               </div>
-              <span className="text-xs font-black bg-black/10 px-3 py-1.5 rounded-xl text-slate-950">
+              <span className="text-xs font-black bg-black/10 px-3 py-1.5 rounded-xl text-slate-950 shrink-0 whitespace-nowrap">
                 完成本次睡眠 →
               </span>
             </button>

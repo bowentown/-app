@@ -327,12 +327,12 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 key={s}
                 type="button"
                 onClick={() => handlePetSkinChange(s)}
-                className={`px-2.5 py-1 rounded-full text-[10px] font-bold border transition-all cursor-pointer active:scale-95 ${
+                className={`px-3 py-1.5 rounded-full text-[10px] font-bold border transition-all cursor-pointer active:scale-95 ${
                   petSkin === s
                     ? `${theme.accentText} border ${theme.accentBorder}`
                     : 'bg-slate-800 border-slate-600 text-slate-400'
                 }`}
-                style={petSkin === s ? { background: `${theme.accentHex}26` } : undefined}
+                style={petSkin === s ? { background: `${theme.accentHex}14` } : undefined}
               >
                 {s === 'default' ? '常服' : '樱花'}
               </button>
@@ -343,8 +343,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         {/* 播报频率：每 N 次点击大肥鱼，她自动傲娇播报一次 */}
         <div className="flex items-center justify-between">
           <div className="min-w-0">
-            <p className="text-[11px] font-bold text-white">女仆播报频率</p>
-            <p className="text-[10px] text-slate-500 leading-relaxed">
+            <p className="text-[11px] font-bold text-white">傲娇播报频率</p>
+            <p className="text-[10px] text-slate-400 leading-relaxed">
               每 {petEvery} 次点她，大肥鱼会自动傲娇播报一次，其余点击弹出「消息 / 护眼」按钮
             </p>
           </div>
@@ -354,7 +354,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               aria-label="减少播报频率"
               onClick={() => handlePetEveryChange(petEvery - 1)}
               disabled={petEvery <= 1}
-              className="w-7 h-7 rounded-lg bg-slate-700/70 text-slate-200 text-sm font-black disabled:opacity-30 cursor-pointer active:scale-90 transition-transform"
+              className="w-10 h-10 rounded-lg bg-slate-700/70 text-slate-200 text-sm font-black disabled:opacity-30 cursor-pointer active:scale-90 transition-transform"
             >
               −
             </button>
@@ -364,7 +364,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               aria-label="增加播报频率"
               onClick={() => handlePetEveryChange(petEvery + 1)}
               disabled={petEvery >= 20}
-              className="w-7 h-7 rounded-lg bg-slate-700/70 text-slate-200 text-sm font-black disabled:opacity-30 cursor-pointer active:scale-90 transition-transform"
+              className="w-10 h-10 rounded-lg bg-slate-700/70 text-slate-200 text-sm font-black disabled:opacity-30 cursor-pointer active:scale-90 transition-transform"
             >
               ＋
             </button>

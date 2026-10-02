@@ -92,8 +92,8 @@ export const TripArrivalModal: React.FC<Props> = ({ postcardId, onClose, onOpenM
             <button
               type="button"
               onClick={handleOpenEnvelope}
-              style={{ background: 'linear-gradient(90deg, #0ea5e9, #4f46e5)' }}
-              className="w-full py-3 rounded-2xl text-white text-xs font-bold shadow-lg active:scale-95 transition-transform cursor-pointer"
+              style={{ background: '#0ea5e9' }}
+              className="w-full py-3 rounded-2xl text-[#0b1026] text-xs font-bold shadow-lg active:scale-95 transition-transform cursor-pointer"
             >
               ✉️ 拆开信封并查看
             </button>
@@ -120,7 +120,7 @@ export const TripArrivalModal: React.FC<Props> = ({ postcardId, onClose, onOpenM
               <button
                 type="button"
                 onClick={handleFinish}
-                className="w-full py-2.5 rounded-xl bg-[#0284c7] hover:bg-[#0ea5e9] text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition-transform cursor-pointer"
+                className="w-full py-2.5 rounded-xl bg-[#0ea5e9] hover:bg-[#38bdf8] text-[#0b1026] text-xs font-bold flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition-transform cursor-pointer"
               >
                 <Heart className="w-3.5 h-3.5 fill-white" />
                 收下明信片并去朋友圈点赞

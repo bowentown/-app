@@ -62,19 +62,20 @@ export const PostcardCard: React.FC<Props> = ({ postcardId, postcard: initialPos
               />
             </div>
 
-            {/* 拍立得底部白色手写留白区域：地点与伴手礼两行，不遮画 */}
+            {/* 底部信息区：正面底色是深色（bg-[#0f172a]），文字必须用浅色——
+                此前沿用"白色留白"时代的 #1e293b，实测对比度 1.22:1 几乎不可见 */}
             <div className="pt-2 px-1 space-y-0.5">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[10px] font-black text-[#1e293b] tracking-tight truncate">
+                <span className="text-[10px] font-black text-slate-200 tracking-tight truncate">
                   {card.country} · {card.title}
                 </span>
-                <span className="text-[9px] text-[#64748b] font-medium flex items-center gap-0.5 shrink-0">
+                <span className="text-[9px] text-[#94a3b8] font-medium flex items-center gap-0.5 shrink-0">
                   <RotateCw className="w-2.5 h-2.5" />
                   翻面
                 </span>
               </div>
-              <div className="text-[10px] font-bold text-[#1e293b] flex items-center gap-1 truncate">
-                <Sparkles className="w-3 h-3 text-[#f59e0b] fill-amber-500 shrink-0" />
+              <div className="text-[10px] font-bold text-slate-200 flex items-center gap-1 truncate">
+                <Sparkles className="w-3 h-3 text-[#fbbf24] fill-[#fbbf24] shrink-0" />
                 <span className="truncate">{card.souvenir.name}</span>
               </div>
             </div>

@@ -111,6 +111,8 @@
 
 html {
   background: #070a12; /* 冷启动与 WebView 首帧同色，消灭白屏闪现 */
+  /* App 式界面禁双击缩放（连点两下不再触发整页放大），双指缩放保留 */
+  touch-action: manipulation;
 }
 
 /* OLED 纯黑主题：阴影在纯黑上发灰，改由描边分层 */

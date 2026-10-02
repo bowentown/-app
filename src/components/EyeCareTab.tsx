@@ -155,12 +155,14 @@ export const EyeCareTab: React.FC<EyeCareTabProps> = ({ userProfile, onUpdatePro
           </label>
         </div>
 
-        {/* 滤镜色预览细条 */}
-        <div
-          className="h-2 rounded-full border border-white/5"
-          style={{ background: `linear-gradient(90deg, #0b1026, ${styles.warm})` }}
-          aria-hidden
-        />
+        {/* 滤镜色预览细条：仅开启时显示（关闭态是条几乎全黑的空条，像坏掉的进度条） */}
+        {cfg.enabled && (
+          <div
+            className="h-2 rounded-full border border-white/5"
+            style={{ background: `linear-gradient(90deg, #0b1026, ${styles.warm})` }}
+            aria-hidden
+          />
+        )}
 
         {native && cfg.enabled && !granted && (
           <button
@@ -389,7 +391,7 @@ export const EyeCareTab: React.FC<EyeCareTabProps> = ({ userProfile, onUpdatePro
             step={5}
             value={cfg.warmStrength}
             onChange={(e) => patch({ warmStrength: Number(e.target.value) })}
-            className="w-full accent-orange-500 cursor-pointer h-2 bg-slate-700 rounded-lg"
+            className="w-full accent-orange-500 cursor-pointer h-11 bg-transparent"
             aria-label="滤镜强度"
           />
         </div>
@@ -405,7 +407,7 @@ export const EyeCareTab: React.FC<EyeCareTabProps> = ({ userProfile, onUpdatePro
             step={5}
             value={cfg.dimStrength}
             onChange={(e) => patch({ dimStrength: Number(e.target.value) })}
-            className="w-full accent-slate-400 cursor-pointer h-2 bg-slate-700 rounded-lg"
+            className="w-full accent-slate-400 cursor-pointer h-11 bg-transparent"
             aria-label="屏幕减光"
           />
         </div>

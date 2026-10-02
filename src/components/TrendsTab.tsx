@@ -159,6 +159,8 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
                       className="cursor-pointer"
                       onClick={() => setHoveredRecord(r)}
                     >
+                      {/* 隐形命中区：r=4 的点直径只有 8px，手指根本点不中 */}
+                      <circle cx={x} cy={y} r={16} fill="transparent" pointerEvents="all" />
                       <circle
                         cx={x}
                         cy={y}

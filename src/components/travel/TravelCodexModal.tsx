@@ -140,13 +140,14 @@ export const TravelCodexModal: React.FC<Props> = ({ onClose }) => {
         </div>
 
         {/* 大洲分类标签 */}
+        <div className="relative">
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
           <button
             type="button"
             onClick={() => setTab('all')}
             className={`px-3 py-1.5 rounded-xl text-[10px] font-bold shrink-0 transition-colors cursor-pointer ${
               tab === 'all'
-                ? 'bg-[#0ea5e9] text-white shadow-sm'
+                ? 'bg-[#0ea5e9] text-[#0b1026] shadow-sm'
                 : 'bg-slate-900/80 text-[#94a3b8] hover:text-[#e2e8f0] border border-[#1e293b]'
             }`}
           >
@@ -164,7 +165,7 @@ export const TravelCodexModal: React.FC<Props> = ({ onClose }) => {
                 onClick={() => handleContinentTab(key)}
                 className={`px-3 py-1.5 rounded-xl text-[10px] font-bold shrink-0 transition-colors cursor-pointer ${
                   active
-                    ? 'bg-[#0ea5e9] text-white shadow-sm'
+                    ? 'bg-[#0ea5e9] text-[#0b1026] shadow-sm'
                     : 'bg-slate-900/80 text-[#94a3b8] hover:text-[#e2e8f0] border border-[#1e293b]'
                 }`}
               >
@@ -173,6 +174,9 @@ export const TravelCodexModal: React.FC<Props> = ({ onClose }) => {
               </button>
             );
           })}
+        </div>
+        {/* 右缘渐隐：标签可横向滚动（no-scrollbar 藏了滚动条，给个可滚提示） */}
+        <div aria-hidden className="pointer-events-none absolute right-0 top-0 bottom-1 w-10" style={{ background: 'linear-gradient(90deg, transparent, #020617)' }} />
         </div>
 
         {tipMessage && (
@@ -279,7 +283,9 @@ export const TravelCodexModal: React.FC<Props> = ({ onClose }) => {
           {...detailA11y.dialogProps}
           className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-md flex flex-col items-center justify-center p-4 animate-fadeIn"
         >
-          <div className="w-full max-w-xs space-y-4">
+          {/* 灯箱背景：点暗色区域关闭（内容层阻断冒泡） */}
+          <div aria-hidden onClick={() => setSelectedCard(null)} className="absolute inset-0" />
+          <div className="relative w-full max-w-xs space-y-4">
             <div className="flex items-center justify-between text-white">
               <div className="flex items-center gap-1.5 text-xs font-bold text-[#7dd3fc]">
                 <span>🏮</span>

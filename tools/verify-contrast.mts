@@ -97,4 +97,4 @@ if (problems.length > 0) {
   for (const p of problems) console.error('  ' + p);
   process.exit(1);
 }
-console.log('✓ verify-contrast：全部主题对比度达标（AA 4.5:1）');
+console.log('✓ verify-contrast：已覆盖的 2 类模式达标（AA 4.5:1；硬编码色与卡片底上的 chip 不在本护栏范围，见文件头注释）');

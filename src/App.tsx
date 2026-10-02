@@ -50,6 +50,8 @@ export const App: React.FC = () => {
   const [sleepStartSignal, setSleepStartSignal] = useState(0);
   const TAB_ORDER: NavTab[] = ['today', 'trends', 'coach', 'eyecare', 'settings'];
   const trackRef = useRef<HTMLDivElement>(null);
+  // 最近一次划动抬手的时刻：swallowClick 的时间窗判定用
+  const lastSwipeAtRef = useRef(0);
   const idxRef = useRef(0);
   const snapMsRef = useRef(300);
   const dragRef = useRef<{
@@ -98,6 +100,10 @@ export const App: React.FC = () => {
         // 逐字段合并：eyeCare 存在但缺内部字段（如 warmColor）时，
         // 此前会把 undefined 一直带到渲染层打崩页面
         parsedProfile.eyeCare = { ...DEFAULT_EYE_CARE, ...(parsedProfile.eyeCare || {}) };
+        // 同类兜底：残缺/老配置缺 target* 时，此前会在首页渲染出 undefined/null
+        parsedProfile.targetBedtime = parsedProfile.targetBedtime || '23:30';
+        parsedProfile.targetWakeTime = parsedProfile.targetWakeTime || '07:30';
+        parsedProfile.targetDurationHours = Number(parsedProfile.targetDurationHours) || 8;
         return parsedProfile;
       } catch (e) {
         console.error('Failed to parse profile', e);
@@ -397,7 +403,11 @@ export const App: React.FC = () => {
       if (d.samples.length > 12) d.samples.shift();
     };
 
+    // 划动后短窗内吞掉合成 click（防止顺带触发卡片按钮）。
+    // 不能用 {once:true} 常驻监听器：拖拽多半不派发合成 click，once 永不触发，
+    // 监听器会一直留着，把用户划动后的下一次真实点击吞掉（表现为要点两次）
     const swallowClick = (e: MouseEvent) => {
+      if (performance.now() - lastSwipeAtRef.current > 350) return;
       e.stopPropagation();
       e.preventDefault();
     };
@@ -428,9 +438,9 @@ export const App: React.FC = () => {
       const ms = Math.max(150, Math.min(SNAP_MS, SNAP_MS - Math.abs(v) * 120));
       snapMsRef.current = ms;
 
-      // 划动会派发合成 click：吞掉这一次，避免顺带触发卡片上的展开/按钮
+      // 记下划动时刻，由常驻的 swallowClick 按时间窗判定（见上）
       if (Math.abs(moved) > 10) {
-        window.addEventListener('click', swallowClick, { capture: true, once: true });
+        lastSwipeAtRef.current = performance.now();
       }
 
       if (idx !== d.idx) {
@@ -440,6 +450,7 @@ export const App: React.FC = () => {
       }
     };
 
+    window.addEventListener('click', swallowClick, { capture: true });
     el.addEventListener('pointerdown', onDown);
     // 非 passive：必须能 preventDefault 夺走横向手势，否则浏览器会与拖拽同时滚动
     el.addEventListener('pointermove', onMove, { passive: false });
@@ -450,6 +461,7 @@ export const App: React.FC = () => {
     window.addEventListener('pointerup', finish);
     window.addEventListener('pointercancel', finish);
     return () => {
+      window.removeEventListener('click', swallowClick, { capture: true });
       el.removeEventListener('pointerdown', onDown);
       el.removeEventListener('pointermove', onMove);
       el.removeEventListener('pointerup', finish);
