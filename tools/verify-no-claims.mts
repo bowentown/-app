@@ -27,6 +27,7 @@ const FORBIDDEN = [
   '治愈失眠',
   '治疗失眠',
   '符合医学标准',
+  '监测到你的睡眠',   // 使用行为数据语境（P3）：行为性 ≠ 生理性
 ];
 
 function listFiles(dir: string): string[] {

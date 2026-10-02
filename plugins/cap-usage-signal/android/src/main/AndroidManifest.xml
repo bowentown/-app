@@ -1,0 +1,10 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- 使用情况访问（特殊权限，非运行时弹窗）：用户须在
+         设置 → 应用 → 特殊应用权限 → 使用情况访问 中手动开启。
+         插件只回传聚合结果，原始事件流不出原生层。 -->
+    <uses-permission
+        android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
+</manifest>

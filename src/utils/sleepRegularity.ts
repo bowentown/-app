@@ -15,30 +15,9 @@ export interface RegularityResult {
   score: number;    // 0-100：avgDev ≤10 分钟 → 100，≥90 分钟 → 0，中间线性
 }
 
-/** 就寝时刻统一到 24h+ 轴：0:00–11:59 视作前一晚的延续（23:50 与 00:10 相差 20 分钟而非 1420）。 */
-function bedAxis(hhmm: string): number {
-  const [h, m] = hhmm.split(':').map(Number);
-  const v = (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0);
-  return v < 720 ? v + 1440 : v;
-}
-
-/** 起床时刻普通分钟轴（05:00–11:59 常态分布，无跨午夜需求）。 */
-function wakeAxis(hhmm: string): number {
-  const [h, m] = hhmm.split(':').map(Number);
-  return (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0);
-}
-
-function median(a: number[]): number {
-  const s = [...a].sort((x, y) => x - y);
-  const mid = s.length >> 1;
-  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
-}
-
-/** 平均绝对偏差（MAD from median）：中位数比均值抗离群——一夜熬夜不应毁掉整周规律度。 */
-function madFromMedian(a: number[]): number {
-  const med = median(a);
-  return a.reduce((acc, v) => acc + Math.abs(v - med), 0) / a.length;
-}
+// 数学口径下沉到 clockMath（P3 手机使用规律度共用同一套 MAD/映射），
+// 行为不变——verify-regularity 护栏继续做反向验证
+import { bedClockAxis as bedAxis, clockMinutes as wakeAxis, madFromMedian, deviationToScore } from './clockMath';
 
 /**
  * 近 7 晚规律度（records 需按日期降序，records[0] 最新）。
@@ -50,7 +29,7 @@ export function computeRegularity(records: SleepRecord[]): RegularityResult | nu
   const bedDev = Math.round(madFromMedian(wk.map((r) => bedAxis(r.bedtime))));
   const wakeDev = Math.round(madFromMedian(wk.map((r) => wakeAxis(r.wakeTime))));
   const avgDev = (bedDev + wakeDev) / 2;
-  const score = Math.max(0, Math.min(100, Math.round(100 - Math.max(0, avgDev - 10) * (100 / 80))));
+  const score = deviationToScore(avgDev);
   return { nights: wk.length, bedDev, wakeDev, avgDev: Math.round(avgDev), score };
 }
 

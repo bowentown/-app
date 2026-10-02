@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   TrendingUp,
@@ -18,10 +18,22 @@ import {
   Info,
   CheckCircle2,
   Share2,
+  Smartphone,
 } from 'lucide-react';
 import { SleepRecord } from '../types/sleep';
 import { computeRegularity, regularityTier } from '../utils/sleepRegularity';
 import { ShareCardModal } from './ShareCardModal';
+import {
+  usageHasPermission,
+  usageOpenSettings,
+  usagePrompted,
+  refreshUsageDays,
+  cachedUsageDays,
+  clearUsageData,
+  computeUsageRegularity,
+  type UsageDay,
+} from '../utils/usageSignal';
+import { isNativePlatform } from '../utils/nativeAlarmScheduler';
 import { formatDurationChinese } from '../utils/sleepScore';
 import { ThemeConfig } from '../utils/themeStyles';
 
@@ -45,6 +57,19 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
   const [hoveredRecord, setHoveredRecord] = useState<SleepRecord | null>(null);
   const [isHistoryExpanded, setIsHistoryExpanded] = useState(false);
   const [showShare, setShowShare] = useState(false);
+  // ── 手机使用对照（P3）：native-only，权限/数据/引导标记 ──
+  const [usagePerm, setUsagePerm] = useState<'checking' | 'granted' | 'denied'>('checking');
+  const [usageDays, setUsageDays] = useState<UsageDay[]>(() => cachedUsageDays());
+  const [usagePromptedOnce, setUsagePromptedOnce] = useState(() => usagePrompted());
+
+  useEffect(() => {
+    if (!isNativePlatform()) return;
+    void (async () => {
+      const granted = await usageHasPermission();
+      setUsagePerm(granted ? 'granted' : 'denied');
+      if (granted) setUsageDays(await refreshUsageDays(7));
+    })();
+  }, []);
   const [historyLimit, setHistoryLimit] = useState(50);
 
 
@@ -502,6 +527,100 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
           </div>
         );
       })()}
+
+      {/* 手机使用对照（P3）：native-only。对照而非替代——"手机显示"永远
+          不说"入睡"；权限是特殊授权，拒绝后不反复弹引导（一次性标记） */}
+      {isNativePlatform() && (
+        <div className={`${theme.cardBg} rounded-3xl p-5 border ${theme.cardBorder} shadow-xl space-y-3`}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Smartphone className={`w-4 h-4 ${theme.accentText}`} />
+              <h3 className="text-sm font-bold text-white">手机使用对照</h3>
+            </div>
+            {usagePerm === 'granted' && (
+              <button
+                type="button"
+                onClick={() => { clearUsageData(); setUsageDays([]); }}
+                className="text-[10px] text-slate-500 hover:text-slate-300 underline cursor-pointer"
+              >
+                清除手机使用数据
+              </button>
+            )}
+          </div>
+
+          {usagePerm === 'checking' && (
+            <p className={`text-[11px] ${textMuted}`}>检查使用情况访问权限…</p>
+          )}
+
+          {usagePerm === 'denied' && (
+            usagePromptedOnce ? (
+              <p className={`text-[11px] ${textMuted} leading-relaxed`}>
+                使用情况访问未开启。
+                <button
+                  type="button"
+                  onClick={() => void usageOpenSettings()}
+                  className="underline cursor-pointer hover:text-white"
+                >
+                  点此前往系统设置
+                </button>
+                ，开启后她会知道你几点真正放下手机——数据只留在手机上。
+              </p>
+            ) : (
+              <div className="space-y-2.5">
+                <p className="text-[11px] text-slate-200 leading-relaxed">
+                  开启"使用情况访问"，她会知道你昨晚几点真正放下手机、早上几点拿起——
+                  和你的记录并排对照，数据只留在手机上。
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUsagePromptedOnce(true);
+                    void usageOpenSettings().then(async () => {
+                      const granted = await usageHasPermission();
+                      setUsagePerm(granted ? 'granted' : 'denied');
+                      if (granted) setUsageDays(await refreshUsageDays(7));
+                    });
+                  }}
+                  className={`w-full py-2.5 rounded-xl ${theme.accentText} border ${theme.accentBorder} text-xs font-bold cursor-pointer active:scale-[0.98] transition-transform`}
+                  style={{ background: `${theme.accentHex}1a` }}
+                >
+                  前往系统设置开启
+                </button>
+              </div>
+            )
+          )}
+
+          {usagePerm === 'granted' && (() => {
+            const uReg = computeUsageRegularity(usageDays);
+            const shown = usageDays.filter((d) => d.lastActive).slice(0, 7);
+            return (
+              <div className="space-y-2">
+                {uReg && (
+                  <div className={`${innerBg} border ${innerBorder} rounded-2xl p-3 flex items-center justify-between`}>
+                    <span className="text-[11px] font-bold text-slate-200">手机使用规律度</span>
+                    <span className={`font-mono font-black ${
+                      uReg.score >= 80 ? 'text-emerald-400' : uReg.score >= 50 ? 'text-amber-400' : 'text-rose-400'
+                    }`}>{uReg.score}</span>
+                  </div>
+                )}
+                {shown.length === 0 ? (
+                  <p className={`text-[11px] ${textMuted}`}>还没有可用的使用数据，明天再来看看。</p>
+                ) : shown.map((d) => (
+                  <div key={d.date} className={`${innerBg} border ${innerBorder} rounded-xl px-3 py-2 flex items-center justify-between text-[11px]`}>
+                    <span className="text-slate-300 font-mono">
+                      {d.lastActive || '--:--'} 放下 → {d.firstActive || '--:--'} 拿起
+                    </span>
+                    <span className={`${textMuted} font-medium shrink-0`}>夜间拿起 {d.nightPickups} 次</span>
+                  </div>
+                ))}
+                <p className="text-[10px] text-slate-500 leading-relaxed">
+                  基于手机使用记录（屏幕亮灭），不是睡眠监测；"放下手机"不等于入睡。
+                </p>
+              </div>
+            );
+          })()}
+        </div>
+      )}
 
       {createPortal(
         <ShareCardModal open={showShare} onClose={() => setShowShare(false)} records={records} theme={theme} />,

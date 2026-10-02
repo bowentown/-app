@@ -1,0 +1,14 @@
+{
+  "name": "cap-usage-signal",
+  "version": "1.0.0",
+  "description": "Usage-signal aggregation (screen off/on via UsageStatsManager) for SomnaCare — aggregates only, never raw events",
+  "main": "index.js",
+  "capacitor": {
+    "android": {
+      "src": "android"
+    }
+  },
+  "peerDependencies": {
+    "@capacitor/core": ">=5.0.0"
+  }
+}
