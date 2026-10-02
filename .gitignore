@@ -6,3 +6,8 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# 签名密钥永不入仓（CI 从 GitHub Secrets 注入；本地备份在 ~/.somnacare-signing/）
+*.keystore
+*.jks
+keystore.b64
