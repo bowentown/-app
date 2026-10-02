@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   TrendingUp,
   Activity,
@@ -16,8 +17,11 @@ import {
   Trash2,
   Info,
   CheckCircle2,
+  Share2,
 } from 'lucide-react';
 import { SleepRecord } from '../types/sleep';
+import { computeRegularity, regularityTier } from '../utils/sleepRegularity';
+import { ShareCardModal } from './ShareCardModal';
 import { formatDurationChinese } from '../utils/sleepScore';
 import { ThemeConfig } from '../utils/themeStyles';
 
@@ -40,6 +44,7 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
   const [viewMode, setViewMode] = useState<MetricViewMode>('quality');
   const [hoveredRecord, setHoveredRecord] = useState<SleepRecord | null>(null);
   const [isHistoryExpanded, setIsHistoryExpanded] = useState(false);
+  const [showShare, setShowShare] = useState(false);
   const [historyLimit, setHistoryLimit] = useState(50);
 
 
@@ -423,13 +428,7 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
       {/* 本周睡眠小结：填充留白 + 周维度可读洞察 */}
       {records.length > 0 && (() => {
         const wk = records.slice(0, 7);
-        // 就寝波动：近 7 晚就寝时间的平均绝对偏差（跨午夜统一到 24h+ 轴）
-        const bedMins = wk.map((r) => {
-          const [bh, bm] = r.bedtime.split(':').map(Number);
-          return bh < 12 ? (bh + 24) * 60 + bm : bh * 60 + bm;
-        });
-        const bedMean = bedMins.reduce((a, b) => a + b, 0) / bedMins.length;
-        const bedDev = Math.round(bedMins.reduce((a, b) => a + Math.abs(b - bedMean), 0) / bedMins.length);
+        const reg = computeRegularity(records);
         const avgScoreWk = Math.round(wk.reduce((a, r) => a + r.sleepScore, 0) / wk.length);
         const avgDurWk = Math.round(wk.reduce((a, r) => a + r.durationMinutes, 0) / wk.length);
         const avgDeepWk = Math.round(wk.reduce((a, r) => a + r.deepSleepMinutes, 0) / wk.length);
@@ -447,6 +446,15 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
               <Sparkles className={`w-4 h-4 ${theme.accentText}`} />
               <h3 className="text-sm font-bold text-white">本周睡眠小结</h3>
               <span className={`text-[10px] ${textMuted} font-mono ml-auto`}>近 {wk.length} 晚</span>
+              {/* 分享卡入口：插画家+宠物语录+聚合数字，生成前可预览可勾选 */}
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setShowShare(true); }}
+                aria-label="生成每周睡眠分享卡"
+                className={`ml-1 -mr-1 p-1.5 rounded-lg ${theme.accentText} cursor-pointer active:scale-90 transition-transform`}
+              >
+                <Share2 className="w-4 h-4" />
+              </button>
             </div>
             <div className="grid grid-cols-3 gap-2.5">
               <div className={`${innerBg} border ${innerBorder} rounded-2xl p-3`}>
@@ -467,16 +475,38 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
                 </span>
               </div>
             </div>
+            {reg ? (
+              <div className={`${innerBg} border ${innerBorder} rounded-2xl p-3.5 space-y-1.5`}>
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-200">作息规律度</span>
+                  <span className={`font-mono font-black text-lg ${
+                    reg.score >= 80 ? 'text-emerald-400' : reg.score >= 50 ? 'text-amber-400' : 'text-rose-400'
+                  }`}>{reg.score}</span>
+                </div>
+                <p className="text-[10px] text-slate-400 leading-relaxed">
+                  就寝 ±{reg.bedDev} 分钟 · 起床 ±{reg.wakeDev} 分钟 ·{' '}
+                  {regularityTier(reg.score) === 'steady' ? '作息很稳' : regularityTier(reg.score) === 'ok' ? '基本规律' : '作息波动大'}
+                </p>
+                <p className="text-[10px] text-slate-500 leading-relaxed">
+                  按你自己记录的作息计算，不是测量值
+                </p>
+              </div>
+            ) : (
+              <p className={`text-[11px] ${textMuted} leading-relaxed`}>
+                📊 记录满 3 晚后，这里会显示作息规律度（就寝与起床的稳定程度）
+              </p>
+            )}
             <p className={`text-[11px] ${textMuted} leading-relaxed`}>
-              最佳 <span className="text-white font-bold">{best.date}</span> · {best.sleepScore} 分 · 就寝波动{' '}
-              <span className={`font-mono font-bold ${bedDev <= 25 ? 'text-emerald-400' : bedDev <= 45 ? 'text-amber-400' : 'text-rose-400'}`}>
-                ±{bedDev}m
-              </span>
-              · {bedDev <= 25 ? '作息很稳' : bedDev <= 45 ? '就寝时间尚稳' : '作息波动大'}
+              最佳 <span className="text-white font-bold">{best.date}</span> · {best.sleepScore} 分
             </p>
           </div>
         );
       })()}
+
+      {createPortal(
+        <ShareCardModal open={showShare} onClose={() => setShowShare(false)} records={records} theme={theme} />,
+        document.body,
+      )}
     </div>
   );
 };

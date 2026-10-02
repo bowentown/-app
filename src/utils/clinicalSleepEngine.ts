@@ -295,7 +295,7 @@ export function generateLocalClinicalAnalysis(
       },
     ],
     mindsetAffirmation:
-      '允许思绪如云朵般悄然飘过，黑夜是身体自我治愈的神圣时刻，今晚您将拥有一场深沉安稳的修复之旅。',
+      '允许思绪如云朵般悄然飘过，黑夜是身体自我修复的神圣时刻，今晚您将拥有一场深沉安稳的修复之旅。',
   };
 }
 
