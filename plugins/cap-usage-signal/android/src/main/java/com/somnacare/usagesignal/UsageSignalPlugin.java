@@ -27,8 +27,8 @@ import java.util.Locale;
  *
  * 三个信号（克制边界）：
  *  - lastActive   放下手机时刻：夜窗（18:00–次日 06:00）内最后一次"屏幕灭"
- *  - firstActive  行为性醒来：晨窗（04:00–12:00）内距上次交互 ≥4 小时的第一次亮屏
- *  - nightPickups 夜间拿起次数：22:00–次日 08:00 之间的亮屏次数
+ *  - firstActive  早上第一次拿起手机：晨窗（04:00–12:00）首次亮屏
+ *  - nightPickups 夜间拿起次数：22:00–次日 06:00 亮屏次数（5s 去重）
  *
  * 文案红线（由调用方遵守）：可以说"手机显示你 00:20 放下手机"，
  * 不可以说"你 00:20 入睡"——放下手机 ≠ 睡着。
@@ -46,7 +46,6 @@ public class UsageSignalPlugin extends Plugin {
     private static final int EVT_KEYGUARD_HIDDEN = 18;
 
     private static final long DAY_MS = 86400000L;
-    private static final long WAKE_GAP_MS = 4 * 3600000L;   // 行为性醒来：距上次交互 ≥4h
 
     private boolean hasUsageAccess() {
         Context ctx = getContext();
@@ -110,7 +109,6 @@ public class UsageSignalPlugin extends Plugin {
             Calendar cal = Calendar.getInstance();
 
             LinkedHashMap<String, NightAgg> buckets = new LinkedHashMap<>();
-            long prevInteractiveEnd = -1;
 
             UsageEvents events = usm.queryEvents(begin, now);
             UsageEvents.Event ev = new UsageEvents.Event();
@@ -141,16 +139,20 @@ public class UsageSignalPlugin extends Plugin {
                     // 夜窗（18:00–次日 06:00）内的熄屏 → "放下手机"（最后一次为准）
                     if (hour >= 18 || hour < 6) agg.lastActive = t;
                 } else {
-                    if (hour >= 22 || hour < 8) agg.nightPickups++;
-                    // 晨窗（04:00–12:00）且距上次交互 ≥4h → 行为性醒来（取最早达标的一次）
-                    if (hour >= 4 && hour < 12
-                            && agg.firstActive < 0
-                            && prevInteractiveEnd > 0
-                            && t - prevInteractiveEnd >= WAKE_GAP_MS) {
+                    // 夜间拿起（22:00–次日 06:00）：一次拿起通常同时产生
+                    // 亮屏+解锁两事件，5 秒内合并计 1 次（否则双倍计数）
+                    if ((hour >= 22 || hour < 6)
+                            && (agg.lastPickupAt < 0 || t - agg.lastPickupAt >= 5000)) {
+                        agg.nightPickups++;
+                        agg.lastPickupAt = t;
+                    }
+                    // 早上第一次拿起手机：晨窗（04:00–12:00）首次亮屏。
+                    // 口径刻意简单可解释——"距上次交互 ≥4h"会被半夜一瞥
+                    // 抹掉真起床（第 19 轮 §1.4），这里以首次亮屏为准
+                    if (hour >= 4 && hour < 12 && agg.firstActive < 0) {
                         agg.firstActive = t;
                     }
                 }
-                prevInteractiveEnd = t;
             }
 
             JSArray arr = new JSArray();

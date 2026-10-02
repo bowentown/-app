@@ -4,7 +4,8 @@
  *
  * 隐私红线（此图会发到微信群）：只放聚合后的数字（规律度/平均时长），
  * 不放具体就寝/起床时刻（作息指纹）、不放梦境/心情/习惯、日期只写
- * "近 7 晚"——由 verify-no-claims 护栏与调用方开关共同保障。
+ * "近 7 晚"——由 verify-share-privacy 护栏（源码字段扫描）与调用方开关
+ * 共同保障；临床/因果措辞另由 verify-no-claims 扫描。
  *
  * 插画同源加载（fetch→Blob→createImageBitmap，兜底 Image），不污染 canvas。
  */
@@ -73,6 +74,48 @@ function darken(hex: string, f: number): string {
   return `rgb(${r},${g},${b})`;
 }
 
+// ── 布局规划（纯函数）：先算坐标再绘制——第 19 轮 N-1 的教训是
+//    "cy 累加漂移"把语录推出画布外（默认配置即坏）。布局坐标全部
+//    由本函数给出，verify-share-layout 护栏对四种开关组合断言
+//    maxY ≤ CARD_H - 安全边距，这类越界从此在 CI 被拦。
+export interface WeeklyLayout {
+  brandY: number;
+  ix: number; iy: number; iw: number; ih: number;
+  statsTop: number;
+  regX: number | null;   // 规律度栏中心（null = 该栏隐藏）
+  durX: number | null;   // 时长栏中心
+  labelY: number; numY: number; subY: number;
+  statsBottom: number;
+  quoteTop: number; quoteLineH: number; maxQuoteLines: number;
+  signatureY: number;
+  footerY: number;
+  maxY: number;
+}
+
+export function planWeeklyLayout(showRegularity: boolean, showDuration: boolean): WeeklyLayout {
+  const both = showRegularity && showDuration;
+  const any = showRegularity || showDuration;
+  const ix = 120;
+  const iw = CARD_W - 240;
+  const iy = 140;
+  const ih = 620;
+  const statsTop = iy + ih + 50;                 // 810
+  // 两栏并排：中心各在 300 / 780；单栏居中 540
+  const regX = !showRegularity ? null : both ? 300 : CARD_W / 2;
+  const durX = !showDuration ? null : both ? 780 : CARD_W / 2;
+  const labelY = statsTop + 46;                  // 856
+  const numY = statsTop + 170;                   // 980
+  const subY = statsTop + 216;                   // 1026
+  const statsBottom = statsTop + 250;            // 1060
+  const quoteTop = any ? statsBottom + 70 : statsTop + 46;
+  const quoteLineH = 58;
+  const maxQuoteLines = 3;                       // 语录 ≤60 字 @40px ≈ ≤3 行（保守预算）
+  const signatureY = quoteTop + maxQuoteLines * quoteLineH + 46;
+  const footerY = CARD_H - 64;                   // 1376
+  const maxY = Math.max(signatureY, footerY);
+  return { brandY: 96, ix, iy, iw, ih, statsTop, regX, durX, labelY, numY, subY, statsBottom, quoteTop, quoteLineH, maxQuoteLines, signatureY, footerY, maxY };
+}
+
 /** 宠物周报语录：按规律度分档 + 日期哈希确定选取（傲娇，零医疗声称）。 */
 export function petWeeklyQuote(regularity: RegularityResult | null, dayKey: number): string {
   const tier = regularity ? regularity.score >= 80 ? 'steady' : regularity.score >= 50 ? 'ok' : 'wild' : 'few';
@@ -132,6 +175,8 @@ export async function renderWeeklyCard(input: WeeklyCardInput): Promise<WeeklyCa
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Canvas 2D 不可用');
 
+  const L = planWeeklyLayout(input.showRegularity, input.showDuration);
+
   // ── 背景：主题页面色 → 加深渐变 ──
   const bg = input.pageBgHex || '#0B1026';
   const grad = ctx.createLinearGradient(0, 0, 0, CARD_H);
@@ -144,12 +189,11 @@ export async function renderWeeklyCard(input: WeeklyCardInput): Promise<WeeklyCa
   ctx.fillStyle = '#FFFFFF';
   ctx.textAlign = 'center';
   ctx.font = '700 44px system-ui, sans-serif';
-  ctx.fillText('🌙 极光睡眠 SomnaCare', CARD_W / 2, 108);
+  ctx.fillText('🌙 极光睡眠 SomnaCare', CARD_W / 2, L.brandY);
 
   // ── 插画：已解锁明信片按周数轮换（没解锁回默认自拍）──
-  const state = loadTravelState();
   const unlocked: TravelPostcard[] = [];
-  for (const id of state.unlockedCardIds) {
+  for (const id of loadTravelState().unlockedCardIds) {
     const c = getPostcardById(id);
     if (c) unlocked.push(c);
   }
@@ -158,66 +202,56 @@ export async function renderWeeklyCard(input: WeeklyCardInput): Promise<WeeklyCa
   const imgUrl = chosen ? thumbUrlOf(chosen.imageUrl) : `${import.meta.env.BASE_URL || '/'}whale-selfie.png`;
   const img = await loadImage(imgUrl);
 
-  const ix = 120;
-  const iy = 170;
-  const iw = CARD_W - 240;
-  const ih = 700;
-  roundedPath(ctx, ix, iy, iw, ih, 36);
+  roundedPath(ctx, L.ix, L.iy, L.iw, L.ih, 36);
   ctx.save();
   ctx.clip();
-  drawCover(ctx, img, ix, iy, iw, ih);
+  drawCover(ctx, img, L.ix, L.iy, L.iw, L.ih);
   ctx.restore();
   ctx.strokeStyle = input.accentHex;
   ctx.lineWidth = 4;
-  roundedPath(ctx, ix, iy, iw, ih, 36);
+  roundedPath(ctx, L.ix, L.iy, L.iw, L.ih, 36);
   ctx.stroke();
 
   // 插画下沿地名签（有明信片时）
   if (chosen) {
     ctx.fillStyle = 'rgba(2,6,23,0.72)';
-    roundedPath(ctx, ix + 20, iy + ih - 86, 320, 62, 16);
+    roundedPath(ctx, L.ix + 20, L.iy + L.ih - 86, 320, 62, 16);
     ctx.fill();
     ctx.fillStyle = '#E2E8F0';
     ctx.textAlign = 'left';
     ctx.font = '700 30px system-ui, sans-serif';
-    ctx.fillText(`📍 ${chosen.country}`, ix + 44, iy + ih - 42);
+    ctx.fillText(`📍 ${chosen.country}`, L.ix + 44, L.iy + L.ih - 42);
   }
 
-  // ── 数据区：只放聚合数字 ──
-  let cy = iy + ih + 130;
-  ctx.textAlign = 'center';
+  // ── 数据区：两栏并排（单开居中占宽），只放聚合数字 ──
   if (input.showRegularity && regularity) {
+    ctx.textAlign = 'center';
     ctx.fillStyle = 'rgba(255,255,255,0.65)';
-    ctx.font = '500 36px system-ui, sans-serif';
-    ctx.fillText('作息规律度（近 7 晚）', CARD_W / 2, cy);
-    cy += 96;
+    ctx.font = '500 34px system-ui, sans-serif';
+    ctx.fillText('作息规律度（近 7 晚）', L.regX!, L.labelY);
     ctx.fillStyle = input.accentHex;
-    ctx.font = '900 128px system-ui, sans-serif';
-    ctx.fillText(String(regularity.score), CARD_W / 2, cy);
-    cy += 66;
+    ctx.font = '900 116px system-ui, sans-serif';
+    ctx.fillText(String(regularity.score), L.regX!, L.numY);
     ctx.fillStyle = 'rgba(255,255,255,0.55)';
-    ctx.font = '400 28px system-ui, sans-serif';
-    ctx.fillText('就寝 ±' + regularity.bedDev + ' 分钟 · 起床 ±' + regularity.wakeDev + ' 分钟 · 按你自己记录的作息计算', CARD_W / 2, cy);
-    cy += 90;
+    ctx.font = '400 26px system-ui, sans-serif';
+    ctx.fillText(`就寝 ±${regularity.bedDev} · 起床 ±${regularity.wakeDev} 分钟`, L.regX!, L.subY);
   }
   if (input.showDuration && avgDurationMin !== null) {
+    ctx.textAlign = 'center';
     ctx.fillStyle = 'rgba(255,255,255,0.65)';
-    ctx.font = '500 36px system-ui, sans-serif';
-    ctx.fillText('平均睡眠时长', CARD_W / 2, cy);
-    cy += 84;
+    ctx.font = '500 34px system-ui, sans-serif';
+    ctx.fillText('平均睡眠时长', L.durX!, L.labelY);
     ctx.fillStyle = '#FFFFFF';
-    ctx.font = '900 84px system-ui, sans-serif';
-    ctx.fillText(`${Math.floor(avgDurationMin / 60)} 小时 ${avgDurationMin % 60} 分`, CARD_W / 2, cy);
-    cy += 90;
+    ctx.font = '900 64px system-ui, sans-serif';
+    ctx.fillText(`${Math.floor(avgDurationMin / 60)} 小时 ${avgDurationMin % 60} 分`, L.durX!, L.numY);
   }
 
-  // ── 宠物语录 ──
+  // ── 宠物语录（坐标由 planner 固定，不再 cy 累加漂移）──
   const dayKey = Number((now.getFullYear() + '' + (now.getMonth() + 1) + now.getDate()).slice(-4)) + now.getDay();
   const quote = petWeeklyQuote(input.showRegularity ? regularity : null, dayKey);
   ctx.fillStyle = '#FFFFFF';
   ctx.font = '500 40px system-ui, sans-serif';
   const maxW = CARD_W - 280;
-  // 手动换行（中文按字符断行）
   const lines: string[] = [];
   let cur = '';
   for (const ch of `「${quote}」`) {
@@ -225,16 +259,16 @@ export async function renderWeeklyCard(input: WeeklyCardInput): Promise<WeeklyCa
     else cur += ch;
   }
   lines.push(cur);
-  let qy = Math.max(cy + 40, CARD_H - 330);
-  for (const line of lines) { ctx.fillText(line, CARD_W / 2, qy); qy += 58; }
+  let qy = L.quoteTop;
+  for (const line of lines) { ctx.fillText(line, CARD_W / 2, qy); qy += L.quoteLineH; }
   ctx.fillStyle = 'rgba(255,255,255,0.7)';
   ctx.font = '600 34px system-ui, sans-serif';
-  ctx.fillText('—— 蓝色大肥鱼 🐋', CARD_W / 2, qy + 16);
+  ctx.fillText('—— 蓝色大肥鱼 🐋', CARD_W / 2, L.signatureY);
 
   // ── 底部诚实边界 ──
   ctx.fillStyle = 'rgba(255,255,255,0.38)';
   ctx.font = '400 26px system-ui, sans-serif';
-  ctx.fillText('数据仅存本机 · 统计为模型估算，非医疗诊断', CARD_W / 2, CARD_H - 74);
+  ctx.fillText('数据仅存本机 · 统计为模型估算，非医疗诊断', CARD_W / 2, L.footerY);
 
   const blob = await new Promise<Blob>((resolve, reject) =>
     canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('toBlob 失败（canvas 被污染或内核不支持）'))), 'image/jpeg', 0.92)

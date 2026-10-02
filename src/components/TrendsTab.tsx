@@ -463,7 +463,7 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
             role="button"
             tabIndex={0}
             aria-label="展开本周睡眠小结详情"
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setIsHistoryExpanded(true); } }}
+            onKeyDown={(e) => { if (e.target !== e.currentTarget) return; if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setIsHistoryExpanded(true); } }}
             onClick={() => setIsHistoryExpanded(true)}
             className={`${theme.cardBg} rounded-3xl p-5 border ${theme.cardBorder} shadow-xl space-y-4 cursor-pointer hover:border-white/20 active:scale-[0.99] transition-all`}
           >
@@ -476,7 +476,7 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
                 type="button"
                 onClick={(e) => { e.stopPropagation(); setShowShare(true); }}
                 aria-label="生成每周睡眠分享卡"
-                className={`ml-1 -mr-1 p-1.5 rounded-lg ${theme.accentText} cursor-pointer active:scale-90 transition-transform`}
+                className={`ml-1 -mr-1 p-2.5 -m-1 rounded-lg ${theme.accentText} cursor-pointer active:scale-90 transition-transform`}
               >
                 <Share2 className="w-4 h-4" />
               </button>
@@ -512,7 +512,7 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
                   就寝 ±{reg.bedDev} 分钟 · 起床 ±{reg.wakeDev} 分钟 ·{' '}
                   {regularityTier(reg.score) === 'steady' ? '作息很稳' : regularityTier(reg.score) === 'ok' ? '基本规律' : '作息波动大'}
                 </p>
-                <p className="text-[10px] text-slate-500 leading-relaxed">
+                <p className="text-[10px] text-slate-400 leading-relaxed">
                   按你自己记录的作息计算，不是测量值
                 </p>
               </div>
@@ -541,7 +541,7 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
               <button
                 type="button"
                 onClick={() => { clearUsageData(); setUsageDays([]); }}
-                className="text-[10px] text-slate-500 hover:text-slate-300 underline cursor-pointer"
+                className="text-[10px] text-slate-400 hover:text-slate-300 underline cursor-pointer py-1.5 -my-1.5"
               >
                 清除手机使用数据
               </button>
@@ -559,7 +559,7 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
                 <button
                   type="button"
                   onClick={() => void usageOpenSettings()}
-                  className="underline cursor-pointer hover:text-white"
+                  className="underline cursor-pointer hover:text-white py-1.5 -my-1.5"
                 >
                   点此前往系统设置
                 </button>

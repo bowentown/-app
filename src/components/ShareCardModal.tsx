@@ -77,7 +77,7 @@ export const ShareCardModal: React.FC<Props> = ({ open, onClose, records, theme 
         const url = URL.createObjectURL(out.blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `somnacare-week-card.png`;
+        a.download = `somnacare-week-card.jpg`;
         document.body.appendChild(a);
         a.click();
         a.remove();
@@ -98,7 +98,7 @@ export const ShareCardModal: React.FC<Props> = ({ open, onClose, records, theme 
       type="button"
       onClick={() => set(!on)}
       aria-pressed={on}
-      className="flex items-center gap-2.5 cursor-pointer"
+      className="flex items-center gap-2.5 cursor-pointer py-2.5 -my-2.5"
     >
       <span className={`relative w-10 h-5 rounded-full transition-colors ${on ? 'bg-sky-500' : 'bg-slate-600'}`}>
         <span
@@ -127,7 +127,7 @@ export const ShareCardModal: React.FC<Props> = ({ open, onClose, records, theme 
             type="button"
             onClick={onClose}
             aria-label="关闭分享卡预览"
-            className="w-8 h-8 rounded-full bg-slate-800/80 border border-slate-700 text-slate-300 hover:text-white flex items-center justify-center cursor-pointer active:scale-90 transition-transform"
+            className="w-10 h-10 rounded-full bg-slate-800/80 border border-slate-700 text-slate-300 hover:text-white flex items-center justify-center cursor-pointer active:scale-90 transition-transform"
           >
             <X className="w-4 h-4" />
           </button>
@@ -142,7 +142,7 @@ export const ShareCardModal: React.FC<Props> = ({ open, onClose, records, theme 
           ) : preview ? (
             <img src={preview} alt="每周睡眠分享卡预览" className="w-full" />
           ) : (
-            <div className="text-slate-500 text-xs py-10">{note ?? '暂无可生成的内容'}</div>
+            <div className="text-slate-400 text-xs py-10">{note ?? '暂无可生成的内容'}</div>
           )}
         </div>
 
@@ -151,7 +151,7 @@ export const ShareCardModal: React.FC<Props> = ({ open, onClose, records, theme 
           <Toggle label="显示规律度" on={showRegularity} set={setShowRegularity} />
           <Toggle label="显示平均时长" on={showDuration} set={setShowDuration} />
         </div>
-        <p className="text-[10px] text-slate-500 leading-relaxed -mt-1">
+        <p className="text-[10px] text-slate-400 leading-relaxed -mt-1">
           卡片只包含聚合数字，不含具体就寝/起床时刻与梦境记录，可放心分享。
         </p>
 

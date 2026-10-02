@@ -64,14 +64,16 @@ for (const [name, theme] of Object.entries(APP_THEMES)) {
   if (c1 < 4.5) problems.push(`${name}: accentFg 在 accentBg 上 ${c1.toFixed(2)}:1 < 4.5`);
   if (c2 < 4.5) problems.push(`${name}: accentFg 在 hover 底上 ${c2.toFixed(2)}:1 < 4.5`);
 
-  // 选中 chip 模式：accentText 叠在 accentHex@15% over pageBg
-  const pageBg = hex(theme.pageBg);
-  const chipBg = over(theme.accentHex, 0.15, pageBg);
+  // 选中 chip 模式：accentText 叠在 accentHex@10% over cardInnerBg
+  // （第 19 轮 §1.6：chip 实际坐在卡片内层底上，此前错拿 pageBg 当底——
+  //   pageBg 更暗，会把 4.47 的实况算成 4.98 假绿）
+  const innerBg = hex(theme.cardInnerBg);
+  const chipBg = over(theme.accentHex, 0.10, innerBg);
   const chipFg = hex(theme.accentText);
   const c3 = contrast(chipFg, chipBg);
-  console.log(`  ${name}: chip(accentText/accentHex@15%)=${c3.toFixed(2)}:1`);
+  console.log(`  ${name}: chip(accentText/accentHex@10% over innerBg)=${c3.toFixed(2)}:1`);
   // oklch 实测偏差余量（第三轮报告：静态 vs 浏览器差 ~0.2）
-  if (c3 < 4.5) problems.push(`${name}: chip 文字 ${c3.toFixed(2)}:1 < 4.5`);
+  if (c3 < 4.5) problems.push(`${name}: chip 文字(innerBg 底) ${c3.toFixed(2)}:1 < 4.5`);
 }
 // ── 调用点扫描：那个曾经的缺陷（accentBg + 硬编码白字）发生在调用处，
 // 只算主题对象自身永远拦不住它 ──

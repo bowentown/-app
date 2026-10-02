@@ -205,7 +205,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         const skipped = confirm(
           `全量备份导入将覆盖当前的睡眠记录、朋友圈与聊天历史（图鉴与档案按文件内容恢复）。\n` +
           `包含：记录 ${parsed.data.records.length} 条 · 朋友圈 ${parsed.data.moments.length} 条 · 聊天 ${parsed.data.chat.length} 条。\n` +
-          `API 密钥不包含在备份中，将保留本机已填写的值。继续？`,
+          `API 密钥不包含在备份中：覆盖安装会保留本机已填的值；卸载/换机迁移后需重新填写（DeepSeek / 自建 Key / HF token）。继续？`,
         );
         if (!skipped) return;
         const r = restoreFullBackup(parsed.data);

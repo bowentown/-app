@@ -19,7 +19,7 @@ export interface FullBackup {
   travel: Record<string, unknown> | null;
   moments: unknown[];
   chat: unknown[];
-  petPrefs: { skin?: string; bubbleEvery?: number };
+  petPrefs: { skin?: string; bubbleEvery?: number; enabled?: boolean };
 }
 
 const KEYS = {
@@ -30,6 +30,7 @@ const KEYS = {
   chat: 'somnacare_chat_history',
   skin: 'somnacare_pet_skin',
   bubble: 'somnacare_pet_bubble_every',
+  petEnabled: 'somnacare_pet_enabled',
 } as const;
 
 /** 这些 profile 字段是凭据，默认不进备份文件。 */
@@ -68,6 +69,7 @@ export function buildFullBackup(): FullBackup {
   const skin = localStorage.getItem(KEYS.skin);
   const bubbleRaw = localStorage.getItem(KEYS.bubble);
   const bubbleEvery = bubbleRaw !== null ? Number(bubbleRaw) : NaN;
+  const petEnabledRaw = localStorage.getItem(KEYS.petEnabled);
 
   return {
     app: 'somnacare',
@@ -81,6 +83,7 @@ export function buildFullBackup(): FullBackup {
     petPrefs: {
       skin: skin || undefined,
       bubbleEvery: Number.isFinite(bubbleEvery) ? bubbleEvery : undefined,
+      enabled: petEnabledRaw === '1' ? true : petEnabledRaw === '0' ? false : undefined,
     },
   };
 }
@@ -140,6 +143,9 @@ export function restoreFullBackup(data: FullBackup): {
   if (data.petPrefs?.skin) localStorage.setItem(KEYS.skin, data.petPrefs.skin);
   if (typeof data.petPrefs?.bubbleEvery === 'number') {
     localStorage.setItem(KEYS.bubble, String(data.petPrefs.bubbleEvery));
+  }
+  if (typeof data.petPrefs?.enabled === 'boolean') {
+    localStorage.setItem(KEYS.petEnabled, data.petPrefs.enabled ? '1' : '0');
   }
   // 敏感 top-level key（HF token）不在备份里 → 不动本机值
 
