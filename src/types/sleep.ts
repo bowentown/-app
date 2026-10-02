@@ -99,7 +99,9 @@ export interface EyeCareConfig {
   warmStrength: number; // 0-100 滤镜强度
   dimStrength: number; // 0-100 屏幕减光强度
   scheduleEnabled: boolean; // 定时开关（默认关闭，用户按需开启）
-  auto?: boolean; // 自动日变：白天自动减弱，入夜（19-23 点）渐强至满档
+  auto?: boolean; // 自动日变：白天自动减弱，渐强时段（autoStart→autoEnd）内线性增至满档
+  autoStart?: string; // 'HH:MM' 渐强开始（默认 19:00）
+  autoEnd?: string; // 'HH:MM' 达到满档（默认 23:00）
   start: string; // 'HH:MM'
   end: string; // 'HH:MM'
 }
@@ -113,6 +115,8 @@ export const DEFAULT_EYE_CARE: EyeCareConfig = {
   scheduleEnabled: false,
   start: '22:00',
   end: '07:00',
+  autoStart: '19:00',
+  autoEnd: '23:00',
 };
 
 export interface UserProfile {

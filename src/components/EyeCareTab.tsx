@@ -151,7 +151,14 @@ export const EyeCareTab: React.FC<EyeCareTabProps> = ({ userProfile, onUpdatePro
               onChange={(e) => void handleToggle(e.target.checked)}
               className="sr-only peer"
             />
-            <div className="w-11 h-6 bg-slate-600 peer-checked:bg-orange-500 rounded-full transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:transition-transform peer-checked:after:translate-x-5" />
+            {/* 真实子元素拨钮 + 内联 left：after:translate-x-* 依赖 v4 的
+                translate 变量链（@property），旧 WebView 上拨钮会卡死在左侧 */}
+            <div className={`relative w-11 h-6 rounded-full transition-colors ${cfg.enabled ? 'bg-orange-500' : 'bg-slate-600'}`}>
+              <span
+                className="absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all"
+                style={{ left: cfg.enabled ? '22px' : '2px' }}
+              />
+            </div>
           </label>
         </div>
 
@@ -353,7 +360,9 @@ export const EyeCareTab: React.FC<EyeCareTabProps> = ({ userProfile, onUpdatePro
         <div className={`${theme.cardInnerBg} border ${theme.cardInnerBorder} rounded-2xl p-3.5 flex items-center justify-between`}>
           <div>
             <span className="text-xs font-bold text-slate-200 block">自动日变</span>
-            <span className="text-[10px] text-slate-500">白天自动减弱，19–23 点渐强至满档</span>
+            <span className="text-[10px] text-slate-500">
+              白天自动减弱，{cfg.autoStart || '19:00'} 起渐强，{cfg.autoEnd || '23:00'} 起满档
+            </span>
           </div>
           <button
             type="button"
@@ -364,10 +373,10 @@ export const EyeCareTab: React.FC<EyeCareTabProps> = ({ userProfile, onUpdatePro
             }}
             aria-pressed={!!cfg.auto}
             aria-label="自动日变"
-            className="relative inline-flex items-center cursor-pointer shrink-0"
+            className="relative inline-flex items-center cursor-pointer shrink-0 p-2.5 -m-2.5"
           >
             <span
-              className={`block w-10 h-9 rounded-full transition-colors relative ${
+              className={`block w-10 h-5 rounded-full transition-colors relative ${
                 cfg.auto ? 'bg-orange-500' : 'bg-slate-600'
               }`}
             >
@@ -379,6 +388,28 @@ export const EyeCareTab: React.FC<EyeCareTabProps> = ({ userProfile, onUpdatePro
             </span>
           </button>
         </div>
+        {cfg.auto && (
+          <div className="flex items-center justify-between text-xs" data-no-swipe>
+            <span className="text-slate-200">渐强时段</span>
+            <div className="flex items-center gap-2">
+              <input
+                type="time"
+                value={cfg.autoStart || '19:00'}
+                onChange={(e) => patch({ autoStart: e.target.value })}
+                aria-label="开始渐强时刻"
+                className="bg-slate-800 rounded-lg px-2 py-1.5 text-slate-100 font-mono"
+              />
+              <span className="text-slate-500">→</span>
+              <input
+                type="time"
+                value={cfg.autoEnd || '23:00'}
+                onChange={(e) => patch({ autoEnd: e.target.value })}
+                aria-label="达到满档时刻"
+                className="bg-slate-800 rounded-lg px-2 py-1.5 text-slate-100 font-mono"
+              />
+            </div>
+          </div>
+        )}
         <div className="space-y-1.5">
           <div className="flex justify-between text-xs font-bold">
             <span className="text-slate-200">滤镜强度</span>
@@ -428,7 +459,12 @@ export const EyeCareTab: React.FC<EyeCareTabProps> = ({ userProfile, onUpdatePro
               onChange={(e) => patch({ scheduleEnabled: e.target.checked })}
               className="sr-only peer"
             />
-            <div className="w-10 h-5 bg-slate-600 peer-checked:bg-indigo-500 rounded-full transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-4 after:h-4 after:bg-white after:rounded-full after:transition-transform peer-checked:after:translate-x-5" />
+            <div className={`relative w-10 h-5 rounded-full transition-colors ${cfg.scheduleEnabled ? 'bg-indigo-500' : 'bg-slate-600'}`}>
+              <span
+                className="absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all"
+                style={{ left: cfg.scheduleEnabled ? '18px' : '2px' }}
+              />
+            </div>
           </label>
         </div>
 

@@ -194,7 +194,7 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
             <button
               type="button"
               onClick={() => setIsOpen(!isOpen)}
-              className={`w-10 h-10 rounded-lg ${theme?.cardInnerBg || 'bg-slate-800'} ${theme?.accentText} cursor-pointer`}
+              className={`w-9 h-9 rounded-lg ${theme?.cardInnerBg || 'bg-slate-800'} ${theme?.accentText} cursor-pointer`}
               aria-label={isOpen ? '收起闹钟列表' : '展开闹钟列表'}
             >
               {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}

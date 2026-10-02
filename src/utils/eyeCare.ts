@@ -36,13 +36,24 @@ export async function eyeCareOpenPermissionSettings(): Promise<void> {
   }
 }
 
-/** 自动日变：白天（07-19 点）35%，19-23 点线性渐强至 100%，夜间满档（Twilight 式日落-日出） */
+/**
+ * 自动日变：白天（07 点起）35%，渐强时段（autoStart→autoEnd，默认 19-23 点）
+ * 线性增至 100%，此后满档（Twilight 式日落-日出）。时段可在护眼页自定义。
+ */
 export function withAutoStrength(cfg: EyeCareConfig, now: Date = new Date()): EyeCareConfig {
   if (!cfg.auto) return cfg;
+  const toH = (t: string | undefined, fb: number): number => {
+    const [h, m] = (t || '').split(':').map(Number);
+    const v = (Number.isFinite(h) ? h : 0) + (Number.isFinite(m) ? m : 0) / 60;
+    return v >= 0 && v < 24 ? v : fb;
+  };
+  let startH = toH(cfg.autoStart, 19);
+  let endH = toH(cfg.autoEnd, 23);
+  if (endH <= startH) { endH = Math.min(23.99, startH + 4); }  // 结束早于开始：回退为 4 小时窗
   const h = now.getHours() + now.getMinutes() / 60;
   let f: number;
-  if (h >= 7 && h < 19) f = 0.35;
-  else if (h >= 19 && h < 23) f = 0.35 + 0.65 * ((h - 19) / 4);
+  if (h >= 7 && h < startH) f = 0.35;
+  else if (h >= startH && h < endH) f = 0.35 + 0.65 * ((h - startH) / (endH - startH));
   else f = 1;
   return {
     ...cfg,

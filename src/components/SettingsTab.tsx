@@ -299,7 +299,12 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               />
               {/* 开关选中色用主题 accentBg（themeStyles 里的字面类会被 Tailwind 生成）：
                   受控组件直接按 petOn 切换，不再依赖 peer-checked 的固定色 */}
-              <div className={`w-11 h-6 rounded-full transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:transition-transform ${petOn ? theme.accentBg : 'bg-slate-600'} ${petOn ? 'after:translate-x-5' : ''}`} />
+              <div className={`relative w-11 h-6 rounded-full transition-colors ${petOn ? theme.accentBg : 'bg-slate-600'}`}>
+                <span
+                  className="absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all"
+                  style={{ left: petOn ? '22px' : '2px' }}
+                />
+              </div>
             </label>
           )}
         </div>
