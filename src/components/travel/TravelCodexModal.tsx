@@ -237,15 +237,17 @@ export const TravelCodexModal: React.FC<Props> = ({ onClose }) => {
             );
           })}
 
-          {/* 更多大洲占位：诚实的"敬请期待"，而不是永远抽不到的锁卡 */}
-          <div
-            aria-hidden
-            className="aspect-[3/4] rounded-2xl border border-dashed border-slate-700/70 bg-slate-900/30 flex flex-col items-center justify-center gap-1.5 text-[#64748b]"
-          >
-            <Compass className="w-5 h-5" />
-            <span className="text-[9px] font-bold">更多大洲</span>
-            <span className="text-[8px]">插画筹备中</span>
-          </div>
+          {/* 更多大洲占位：只在还有未开放大洲时显示（四洲全开后即隐藏） */}
+          {ALL_POSTCARDS.some((c) => !ART_READY_CONTINENTS.includes(c.continent)) && (
+            <div
+              aria-hidden
+              className="aspect-[3/4] rounded-2xl border border-dashed border-slate-700/70 bg-slate-900/30 flex flex-col items-center justify-center gap-1.5 text-[#64748b]"
+            >
+              <Compass className="w-5 h-5" />
+              <span className="text-[9px] font-bold">更多大洲</span>
+              <span className="text-[8px]">插画筹备中</span>
+            </div>
+          )}
         </div>
       </div>
 

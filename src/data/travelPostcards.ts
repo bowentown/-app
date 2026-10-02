@@ -1023,7 +1023,7 @@ export const ALL_POSTCARDS: TravelPostcard[] = [
     "country": "肯尼亚",
     "title": "金黄大草原金合欢树与长颈鹿",
     "imageUrl": "postcards/africa/card-africa-47.webp",
-    "text": "金黄色的草原一直连到了太阳落下去的地方！长颈鹿一家三口慢悠悠地在晚霞里散步，步子迈得那么优雅。大草原上的动物日落而息，天黑了就安心睡觉，鱼片你也该向长颈鹿学习啦！",
+    "text": "金黄色的草原一直连到了太阳落下去的地方！长颈鹿一家三口慢悠悠地在晚霞里散步，步子迈得那么优雅。大草原上的动物日落而息，天黑了就安心睡觉，鱼片你也该向长颈鹿学习啦！……哼，本鱼就不用学，整个草原论会睡觉，本鱼认第二没鱼敢认第一。",
     "souvenir": {
       "name": "马赛马拉乌木手工雕刻长颈鹿",
       "emoji": "🦒",
@@ -1045,7 +1045,7 @@ export const ALL_POSTCARDS: TravelPostcard[] = [
     "country": "坦桑尼亚",
     "title": "晨光大草原热气球与万兽奔腾",
     "imageUrl": "postcards/africa/card-africa-48.webp",
-    "text": "早晨坐着热气球飘在几百米的高空！脚下的大草原像一张巨大的金色地毯，斑马群像一颗颗小芝麻在草地上欢快地吃草。飞在云彩和微风里，感觉自己轻得像一朵蒲公英。早安世界，早安鱼片！",
+    "text": "早晨坐着热气球飘在几百米的高空！脚下的大草原像一张巨大的金色地毯，斑马群像一颗颗小芝麻在草地上欢快地吃草。飞在云彩和微风里，感觉自己轻得像一朵蒲公英。早安世界，早安鱼片！……喊这么大声是因为风大，才不是特意叫你起床。",
     "souvenir": {
       "name": "热气球藤编小竹篮微缩挂坠",
       "emoji": "🎈",
@@ -1125,7 +1125,7 @@ export const AFRICA_POSTCARDS = ALL_POSTCARDS.filter((c) => c.continent === 'afr
  * 集齐全图鉴达成率永远停在 36%，欧/美/非标签是无法兑现的承诺。
  * 新大洲插画补齐后，把对应大洲加进本数组即可解锁（文案数据已在）。
  */
-export const ART_READY_CONTINENTS: readonly ContinentType[] = ['asia', 'europe', 'americas'];
+export const ART_READY_CONTINENTS: readonly ContinentType[] = ['asia', 'europe', 'americas', 'africa'];
 
 /** 当前可探索卡池（= 插画已就绪大洲的卡片） */
 export const TRIP_POOL: TravelPostcard[] = ALL_POSTCARDS.filter((c) =>
