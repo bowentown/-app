@@ -342,7 +342,7 @@ export const ActiveSleepModal: React.FC<ActiveSleepModalProps> = ({
           />
         ))}
         <div
-          className="absolute -top-32 left-1/2 -translate-x-1/2 w-[28rem] h-[28rem] rounded-full blur-3xl"
+          className="absolute -top-32 left-0 right-0 mx-auto w-[28rem] h-[28rem] rounded-full blur-3xl"
           style={{ background: `radial-gradient(circle, ${theme.accentHex}1f 0%, transparent 70%)` }}
         />
       </div>

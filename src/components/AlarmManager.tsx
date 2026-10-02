@@ -191,13 +191,16 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
                 {alarms.filter((a) => a.enabled).length}/{alarms.length} 已启用
               </span>
             )}
+            {/* 视觉块与"添加闹钟"胶囊同高（28px）；命中区由透明按钮 padding 扩到 40px */}
             <button
               type="button"
               onClick={() => setIsOpen(!isOpen)}
-              className={`w-9 h-9 rounded-lg ${theme?.cardInnerBg || 'bg-slate-800'} ${theme?.accentText} cursor-pointer`}
+              className="p-1.5 -m-1.5 rounded-lg cursor-pointer"
               aria-label={isOpen ? '收起闹钟列表' : '展开闹钟列表'}
             >
-              {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              <span className={`h-7 w-7 rounded-lg ${theme?.cardInnerBg || 'bg-slate-800'} ${theme?.accentText} flex items-center justify-center`}>
+                {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </span>
             </button>
           </div>
 
@@ -509,7 +512,8 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
                     <Trash2 className="w-4 h-4" />
                   </button>
 
-                  {/* Switch toggle */}
+                  {/* Switch toggle：拨钮用内联 left——translate-x-* 依赖 v4 的
+                      translate 变量链（@property），旧 WebView 上会卡死在左侧 */}
                   <button
                     type="button"
                     aria-label={alarm.enabled ? '关闭该闹钟' : '开启该闹钟'}
@@ -519,9 +523,8 @@ export const AlarmManager: React.FC<AlarmManagerProps> = ({ alarms, onUpdateAlar
                     }`}
                   >
                     <div
-                      className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${
-                        alarm.enabled ? 'translate-x-6' : 'translate-x-0'
-                      }`}
+                      className="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all"
+                      style={{ left: alarm.enabled ? '22px' : '2px' }}
                     />
                   </button>
                 </div>

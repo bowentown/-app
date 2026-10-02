@@ -83,8 +83,10 @@ export const TripArrivalModal: React.FC<Props> = ({ postcardId, onClose, onOpenM
                 <div className="w-11 h-px bg-[#d9c9a3]" />
               </div>
               {/* 火漆印：点它的姿态（整封可点，火漆是视觉锚点） */}
-              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-[#c2554f] border-2 border-[#9e423d] shadow-md flex items-center justify-center text-white text-base">
-                🐋
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-11 h-11 rounded-full bg-[#c2554f] border-2 border-[#9e423d] shadow-md flex items-center justify-center text-white text-base">
+                  🐋
+                </div>
               </div>
             </div>
             <p className="text-[11px] text-[#94a3b8] font-medium">来自远方的来信 · 等你拆开</p>

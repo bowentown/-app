@@ -637,7 +637,7 @@ export const App: React.FC = () => {
       {/* 品牌氛围：页首背后的主题色极光带（呼应开屏动画） */}
       <div aria-hidden className="pointer-events-none absolute top-0 left-0 right-0 h-44 overflow-hidden">
         <div
-          className="absolute -top-28 left-1/2 -translate-x-1/2 w-[130%] h-56 blur-3xl opacity-[0.2]"
+          className="absolute -top-28 left-[-15%] w-[130%] h-56 blur-3xl opacity-[0.2]"
           style={{ background: `linear-gradient(100deg, transparent 12%, ${currentTheme.accentHex} 38%, transparent 52%, #8b5cf6 66%, transparent 84%)` }}
         />
       </div>
@@ -710,7 +710,7 @@ export const App: React.FC = () => {
         document.body,
       )}
       {toastMessage && (
-        <div className={`fixed top-5 left-1/2 -translate-x-1/2 z-[90] px-5 py-3 rounded-2xl ${currentTheme.accentBg.split(' ')[0]} ${currentTheme.accentFg} text-xs font-black shadow-2xl flex items-center gap-2.5 animate-bounce border border-white/10`}>
+        <div className={`fixed top-5 left-0 right-0 mx-auto w-fit z-[90] px-5 py-3 rounded-2xl ${currentTheme.accentBg.split(' ')[0]} ${currentTheme.accentFg} text-xs font-black shadow-2xl flex items-center gap-2.5 animate-bounce border border-white/10`}>
           <CheckCircle2 className="w-5 h-5 text-white/90" />
           <span>{toastMessage}</span>
         </div>

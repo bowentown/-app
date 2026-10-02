@@ -12,6 +12,10 @@ import {
 } from '../utils/petMoments';
 import { getPetSkin } from '../utils/petOverlay';
 import { stripMd } from '../utils/markdown';
+import { loadTravelState } from '../services/travelService';
+import { getPostcardById, thumbUrlOf } from '../data/travelPostcards';
+import type { TravelPostcard } from '../types/travel';
+import { toLocalDateString } from '../utils/dateUtils';
 import { PostcardCard } from './travel/PostcardCard';
 import { TravelCodexModal } from './travel/TravelCodexModal';
 import { getTravelProgress } from '../services/travelService';
@@ -60,11 +64,23 @@ const CardView: React.FC<{ type: MomentCard; moment: Moment }> = ({ type, moment
     // 皮肤值只有 'default' / 'sakura'——此前判的是改名前的 'sport'，恒为
     // false，自拍卡永远不跟随服装。走 petOverlay 的单一真相源
     const isSakura = getPetSkin() === 'sakura';
+    // 自拍轮换：已解锁的旅行明信片按日期轮换当"旅行自拍"（同一天稳定、
+    // 隔天换图）；一张都没解锁时回退默认自拍。用缩略图省流量
+    const unlocked = loadTravelState()
+      .unlockedCardIds.map((id) => getPostcardById(id))
+      .filter((c): c is TravelPostcard => !!c);
+    const dayKey = toLocalDateString().split('-').reduce((a, p) => a + Number(p), 0);
+    const rotated = unlocked.length > 0 ? unlocked[dayKey % unlocked.length] : undefined;
+    const src = rotated ? thumbUrlOf(rotated.imageUrl) : (isSakura ? SELFIE_SRC_SAKURA : SELFIE_SRC);
     return (
       <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-sky-500/30 to-blue-900/40 border border-slate-700/60 aspect-square flex items-center justify-center">
-        <img src={isSakura ? SELFIE_SRC_SAKURA : SELFIE_SRC} alt="大肥鱼自拍" className="w-4/5 h-4/5 object-contain drop-shadow-[0_2px_8px_rgba(56,189,248,0.35)]" />
-        <span className="absolute bottom-1 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded-md bg-black/50 text-[9px] font-bold text-sky-200 whitespace-nowrap">
-          今日营业自拍 · 拒绝加班
+        <img
+          src={src}
+          alt={rotated ? `大肥鱼在${rotated.country}的旅行自拍` : '大肥鱼自拍'}
+          className={rotated ? 'w-full h-full object-cover' : 'w-4/5 h-4/5 object-contain drop-shadow-[0_2px_8px_rgba(56,189,248,0.35)]'}
+        />
+        <span className="absolute bottom-1 left-0 right-0 mx-auto w-fit px-1.5 py-0.5 rounded-md bg-black/50 text-[9px] font-bold text-sky-200 whitespace-nowrap">
+          {rotated ? `旅行营业中 · ${rotated.country}` : '今日营业自拍 · 拒绝加班'}
         </span>
       </div>
     );
