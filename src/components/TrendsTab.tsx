@@ -90,19 +90,43 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
   const last7Records = nightsOnly(records).slice(0, 7).reverse();
   const activeRecord = hoveredRecord || last7Records[last7Records.length - 1];
 
+  // ── 得分曲线的唯一坐标映射 ──
+  // 数据点、折线、参考线【全部】走这一个函数，避免各写一份后漂移。
+  const CHART_W = 280;
+  const CHART_H = 80;
+  const SCORE_MIN = 50;
+  const SCORE_MAX = 100;
+  const scoreToY = (rawScore: number) => {
+    const score = Math.max(SCORE_MIN, Math.min(SCORE_MAX, rawScore));
+    return CHART_H - ((score - SCORE_MIN) / (SCORE_MAX - SCORE_MIN)) * (CHART_H - 20) - 10;
+  };
+  // 单条记录时居中，避免点贴在左边缘
+  const scoreToX = (i: number) =>
+    last7Records.length <= 1 ? CHART_W / 2 : i * (CHART_W / (last7Records.length - 1));
+
+  // ── 参考线的唯一定义 ──
+  // 线本身与右上角图例【都读这份数组】，所以图例不可能与线不一致。
+  // 颜色：项目 @theme 已把 emerald-300/rose-300 覆盖为字面 hex
+  //       （#5ee9b5 / #ffa1ad），因此不会引入 oklch，旧 WebView 安全。
+  //       选 300 档而非 400 档：400 档红线在暖琥珀/晴蓝主题的最坏对比度只有
+  //       3.0:1（零余量）；而 emerald-400 + rose-300 的灰度差仅 0.006，
+  //       红绿色盲无法区分。emerald-300 + rose-300 两项都满足（见下）。
+  // 对比度（非文字图形门槛 ≥3:1；图例文字 AA 小字 ≥4.5:1）。
+  // ⚠️ 参考线【必须完全不透明】：折线下方有 scoreGrad 渐变填充，
+  //    会把局部底色从 #0c1222 提亮到约 rgb(53,61,109)。
+  //    半透明红线压在该填充上只有 ≈2.6:1 —— 达不到 3:1（四套主题实测过）。
+  //    不透明 + 300 档后，最坏情况（四套主题 × 相邻底色/裸底色取最小）：
+  //    绿 9.64:1，红 4.54:1（门槛 3:1），灰度差 0.142（色盲可辨）。
+  // 线型：两者都是虚线（用户要求），但【节奏不同】，红绿色盲可凭线型配对图例。
+  const REF_LINES = [
+    { score: 90, dash: '5 3',  tone: 'text-emerald-300', label: '90 达标' },
+    { score: 75, dash: '2 3',  tone: 'text-rose-300',    label: '75 警戒' },
+  ] as const;
+
   // Helper for SVG smooth trend line points
   const getScoreCoordinates = () => {
     if (last7Records.length === 0) return '';
-    const width = 280;
-    const height = 80;
-    const step = width / Math.max(1, last7Records.length - 1);
-
-    return last7Records.map((r, i) => {
-      const x = i * step;
-      const score = Math.max(50, Math.min(100, r.sleepScore));
-      const y = height - ((score - 50) / 50) * (height - 20) - 10;
-      return `${x},${y}`;
-    }).join(' ');
+    return last7Records.map((r, i) => `${scoreToX(i)},${scoreToY(r.sleepScore)}`).join(' ');
   };
 
   return (
@@ -154,20 +178,39 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
         {viewMode === 'quality' && (
           <div className="space-y-2 animate-tab-fade-in">
             <div className={`relative h-40 ${theme.cardInnerBg} rounded-2xl p-3 border ${theme.cardInnerBorder} flex flex-col justify-between`}>
-              <div className="absolute inset-x-3 top-4 border-b border-dashed border-emerald-500/30 flex justify-between text-[10px] text-emerald-400 font-mono">
-                <span>90分 达标线</span>
-              </div>
-              <div className={`absolute inset-x-3 top-18 border-b border-dashed ${innerBorder} flex justify-between text-[10px] ${textMuted} font-mono`}>
-                <span>75分 警戒线</span>
+              {/* ── 图例：与参考线读同一份 REF_LINES，色/线型都不可能不一致 ── */}
+              <div className="flex items-center justify-end gap-3 text-[9px] font-mono shrink-0 leading-none">
+                {REF_LINES.map((l) => (
+                  <span key={l.score} className={`flex items-center gap-1 ${l.tone}`}>
+                    <svg width="14" height="6" viewBox="0 0 14 6" aria-hidden="true" focusable="false">
+                      <line
+                        x1="0" y1="3" x2="14" y2="3"
+                        stroke="currentColor" strokeWidth="1" strokeDasharray={l.dash}
+                      />
+                    </svg>
+                    {l.label}
+                  </span>
+                ))}
               </div>
 
-              <svg className="w-full h-24 overflow-visible my-auto" viewBox="0 0 280 80">
+              <svg className="w-full h-24 overflow-visible" viewBox="0 0 280 80">
                 <defs>
                   <linearGradient id="scoreGrad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor={theme.accentHex} stopOpacity="0.35" />
                     <stop offset="100%" stopColor={theme.accentHex} stopOpacity="0.0" />
                   </linearGradient>
                 </defs>
+
+                {/* ── 参考线：与数据点共用 scoreToY，绝不另写坐标 ── */}
+                {REF_LINES.map((l) => (
+                  <line
+                    key={l.score}
+                    x1="0" y1={scoreToY(l.score)} x2={CHART_W} y2={scoreToY(l.score)}
+                    stroke="currentColor"
+                    strokeWidth="1" strokeDasharray={l.dash}
+                    className={l.tone}
+                  />
+                ))}
 
                 {last7Records.length > 1 && (
                   <polygon
@@ -186,10 +229,8 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
                 />
 
                 {last7Records.map((r, i) => {
-                  const step = 280 / Math.max(1, last7Records.length - 1);
-                  const x = i * step;
-                  const score = Math.max(50, Math.min(100, r.sleepScore));
-                  const y = 80 - ((score - 50) / 50) * 60 - 10;
+                  const x = scoreToX(i);
+                  const y = scoreToY(r.sleepScore);
                   const isHovered = activeRecord?.id === r.id;
 
                   return (
