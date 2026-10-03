@@ -33,8 +33,10 @@ export const PostcardCard: React.FC<Props> = ({ postcardId, postcard: initialPos
         onClick={() => setIsFlipped((prev) => !prev)}
         className="w-full text-left relative focus:outline-none cursor-pointer block"
       >
+        {/* 容器比例 280/405 = 照片区(256×343，= 图片 896/1200 原比) + 白边/信息行，
+            此前 3/4 让 object-cover 纵向裁掉 ~9%，插画自带的手写地名被切 */}
         <div
-          className="relative w-full aspect-[3/4] rounded-2xl transition-transform duration-500 shadow-xl"
+          className="relative w-full aspect-[280/405] rounded-2xl transition-transform duration-500 shadow-xl"
           style={{
             transformStyle: 'preserve-3d',
             transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)',

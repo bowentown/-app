@@ -200,7 +200,7 @@ export const TravelCodexModal: React.FC<Props> = ({ onClose }) => {
                 type="button"
                 aria-label={`查看明信片：No.${card.index} ${isUnlocked ? card.title : '未解锁'}`}
                 onClick={() => handleCardClick(card)}
-                className={`relative aspect-[3/4] rounded-2xl p-2 text-left flex flex-col justify-between overflow-hidden cursor-pointer transition-transform active:scale-95 ${
+                className={`relative aspect-[157/245] rounded-2xl p-2 text-left flex flex-col justify-between overflow-hidden cursor-pointer transition-transform active:scale-95 ${
                   isUnlocked
                     ? 'bg-[#0f172a] border-2 border-slate-700/80 hover:border-sky-500/80 shadow-lg'
                     : 'bg-slate-900/40 border border-slate-800/80 opacity-60'
@@ -252,7 +252,7 @@ export const TravelCodexModal: React.FC<Props> = ({ onClose }) => {
           {ALL_POSTCARDS.some((c) => !ART_READY_CONTINENTS.includes(c.continent)) && (
             <div
               aria-hidden
-              className="aspect-[3/4] rounded-2xl border border-dashed border-slate-700/70 bg-slate-900/30 flex flex-col items-center justify-center gap-1.5 text-[#64748b]"
+              className="aspect-[157/245] rounded-2xl border border-dashed border-slate-700/70 bg-slate-900/30 flex flex-col items-center justify-center gap-1.5 text-[#64748b]"
             >
               <Compass className="w-5 h-5" />
               <span className="text-[9px] font-bold">更多大洲</span>
