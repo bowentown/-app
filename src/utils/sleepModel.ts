@@ -147,6 +147,8 @@ export function fitSleepModel(input: SleepModelInput): SleepModelOutcome {
   // ── 1) 分窗分桶：只数亮屏次数，时长刻意丢弃 ──
   const wsHour = windowStartHour(chronotype, input.habitBedMin, input.habitWakeMin);
   const windowStart0 = recentWindowStart(now, wsHour);
+  // 逐日锚点按精确 24h 回推，不处理 DST——中国时区无夏令时；跨 DST 地区
+  // 历史窗的本地起点会漂移 ±1h（模型分层 σ=1h 会放大为该夜被闸门排除）
   const spanStart = windowStart0 - (FIT_DAYS - 1) * 86400000;
 
   const days: DayData[] = [];
@@ -156,10 +158,10 @@ export function fitSleepModel(input: SleepModelInput): SleepModelOutcome {
   }
   for (const e of events) {
     if (!(e >= spanStart && e <= observedUntil)) continue;
-    const idx = Math.floor((e - windowStart0) / 86400000);           // 0 = 当前窗（含负数? 不会：e ≥ spanStart ⇒ idx ≥ -(FIT_DAYS-1)）
-    const di = idx + FIT_DAYS - 1;
+    const idx = Math.floor((e - windowStart0) / 86400000);           // 当前窗=0，往前递减（e ≥ spanStart ⇒ idx ∈ [-(FIT_DAYS-1), 0]）
+    const di = -idx;                                                  // ★ 0 = 当前窗——下游 ob0/target 都按此约定
     if (di < 0 || di >= FIT_DAYS) continue;
-    const dayStart = windowStart0 - (FIT_DAYS - 1 - di) * 86400000;
+    const dayStart = windowStart0 - di * 86400000;
     const bin = Math.min(BINS - 1, Math.max(0, Math.floor((e - dayStart) / BIN_MS)));
     days[di].counts[bin] += 1;
   }

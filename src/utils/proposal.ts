@@ -10,7 +10,7 @@
  * 本实现通过 epoch 重建（§3.2 gate 链之后由 verify-proposal 反向注入验证）。
  */
 import { SleepRecord } from '../types/sleep';
-import { bedClockAxis, median, shortArc, clockMinutes } from './clockMath';
+import { bedClockAxis, circularMedian, median, shortArc, clockMinutes } from './clockMath';
 import { nightsOnly } from './recordFilter';
 import { fitSleepModel } from './sleepModel';
 import type { UsageDay } from './usageSignal';
@@ -147,24 +147,38 @@ export interface ModelProposalResult {
   fallbackAllowed: boolean;
 }
 
+// 拟合结果缓存（单条）：键见 computeModelProposal 内注释
+let fitCache: { events: number[]; key: string; outcome: ReturnType<typeof fitSleepModel> } | null = null;
+
 export function computeModelProposal(input: ModelProposalInput): ModelProposalResult {
   if (input.chronotype === 'irregular') return { proposal: null, fallbackAllowed: false };  // gate 0
   if (input.sessionActive) return { proposal: null, fallbackAllowed: false };               // gate 5
 
-  // 先验中心：确认夜睡中位数（≥3 晚）→ 作息类型默认
+  // 先验中心：确认夜睡中位数（≥3 晚）→ 作息类型默认。
+  // ★ 必须用圆周中位数——就寝横跨午夜时线性中位会偏 ~2.5h（模型命门）
   const nights = nightsOnly(input.records).slice(0, 14);
   const hasHabit = nights.length >= 3;
-  const habitBedMin = hasHabit ? median(nights.map((r) => clockMinutes(r.bedtime))) : undefined;
-  const habitWakeMin = hasHabit ? median(nights.map((r) => clockMinutes(r.wakeTime))) : undefined;
+  const habitBedMin = hasHabit ? circularMedian(nights.map((r) => clockMinutes(r.bedtime))) : undefined;
+  const habitWakeMin = hasHabit ? circularMedian(nights.map((r) => clockMinutes(r.wakeTime))) : undefined;
 
-  const fit = fitSleepModel({
-    events: input.events,
-    observedUntil: input.observedUntil,
-    chronotype: input.chronotype === 'day' ? 'day' : 'night',
-    habitBedMin,
-    habitWakeMin,
-    now: (input.now ?? new Date()).getTime(),
-  });
+  // 拟合缓存：events 数组在 usageSignal 的 30min TTL 内是同一引用，而
+  // records/handledDate 的每次变化都会触发 effect 重跑——坐标上升不必重跑。
+  // 缓存命中后 gate 4/6/窗口闸仍全量复查（它们不进缓存键，语义不变）
+  const fitKey = `${input.chronotype === 'day' ? 'day' : 'night'}|${habitBedMin ?? ''}|${habitWakeMin ?? ''}|${input.observedUntil}`;
+  let fit: ReturnType<typeof fitSleepModel>;
+  if (fitCache && fitCache.events === input.events && fitCache.key === fitKey) {
+    fit = fitCache.outcome;
+  } else {
+    fit = fitSleepModel({
+      events: input.events,
+      observedUntil: input.observedUntil,
+      chronotype: input.chronotype === 'day' ? 'day' : 'night',
+      habitBedMin,
+      habitWakeMin,
+      now: (input.now ?? new Date()).getTime(),
+    });
+    fitCache = { events: input.events, key: fitKey, outcome: fit };
+  }
   if (fit.status === 'insufficient') {
     return { proposal: null, fallbackAllowed: true };   // 跑不了模型 → 旧算法顶上
   }

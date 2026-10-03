@@ -53,25 +53,30 @@ export const OneTapSleepTracker: React.FC<OneTapSleepTrackerProps> = ({ onSaveRe
   }, [userProfile?.chronotype]);
 
   // ── 模型化提议（第 26 轮）：SensibleSleep 贝叶斯模型优先，旧启发式作回退 ──
-  // decided=false 仅当模型【跑不了】（非 native / 查询失败 / 数据不足）→ 回退旧算法；
-  // 模型【跑出了结论但被闸门拒绝】→ proposal=null 且不回退（通宵用机等场景
-  // 旧启发式会把"整晚没睡"报成一次睡眠，正是换模型要根治的问题）
+  // 三态：pending（拟合中）→ 不渲染任何提议——此前 decided=false 期间旧启发式
+  // 的提议卡先闪现且可点，用户会在"模型明确拒绝（如通宵用机）"的窗口期内
+  // 写入错误记录；failed（跑不了：非 native/查询失败/数据不足）→ 回退旧启发式；
+  // decided → 模型拍板（含"拒绝"=null，绝不回退）
   const chronotype = userProfile?.chronotype ?? 'night';
   const sessionActive = sleepStartTime !== null;
-  const [modelResult, setModelResult] = useState<{ decided: boolean; proposal: Proposal | null }>({
-    decided: false,
+  const [modelResult, setModelResult] = useState<{ phase: 'pending' | 'decided' | 'failed'; proposal: Proposal | null }>({
+    phase: 'pending',
     proposal: null,
   });
 
   useEffect(() => {
     if (!isNativePlatform() || chronotype === 'irregular') {
-      setModelResult({ decided: false, proposal: null });
+      setModelResult({ phase: 'failed', proposal: null });
       return;
     }
     let cancelled = false;
     void (async () => {
       const ev = await queryScreenOnEvents(14);
-      if (!ev || cancelled) return;   // 查询失败：保持回退态
+      if (cancelled) return;
+      if (!ev) {
+        setModelResult({ phase: 'failed', proposal: null });   // 查询失败：回退态
+        return;
+      }
       const res = computeModelProposal({
         events: ev.events,
         observedUntil: ev.observedUntil,
@@ -82,8 +87,8 @@ export const OneTapSleepTracker: React.FC<OneTapSleepTrackerProps> = ({ onSaveRe
       });
       if (!cancelled) {
         setModelResult(res.fallbackAllowed
-          ? { decided: false, proposal: null }
-          : { decided: true, proposal: res.proposal });
+          ? { phase: 'failed', proposal: null }
+          : { phase: 'decided', proposal: res.proposal });
       }
     })();
     return () => { cancelled = true; };
@@ -99,7 +104,7 @@ export const OneTapSleepTracker: React.FC<OneTapSleepTrackerProps> = ({ onSaveRe
     }),
     [usageDays, records, sleepStartTime, handledDate, userProfile?.chronotype]
   );
-  const proposal = modelResult.decided ? modelResult.proposal : heuristicProposal;
+  const proposal = modelResult.phase === 'failed' ? heuristicProposal : modelResult.proposal;
 
   const markHandled = () => {
     if (!proposal) return;

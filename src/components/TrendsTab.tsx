@@ -271,7 +271,7 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
                 })}
               </svg>
 
-              <div className={`flex justify-between text-[10px] ${textMuted} font-mono pt-1 border-t ${innerBorder}`}>
+              <div className={`flex ${last7Records.length === 1 ? 'justify-center' : 'justify-between'} text-[10px] ${textMuted} font-mono pt-1 border-t ${innerBorder}`}>
                 {last7Records.map((r) => (
                   <span
                     key={r.id}

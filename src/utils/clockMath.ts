@@ -77,3 +77,20 @@ export function shortArc(a: number, b: number): number {
   const d = Math.abs(a - b) % DAY_MIN;
   return Math.min(d, DAY_MIN - d);
 }
+
+/**
+ * 圆周中位数：以圆周均值为轴收拢后取线性中位。
+ * 就寝横跨午夜是常态（22/23/01/02 点的线性中位会偏 ~2.5h）——
+ * 先验中心必须用它，不能用线性 median。
+ */
+export function circularMedian(times: number[]): number {
+  if (times.length === 0) return NaN;
+  const pivot = circularMean(times) ?? 0;
+  const shifted = times.map((v) => {
+    let d = v - pivot;
+    if (d > 720) d -= 1440;
+    if (d < -720) d += 1440;
+    return d;
+  });
+  return ((pivot + median(shifted)) % 1440 + 1440) % 1440;
+}

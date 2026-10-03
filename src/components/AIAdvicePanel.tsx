@@ -100,23 +100,33 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
   const activeSession: ChatSession =
     chat.sessions.find((s) => s.id === chat.activeId) ?? chat.sessions[0];
   const chatMessages = activeSession?.messages ?? [];
-  // 活跃会话消息更新：所有旧调用点继续用 setChatMessages(fn | array)
-  const setChatMessages = (updater: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) => {
+  // 按【会话 id】写入：发送/流式期间用户切走会话时，回复仍写回发起会话——
+  // 旧版按"调用时刻的 activeId"写，await 后切走会把回复写进错误会话，
+  // 流式 token 则因占位符在旧会话里而整体静默丢失
+  const setChatMessagesFor = (sessionId: string, updater: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) => {
     setChat((prev) => ({
       ...prev,
       sessions: prev.sessions.map((s) =>
-        s.id === prev.activeId
+        s.id === sessionId
           ? { ...s, messages: typeof updater === 'function' ? updater(s.messages) : updater, updatedAt: Date.now() }
           : s
       ),
     }));
   };
+  // 活跃会话快捷包装（非异步路径用）
+  const setChatMessages = (updater: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) =>
+    setChatMessagesFor(chat.activeId, updater);
   useEffect(() => {
     // 300ms 防抖：流式生成时每个 token 都会改 messages，
     // 逐次同步 stringify+setItem 约 220 次/生成，全压在打字机路径上
     const t = setTimeout(() => persistChatState(chat), 300);
     return () => clearTimeout(t);
   }, [chat]);
+  // 卸载兜底（分区条件渲染，切 Tab 即卸载）：防抖窗口内最后一批消息
+  // 此前随 cleanup 的 clearTimeout 一起被丢弃——切 Tab 前的发言会丢
+  const chatRef = useRef(chat);
+  chatRef.current = chat;
+  useEffect(() => () => persistChatState(chatRef.current), []);
   const [inputText, setInputText] = useState('');
   const [isSendingChat, setIsSendingChat] = useState(false);
   const [showAssessment, setShowAssessment] = useState(false);
@@ -126,6 +136,7 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
   const sessionsA11y = useModalA11y(showSessions, () => setShowSessions(false), '会话列表');
 
   const handleNewSession = () => {
+    chatStickRef.current = true;   // 新会话从底部开始跟随（旧会话滑过历史时 stick=false）
     setChat((prev) => {
       const active = prev.sessions.find((s) => s.id === prev.activeId);
       if (active && active.messages.length === 0) return prev;   // 已是空会话，不重复建
@@ -135,6 +146,7 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
   };
 
   const handleSwitchSession = (id: string) => {
+    chatStickRef.current = true;   // 同上：切到的会话要滚动到底部
     setChat((prev) => (prev.activeId === id ? prev : { ...prev, activeId: id }));
     setShowSessions(false);
   };
@@ -172,6 +184,23 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
     }
     return merged.slice(0, 4);
   }, [insights]);
+
+  // Android 返回键收起键盘不派发 blur：viewport 高度回弹时主动失焦，
+  // 否则 App 侧"聚焦即隐藏底栏"的状态卡住——键盘已收起、导航条却回不来
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    let prevHeight = vv.height;
+    const onResize = () => {
+      const grew = vv.height - prevHeight;
+      prevHeight = vv.height;
+      if (grew > 120 && document.activeElement === chatInputRef.current) {
+        chatInputRef.current?.blur();
+      }
+    };
+    vv.addEventListener('resize', onResize);
+    return () => vv.removeEventListener('resize', onResize);
+  }, []);
 
   // 快捷提示词行：挂 JS 横滑（祖先 pane 的 touch-action: pan-y 会禁掉原生横滑）
   const promptRowRef = useRef<HTMLDivElement>(null);
@@ -264,6 +293,9 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
   const handleSendMessage = async (textToSend?: string) => {
     const text = textToSend || inputText;
     if (!text.trim() || isSendingChat) return;
+    // 发起时刻的会话快照：请求/流式期间用户切走（抽屉不禁用），回复仍写回这里
+    const targetId = chat.activeId;
+    const targetMessages = chat.sessions.find((s) => s.id === targetId)?.messages ?? [];
 
     const userMsg: ChatMessage = {
       id: `user-${Date.now()}`,
@@ -272,13 +304,13 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
 
-    const newHistory = [...chatMessages, userMsg];
-    setChatMessages(newHistory);
+    const newHistory = [...targetMessages, userMsg];
+    setChatMessagesFor(targetId, newHistory);
     // 会话标题 = 首条用户提问（仅"新对话"占位时改名，不靠模型）
     setChat((prev) => ({
       ...prev,
       sessions: prev.sessions.map((s) =>
-        s.id === prev.activeId && s.title === '新对话' ? { ...s, title: deriveTitle([userMsg]) } : s
+        s.id === targetId && s.title === '新对话' ? { ...s, title: deriveTitle([userMsg]) } : s
       ),
     }));
     setInputText('');
@@ -305,7 +337,7 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
         if (intent.category === 'crisis' || intent.category === 'drug_inquiry') {
           setActiveProviderName('安全护栏接管');
           const guardReply = generateLocalChatReply(text, latestRecord, records);
-          setChatMessages((prev) => [
+          setChatMessagesFor(targetId, (prev) => [
             ...prev,
             {
               id: `ai-${Date.now()}`,
@@ -327,7 +359,7 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
             ? '\n\n（提示：可在 设置 → AI 顾问模型设置 中下载启用端侧小模型）'
             : `\n\n（端侧模型在当前设备不可用：${support.reason}）`;
           const fallbackReply = generateLocalChatReply(text, latestRecord, records) + hint;
-          setChatMessages((prev) => [
+          setChatMessagesFor(targetId, (prev) => [
             ...prev,
             {
               id: `ai-${Date.now()}`,
@@ -341,7 +373,7 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
 
         setActiveProviderName(getActiveModelLabel());
         const aiId = `ai-${Date.now()}`;
-        setChatMessages((prev) => [
+        setChatMessagesFor(targetId, (prev) => [
           ...prev,
           {
             id: aiId,
@@ -370,7 +402,7 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
                   gotFirstToken = true;
                   window.clearTimeout(firstTokenTimer);
                 }
-                setChatMessages((prev) =>
+                setChatMessagesFor(targetId, (prev) =>
                   prev.map((m) => (m.id === aiId ? { ...m, content: m.content === '……' ? token : m.content + token } : m))
                 );
               },
@@ -379,7 +411,7 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
             localGenAbortRef.current.signal
           );
           // 极端情况下模型无输出时兜底到规则引擎
-          setChatMessages((prev) =>
+          setChatMessagesFor(targetId, (prev) =>
             prev.map((m) =>
               m.id === aiId && (m.content.trim() === '' || m.content.trim() === '……') ? { ...m, content: generateLocalChatReply(text, latestRecord, records) } : m
             )
@@ -390,13 +422,13 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
           if (aborted) {
             // 超时/手动停止：不给死胡同提示，用规则引擎即时回复兜底
             const fallbackReply = generateLocalChatReply(text, latestRecord, records);
-            setChatMessages((prev) =>
+            setChatMessagesFor(targetId, (prev) =>
               prev.map((m) => (m.id === aiId ? { ...m, content: fallbackReply } : m))
             );
           } else {
             setActiveProviderName('本地引擎（端侧模型异常，规则兜底）');
             const fallbackReply = generateLocalChatReply(text, latestRecord, records);
-            setChatMessages((prev) => prev.map((m) => (m.id === aiId ? { ...m, content: fallbackReply } : m)));
+            setChatMessagesFor(targetId, (prev) => prev.map((m) => (m.id === aiId ? { ...m, content: fallbackReply } : m)));
           }
         } finally {
           window.clearTimeout(firstTokenTimer);
@@ -418,7 +450,7 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
           content: localReply,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         };
-        setChatMessages((prev) => [...prev, aiReply]);
+        setChatMessagesFor(targetId, (prev) => [...prev, aiReply]);
         return;
       }
 
@@ -483,7 +515,7 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           };
           if (replyText && replyText.trim()) {
-            setChatMessages((prev) => [...prev, aiReply]);
+            setChatMessagesFor(targetId, (prev) => [...prev, aiReply]);
             return;
           }
           console.warn('[chat] 云端返回空内容，转本地规则兜底');
@@ -523,7 +555,7 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
         content: data.reply || '（服务端返回了空回复，请重试）',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
-      setChatMessages((prev) => [...prev, aiReply]);
+      setChatMessagesFor(targetId, (prev) => [...prev, aiReply]);
     } catch (_err) {
       const localReplyText = generateLocalChatReply(text, nightsOnly(records)[0] ?? null, records);
       const aiReply: ChatMessage = {
@@ -532,7 +564,7 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
         content: localReplyText,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
-      setChatMessages((prev) => [...prev, aiReply]);
+      setChatMessagesFor(targetId, (prev) => [...prev, aiReply]);
     } finally {
       setIsSendingChat(false);
     }
@@ -791,7 +823,7 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
             onClick={(e) => { if (e.target === e.currentTarget) setShowSessions(false); }}
             className="fixed inset-0 z-[120] bg-black/85 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
           >
-            <div className={`w-full max-w-md ${theme.cardBg} border-2 ${theme.accentBorder} rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[80dvh] flex flex-col overflow-hidden`}>
+            <div className={`w-full max-w-md ${theme.cardBg} border-2 ${theme.accentBorder} rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[80vh] flex flex-col overflow-hidden`}>
               <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-slate-700/50 shrink-0">
                 <div className="flex items-center gap-2">
                   <MessageSquare className={`w-4 h-4 ${theme.accentText}`} />

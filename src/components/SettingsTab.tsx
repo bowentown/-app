@@ -205,10 +205,17 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           }
           return;
         }
-        // 全量（schema 2）
+        // 全量（schema 2）。chat 兼容两种形状：旧=平铺数组，新=多会话对象
+        const chatData = parsed.data.chat as unknown;
+        const chatCount = Array.isArray(chatData)
+          ? chatData.length
+          : (chatData !== null && typeof chatData === 'object' && Array.isArray((chatData as { sessions?: unknown }).sessions))
+            ? (chatData as { sessions: unknown[] }).sessions.length
+            : 0;
+        const chatCountText = `${chatCount} 段`;
         const skipped = confirm(
           `全量备份导入将覆盖当前的睡眠记录、朋友圈与聊天历史（图鉴与档案按文件内容恢复）。\n` +
-          `包含：记录 ${parsed.data.records.length} 条 · 朋友圈 ${parsed.data.moments.length} 条 · 聊天 ${parsed.data.chat.length} 条。\n` +
+          `包含：记录 ${parsed.data.records.length} 条 · 朋友圈 ${parsed.data.moments.length} 条 · 聊天 ${chatCountText}。\n` +
           `API 密钥不包含在备份中：覆盖安装会保留本机已填的值；卸载/换机迁移后需重新填写（DeepSeek / 自建 Key / HF token）。\n` +
           `手机使用信号数据也不参与备份，换机后需重新积累。继续？`,
         );

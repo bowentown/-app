@@ -11,6 +11,7 @@ import { TodayTab } from './components/TodayTab';
 import { TrendsTab } from './components/TrendsTab';
 import { AIAdvicePanel } from './components/AIAdvicePanel';
 import { OnboardingCard } from './components/OnboardingCard';
+import { useModalA11y } from './utils/modalA11y';
 import { SettingsTab } from './components/SettingsTab';
 import { EyeCareTab } from './components/EyeCareTab';
 import { BottomNavBar, NavTab } from './components/BottomNavBar';
@@ -52,10 +53,17 @@ export const App: React.FC = () => {
   };
   // 首次引导（两步卡，localStorage 一次性门控；冷启动第二次不再出现）
   const [onboardingOpen, setOnboardingOpen] = useState(() => {
-    try { return localStorage.getItem('somnacare_onboarded_v1') !== '1'; } catch { return false; }
+    try {
+      if (localStorage.getItem('somnacare_onboarded_v1') === '1') return false;
+      if (sessionStorage.getItem('somnacare_onboarded_v1') === '1') return false;
+      return true;
+    } catch { return false; }
   });
   const finishOnboarding = () => {
-    try { localStorage.setItem('somnacare_onboarded_v1', '1'); } catch { /* ignore */ }
+    try { localStorage.setItem('somnacare_onboarded_v1', '1'); } catch {
+      // localStorage 不可用（隐私模式/配额满）：至少会话内不再重弹
+      try { sessionStorage.setItem('somnacare_onboarded_v1', '1'); } catch { /* ignore */ }
+    }
     setOnboardingOpen(false);
   };
   const [pendingPostcardId, setPendingPostcardId] = useState<string | null>(() => {
@@ -621,6 +629,9 @@ export const App: React.FC = () => {
     } catch { /* ignore */ }
     setRingingAlarm(null);
   };
+  // 响铃横幅参与模态栈（焦点陷阱 + Esc 停铃）：否则引导/其它模态打开期间，
+  // 键盘/读屏用户 Tab 不到"停止响铃"——闹钟场景恰恰必须一键可达
+  const ringA11y = useModalA11y(!!ringingAlarm, handleStopRinging, '闹钟响铃');
 
   const handleSaveActiveSleep = (newRecord: SleepRecord) => {
     setRecords((prev) => {
@@ -745,7 +756,7 @@ export const App: React.FC = () => {
       {/* Toast Notification */}
       {/* 闹钟响铃横幅（App 层）：portal 到 body，任何分区/弹窗之上可见可停 */}
       {ringingAlarm && createPortal(
-        <div className="fixed top-0 left-0 right-0 z-[300] p-4 bg-gradient-to-r from-amber-600 via-indigo-600 to-violet-600 text-white shadow-2xl animate-pulse flex items-center justify-between">
+        <div ref={ringA11y.ref} {...ringA11y.dialogProps} className="fixed top-0 left-0 right-0 z-[300] p-4 bg-gradient-to-r from-amber-800 via-indigo-600 to-violet-600 text-white shadow-2xl animate-pulse flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 rounded-full bg-white/20 flex items-center justify-center">
               <Bell className="w-6 h-6 animate-spin text-amber-200" />

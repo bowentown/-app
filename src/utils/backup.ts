@@ -18,7 +18,8 @@ export interface FullBackup {
   profile: Record<string, unknown> | null;
   travel: Record<string, unknown> | null;
   moments: unknown[];
-  chat: unknown[];
+  // 多会话（chatStore v1）起为 {v:1,sessions,activeId}；旧版平铺数组。形状校验由 loadChatState 承担
+  chat: unknown;
   petPrefs: { skin?: string; bubbleEvery?: number; enabled?: boolean };
 }
 
@@ -79,7 +80,9 @@ export function buildFullBackup(): FullBackup {
     profile: profile as Record<string, unknown> | null,
     travel: travel as Record<string, unknown> | null,
     moments: Array.isArray(moments) ? moments : [],
-    chat: Array.isArray(chat) ? chat : [],
+    // chat 形状 v1 起为 {v:1,sessions,activeId}（多会话，chatStore）；旧版为平铺数组。
+    // 对象形状也必须带出——此前 Array.isArray 守卫把多会话聊天静默排除出全量备份
+    chat: chat !== null && (Array.isArray(chat) || (typeof chat === 'object' && Array.isArray((chat as { sessions?: unknown }).sessions))) ? chat : [],
     petPrefs: {
       skin: skin || undefined,
       bubbleEvery: Number.isFinite(bubbleEvery) ? bubbleEvery : undefined,
@@ -137,8 +140,12 @@ export function restoreFullBackup(data: FullBackup): {
   if (Array.isArray(data.moments)) {
     localStorage.setItem(KEYS.moments, JSON.stringify(data.moments));
   }
-  if (Array.isArray(data.chat)) {
-    localStorage.setItem(KEYS.chat, JSON.stringify(data.chat));
+  {
+    const c = data.chat as unknown;
+    // 平铺数组（旧备份）与多会话对象（新备份）都原样落盘——形状校验由
+    // loadChatState 承担（它对两种形状都能迁移/读取）
+    const ok = Array.isArray(c) || (c !== null && typeof c === 'object' && Array.isArray((c as { sessions?: unknown }).sessions));
+    if (ok) localStorage.setItem(KEYS.chat, JSON.stringify(c));
   }
   if (data.petPrefs?.skin) localStorage.setItem(KEYS.skin, data.petPrefs.skin);
   if (typeof data.petPrefs?.bubbleEvery === 'number') {

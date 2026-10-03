@@ -54,6 +54,8 @@ interface SimOptions {
   mode?: 'normal' | 'allnighter' | 'uniform' | 'sparse';
   pickupTimesMin?: number[];      // 每晚起夜时刻（时钟分钟）
   seed?: number;
+  lastNightBedMin?: number;       // 最近一晚（i=0）单独的作息（漂移回归用）
+  lastNightWakeMin?: number;
 }
 function simulateEvents(o: SimOptions): { events: number[]; observedUntil: number } {
   const rng = mulberry32(o.seed ?? 20261003);
@@ -64,11 +66,14 @@ function simulateEvents(o: SimOptions): { events: number[]; observedUntil: numbe
   const nd = new Date(now);
   let ws0 = new Date(nd.getFullYear(), nd.getMonth(), nd.getDate(), o.wsHour, 0, 0, 0).getTime();
   if (ws0 > now) ws0 -= 86400000;
-  const bedBin = Math.round((((o.bedMin - o.wsHour * 60) % 1440 + 1440) % 1440) / 15);
-  const wakeBin = Math.round((((o.wakeMin - o.wsHour * 60) % 1440 + 1440) % 1440) / 15);
   const N_WINDOWS = 14;
   for (let i = 0; i < N_WINDOWS; i++) {
     const dayStart = ws0 - i * 86400000;
+    // 最近一晚（i=0）可单独指定作息——回归第 27 轮 P0（分窗索引反了会拿最老窗当目标）
+    const bedFor = i === 0 && o.lastNightBedMin !== undefined ? o.lastNightBedMin : o.bedMin;
+    const wakeFor = i === 0 && o.lastNightWakeMin !== undefined ? o.lastNightWakeMin : o.wakeMin;
+    const bedBin = Math.round((((bedFor - o.wsHour * 60) % 1440 + 1440) % 1440) / 15);
+    const wakeBin = Math.round((((wakeFor - o.wsHour * 60) % 1440 + 1440) % 1440) / 15);
     const ob = Math.max(0, Math.min(96, Math.floor((now - dayStart) / 900000) + 1));
     for (let b = 0; b < ob; b++) {
       let rate: number;
@@ -170,6 +175,13 @@ const ok = (r: ReturnType<typeof fitSleepModel>) => r.status === 'ok' ? r : null
   const r7 = ok(runNight({ now: atTime(16, 0), seed: 77 }));
   check('A7 次日 16:00 打开：提议昨夜', r7 !== null && circularDiff(minutesOf(r7.bedtime), 23 * 60) <= 90,
     r7 ? `${r7.bedtime}/${r7.wakeTime}` : '');
+
+  // A8 作息漂移回归（第 27 轮 P0）：13 晚 23:00–07:00 + 最近一晚 01:30–09:30，
+  // 09:30 打开 → 必须提议【最近一晚】。分窗索引反了会把 13 天前那晚当目标（23:00）
+  const r8 = ok(runNight({ now: atTime(9, 30), seed: 88, lastNightBedMin: 90, lastNightWakeMin: 570 }));
+  check('A8 作息漂移：提议的是最近一晚（01:30），不是历史作息',
+    r8 !== null && circularDiff(minutesOf(r8.bedtime), 90) <= 75 && circularDiff(minutesOf(r8.bedtime), 23 * 60) > 75,
+    r8 ? `${r8.bedtime}/${r8.wakeTime}` : '');
 }
 
 // ── B 组：应拒绝（且不回退旧算法）──

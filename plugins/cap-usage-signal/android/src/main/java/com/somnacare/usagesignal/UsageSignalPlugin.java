@@ -33,9 +33,10 @@ import java.util.Locale;
  * 文案红线（由调用方遵守）：可以说"手机显示你 00:20 放下手机"，
  * 不可以说"你 00:20 入睡"——放下手机 ≠ 睡着。
  *
- * API 级别兼容：SCREEN_INTERACTIVE(15)/SCREEN_NON_INTERACTIVE(16) 约 API 28+
- * 才由系统产生；API 24–27 自动降级到 KEYGUARD_SHOWN(17)/KEYGUARD_HIDDEN(18)。
- * int 常量编译期内联，低版本引用不会崩——系统不产生这些事件即自然降级。
+ * API 级别事实（AOSP 实证）：SCREEN_INTERACTIVE(15)/NON_INTERACTIVE(16) 与
+ * KEYGUARD_SHOWN(17)/HIDDEN(18) 是同一批（API 28+）才出现的常量——API 24–27
+ * 没有任何 KEYGUARD 降级路径，两个查询都返回空。int 常量编译期内联不会崩，
+ * 运行时自然退化为空数据 → 模型 insufficient → 回退旧启发式（优雅降级）。
  */
 @CapacitorPlugin(name = "UsageSignal")
 public class UsageSignalPlugin extends Plugin {
@@ -219,11 +220,18 @@ public class UsageSignalPlugin extends Plugin {
             UsageEvents events = usm.queryEvents(begin, now);
             UsageEvents.Event ev = new UsageEvents.Event();
             JSArray arr = new JSArray();
+            long lastOnTs = -1;
             while (events.hasNextEvent()) {
                 events.getNextEvent(ev);
                 int type = ev.getEventType();
                 boolean on = type == EVT_SCREEN_INTERACTIVE || type == EVT_KEYGUARD_HIDDEN;
-                if (on) arr.put(ev.getTimeStamp());
+                if (!on) continue;
+                // 与 queryDailyUsage 同口径：一次拿起通常同时产生亮屏+解锁两事件，
+                // 5s 内合并计 1——不去重会把清醒段密度系统性放大约 2 倍，
+                // 模型的 λ 对比度闸门（≥8）实际放水一半
+                if (lastOnTs >= 0 && ev.getTimeStamp() - lastOnTs < 5000) continue;
+                lastOnTs = ev.getTimeStamp();
+                arr.put(ev.getTimeStamp());
             }
             JSObject ret = new JSObject();
             ret.put("events", arr);
