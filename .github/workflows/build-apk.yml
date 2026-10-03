@@ -22,10 +22,12 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
-      - name: Set up Node.js 20
+      - name: Set up Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # Capacitor 8 CLI 硬性要求 Node >= 22（npm 只告 EBADENGINE，
+          # npx cap 运行时才硬失败——必须在这里对齐）
+          node-version: 22
 
       - name: Locate App Source & Normalize Root
         run: |
@@ -122,8 +124,8 @@ jobs:
           sed -i 's|</application>|<service android:name="com.somnacare.gemmallm.EyeCareService" android:exported="false" android:foregroundServiceType="specialUse"><property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="eye_care_overlay_filter"/></service><service android:name="com.somnacare.gemmallm.BedtimeOverlayService" android:exported="false" android:foregroundServiceType="specialUse"><property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="bedtime_reminder_overlay"/></service><service android:name="com.somnacare.gemmallm.PetOverlayService" android:exported="false" android:foregroundServiceType="specialUse"><property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="desktop_pet_overlay"/></service><receiver android:name="com.somnacare.gemmallm.BedtimeAlarmReceiver" android:exported="false" /><receiver android:name="com.somnacare.gemmallm.AlarmRingReceiver" android:exported="false" /><service android:name="com.somnacare.gemmallm.AlarmRingService" android:exported="false" android:foregroundServiceType="specialUse"><property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="alarm_ring_loop"/></service><receiver android:name="com.somnacare.gemmallm.BootReceiver" android:exported="false"><intent-filter><action android:name="android.intent.action.BOOT_COMPLETED" /></intent-filter></receiver><service android:name="com.somnacare.gemmallm.EyeCareTileService" android:label="护眼滤镜" android:permission="android.permission.BIND_QUICK_SETTINGS_TILE" android:exported="true"><intent-filter><action android:name="android.service.quicksettings.action.QS_TILE" /></intent-filter></service></application>|' android/app/src/main/AndroidManifest.xml
 
 
-          # MediaPipe 要求 minSdk ≥ 24（Capacitor 模板默认 23）
-          sed -i 's/minSdkVersion = 23/minSdkVersion = 24/' android/variables.gradle
+          # MediaPipe 要求 minSdk ≥ 24（宽匹配：不同 CLI 大版本的模板默认值可能是 23 或更高）
+          sed -i 's/minSdkVersion = [0-9]*/minSdkVersion = 24/' android/variables.gradle
 
           # sed 注入必须命中断言：模板结构变化导致静默不命中时，权限/服务缺失
           # 只会在运行期表现为"闹钟不响/滤镜打不开"——必须在 CI 就拦住
