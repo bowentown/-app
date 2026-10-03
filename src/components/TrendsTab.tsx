@@ -470,15 +470,16 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
             <div className="flex items-center gap-2">
               <Sparkles className={`w-4 h-4 ${theme.accentText}`} />
               <h3 className="text-sm font-bold text-white">本周睡眠小结</h3>
-              <span className={`text-[10px] ${textMuted} font-mono ml-auto`}>近 {wk.length} 晚</span>
+              <span className={`text-[10px] ${textMuted} font-mono`}>近 {wk.length} 晚</span>
               {/* 分享卡入口：插画家+宠物语录+聚合数字，生成前可预览可勾选 */}
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); setShowShare(true); }}
                 aria-label="生成每周睡眠分享卡"
-                className={`ml-1 -mr-1 p-2.5 -m-1 rounded-lg ${theme.accentText} cursor-pointer active:scale-90 transition-transform`}
+                className={`ml-auto mr-1 flex items-center gap-1 px-2.5 py-1.5 -my-1.5 rounded-full ${theme.accentBg} ${theme.accentFg} text-[10px] font-bold cursor-pointer active:scale-95 transition-transform`}
               >
-                <Share2 className="w-4 h-4" />
+                <Share2 className="w-3.5 h-3.5" />
+                <span>分享</span>
               </button>
             </div>
             <div className="grid grid-cols-3 gap-2.5">

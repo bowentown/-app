@@ -18,6 +18,8 @@ import type { TravelPostcard } from '../types/travel';
 import { toLocalDateString } from '../utils/dateUtils';
 import { PostcardCard } from './travel/PostcardCard';
 import { TravelCodexModal } from './travel/TravelCodexModal';
+import { ShareCardModal } from './ShareCardModal';
+import { APP_THEMES } from '../utils/themeStyles';
 import { getTravelProgress } from '../services/travelService';
 
 interface Props {
@@ -136,6 +138,7 @@ export const MomentsOverlay: React.FC<Props> = ({ records, userProfile, onClose 
   const [draft, setDraft] = useState('');
   const [note, setNote] = useState<string | null>(null);
   const [showCodex, setShowCodex] = useState(false);
+  const [showShareCard, setShowShareCard] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const travelProgress = getTravelProgress();
@@ -368,6 +371,12 @@ export const MomentsOverlay: React.FC<Props> = ({ records, userProfile, onClose 
         </div>
 
       {showCodex && <TravelCodexModal onClose={() => setShowCodex(false)} />}
+      <ShareCardModal
+        open={showShareCard}
+        onClose={() => setShowShareCard(false)}
+        records={records}
+        theme={APP_THEMES[userProfile.themeColor as keyof typeof APP_THEMES] || APP_THEMES.midnight}
+      />
     </div>
   );
 };
