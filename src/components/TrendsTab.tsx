@@ -476,7 +476,7 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
                 type="button"
                 onClick={(e) => { e.stopPropagation(); setShowShare(true); }}
                 aria-label="生成每周睡眠分享卡"
-                className={`ml-auto mr-1 flex items-center gap-1 px-2.5 py-1.5 -my-1.5 rounded-full ${theme.accentBg} ${theme.accentFg} text-[10px] font-bold cursor-pointer active:scale-95 transition-transform`}
+                className={`ml-auto mr-1 flex items-center gap-1 px-2.5 py-2.5 -my-2 -my-1.5 rounded-full ${theme.accentBg} ${theme.accentFg} text-[10px] font-bold cursor-pointer active:scale-95 transition-transform`}
               >
                 <Share2 className="w-3.5 h-3.5" />
                 <span>分享</span>
@@ -614,7 +614,7 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
                     <span className={`${textMuted} font-medium shrink-0`}>夜间拿起 {d.nightPickups} 次</span>
                   </div>
                 ))}
-                <p className="text-[10px] text-slate-500 leading-relaxed">
+                <p className="text-[10px] text-slate-400 leading-relaxed">
                   基于手机使用记录（屏幕亮灭），不是睡眠监测；"放下手机"不等于入睡。
                 </p>
               </div>

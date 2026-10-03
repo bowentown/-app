@@ -72,8 +72,13 @@ export const App: React.FC = () => {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
           // 与导入路径共用同一条清洗：畸形记录（缺 bedtime / null 项 / 坏值）
-          // 此前会直接把首页打崩（.split 抛错）或产出 NaN
-          return parsed.map(sanitizeRecord).filter((r): r is SleepRecord => r !== null);
+          // 此前会直接把首页打崩（.split 抛错）或产出 NaN。
+          // 排序与导入路径同契约：records[0] 必须是最近一晚——升序存储
+          // （早期版本/外部播种）会让趋势轴反转、首页指向最老一条
+          return parsed
+            .map(sanitizeRecord)
+            .filter((r): r is SleepRecord => r !== null)
+            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         }
       } catch (e) {
         console.error('Failed to parse saved records, backed up corrupted key:', e);

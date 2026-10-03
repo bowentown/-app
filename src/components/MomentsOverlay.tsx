@@ -207,20 +207,33 @@ export const MomentsOverlay: React.FC<Props> = ({ records, userProfile, onClose 
       className="fixed inset-0 z-[90] flex flex-col bg-slate-950"
       style={{ backgroundColor: '#020617' }}
     >
-      {/* 顶栏：独立页签样式 */}
-      <div className="shrink-0 flex items-center justify-between px-4 pt-3 pb-2.5 border-b border-slate-800/80">
-        <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-400 to-blue-600 flex items-center justify-center text-xl">🐋</div>
-          <div>
-            <p className="text-xs font-black text-white leading-tight">大肥鱼的朋友圈</p>
-            <p className="text-[9px] text-slate-500">蓝色大肥鱼 · 聪明但懒 · 事已至此，先吃饭吧</p>
+      {/* 顶栏：两行布局——第 20 轮实测 5 个胶囊 + 标题挤在 390px 一行里，
+          flex 默认收缩到 min-content（中文 = 一个字），标题和胶囊全部竖排。
+          行 1：头像+标题（min-w-0 truncate）+ 关闭；行 2：胶囊横向滚动 */}
+      <div className="shrink-0 px-4 pt-3 pb-2.5 border-b border-slate-800/80 space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-400 to-blue-600 flex items-center justify-center text-xl shrink-0">🐋</div>
+            <div className="min-w-0">
+              <p className="text-xs font-black text-white leading-tight truncate">大肥鱼的朋友圈</p>
+              <p className="text-[9px] text-slate-500 truncate">蓝色大肥鱼 · 聪明但懒 · 事已至此，先吃饭吧</p>
+            </div>
           </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-8 h-8 rounded-full bg-slate-800/80 border border-slate-700 text-white flex items-center justify-center cursor-pointer active:scale-90 transition-transform shrink-0"
+            aria-label="关闭朋友圈"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="relative">
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
           <button
             type="button"
             onClick={() => setShowShareCard(true)}
-            className="px-2.5 py-1.5 rounded-full bg-indigo-950/80 border border-indigo-700/60 text-[10px] font-bold text-indigo-200 flex items-center gap-1 cursor-pointer active:scale-95 transition-transform"
+            className="shrink-0 whitespace-nowrap px-2.5 py-1.5 rounded-full bg-indigo-950/80 border border-indigo-700/60 text-[10px] font-bold text-indigo-200 flex items-center gap-1 cursor-pointer active:scale-95 transition-transform"
           >
             <span>🖼️</span>
             <span>睡眠卡</span>
@@ -243,7 +256,7 @@ export const MomentsOverlay: React.FC<Props> = ({ records, userProfile, onClose 
           <button
             type="button"
             onClick={() => setShowCodex(true)}
-            className="px-2.5 py-1.5 rounded-full bg-indigo-950/80 border border-indigo-700/60 text-[10px] font-bold text-indigo-200 flex items-center gap-1 cursor-pointer active:scale-95 transition-transform"
+            className="shrink-0 whitespace-nowrap px-2.5 py-1.5 rounded-full bg-indigo-950/80 border border-indigo-700/60 text-[10px] font-bold text-indigo-200 flex items-center gap-1 cursor-pointer active:scale-95 transition-transform"
           >
             <span>🗺️</span>
             <span>图鉴 {travelProgress.unlockedCount}/{travelProgress.totalCount}</span>
@@ -252,19 +265,14 @@ export const MomentsOverlay: React.FC<Props> = ({ records, userProfile, onClose 
             type="button"
             onClick={() => void regenerate()}
             disabled={busy}
-            className="px-2.5 py-1.5 rounded-full bg-white/10 border border-white/20 text-[10px] font-bold text-white flex items-center gap-1 cursor-pointer disabled:opacity-40 active:scale-95 transition-transform"
+            className="shrink-0 whitespace-nowrap px-2.5 py-1.5 rounded-full bg-white/10 border border-white/20 text-[10px] font-bold text-white flex items-center gap-1 cursor-pointer disabled:opacity-40 active:scale-95 transition-transform"
           >
             {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
             生成今日动态
           </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-8 h-8 rounded-full bg-slate-800/80 border border-slate-700 text-white flex items-center justify-center cursor-pointer active:scale-90 transition-transform"
-            aria-label="关闭"
-          >
-            <X className="w-4 h-4" />
-          </button>
+        </div>
+        {/* 右缘渐隐：胶囊可横向滚动（no-scrollbar 藏了滚动条） */}
+        <div aria-hidden className="pointer-events-none absolute right-0 top-0 bottom-0 w-8" style={{ background: 'linear-gradient(90deg, transparent, #020617)' }} />
         </div>
       </div>
 

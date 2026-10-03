@@ -1,0 +1,42 @@
+/**
+ * 元护栏：所有 tools/verify-*.mts 必须被 package.json 的 verify 链引用。
+ *
+ * 背景（第 20 轮）：verify-share-layout / verify-share-privacy 两条护栏
+ * 写好了、手动跑全绿，但少了一行 && 接线，CI 里一次都没跑——
+ * "护栏自己没被护栏管住"。本护栏扫 tools/verify-*.mts 与两条链
+ * （verify 与 verify:css），逐个断言被引用；新增护栏忘了接线就在这里红。
+ *
+ * 方法论约束：护栏必须能反向验证——伪造一个未接线的护栏文件名必须报红。
+ */
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const ROOT = fileURLToPath(new URL('..', import.meta.url));
+const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf-8'));
+const wired = `${pkg.scripts.verify ?? ''} ${pkg.scripts['verify:css'] ?? ''}`;
+
+const guardFiles = readdirSync(join(ROOT, 'tools'))
+  .filter((f) => /^verify-[\w-]+\.mts$/.test(f))
+  .sort();
+
+const missing = guardFiles.filter((f) => !wired.includes(f));
+
+if (missing.length > 0) {
+  console.error('✗ verify-guards-wired：以下护栏未接入 package.json 的 verify/verify:css 链（CI 不会执行）：');
+  for (const m of missing) console.error('   ' + m);
+  console.error('   新护栏写完请追加到 scripts.verify（需要构建产物的加到 verify:css）。');
+  process.exit(1);
+}
+
+// 反向自检：伪造一个"未接线护栏"名单必须被检出
+{
+  const fake = [...guardFiles, 'verify-fake-guard.mts'];
+  const bad = fake.filter((f) => !wired.includes(f));
+  if (!(bad.length === 1 && bad[0] === 'verify-fake-guard.mts')) {
+    console.error('✗ verify-guards-wired：自检失败——伪造的未接线护栏未被检出');
+    process.exit(1);
+  }
+}
+
+console.log(`✓ verify-guards-wired：${guardFiles.length} 条护栏全部接入 CI 执行链`);
