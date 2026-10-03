@@ -58,6 +58,8 @@ export function sanitizeRecord(raw: unknown): SleepRecord | null {
     // 白名单漏字段 = 挂载写回时静默丢数据：latencyEstimated 曾被这里抹掉，
     // AI 把按时作息推算的潜伏期当成实测值讲（第七轮§3①）
     latencyEstimated: typeof r.latencyEstimated === 'boolean' ? r.latencyEstimated : undefined,
+    // 白名单加 kind：nap-only 落字段（'night'/缺省不写，旧数据 JSON 形状一字不变）
+    kind: r.kind === 'nap' ? 'nap' : undefined,
     wakeCount: Math.max(0, Math.round(numOr(r.wakeCount, 0))),
     wakingMood: (['refreshed', 'neutral', 'tired', 'groggy'].includes(r.wakingMood as string)
       ? r.wakingMood

@@ -17,17 +17,20 @@ export interface RegularityResult {
 
 // 数学口径下沉到 clockMath（P3 手机使用规律度共用同一套 MAD/映射），
 // 行为不变——verify-regularity 护栏继续做反向验证
-import { bedClockAxis as bedAxis, clockMinutes as wakeAxis, madFromMedian, deviationToScore } from './clockMath';
+import { circularDev, clockMinutes, deviationToScore } from './clockMath';
+import { nightsOnly } from './recordFilter';
 
 /**
  * 近 7 晚规律度（records 需按日期降序，records[0] 最新）。
  * 少于 3 晚返回 null——不显示假数字。
  */
 export function computeRegularity(records: SleepRecord[]): RegularityResult | null {
-  const wk = records.slice(0, 7);
+  // 纵深防御：即使调用点漏过滤，本函数也不把小睡算进规律度
+  const wk = nightsOnly(records).slice(0, 7);
   if (wk.length < 3) return null;
-  const bedDev = Math.round(madFromMedian(wk.map((r) => bedAxis(r.bedtime))));
-  const wakeDev = Math.round(madFromMedian(wk.map((r) => wakeAxis(r.wakeTime))));
+  // 圆周统计（修 D2）：任何日界断点（12:00/0:00）都不再制造人为偏差
+  const bedDev = Math.round(circularDev(wk.map((r) => clockMinutes(r.bedtime))));
+  const wakeDev = Math.round(circularDev(wk.map((r) => clockMinutes(r.wakeTime))));
   const avgDev = (bedDev + wakeDev) / 2;
   const score = deviationToScore(avgDev);
   return { nights: wk.length, bedDev, wakeDev, avgDev: Math.round(avgDev), score };

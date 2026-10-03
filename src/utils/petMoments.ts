@@ -7,6 +7,7 @@
  */
 import { TRIP_ENERGY_TARGET } from '../services/travelService';
 import type { SleepRecord, UserProfile } from '../types/sleep';
+import { nightsOnly } from './recordFilter';
 
 export interface MomentComment {
   friend: string;
@@ -145,7 +146,7 @@ export function buildSleepFacts(
   const bedtime = profile?.targetBedtime ?? '23:30';
   const today = todayStr(now);
   const lastNight = records.find((r) => r.date === today);
-  const week = records.slice(0, 7);
+  const week = nightsOnly(records as SleepRecord[]).slice(0, 7);
 
   facts.push(`就寝目标 ${bedtime}`);
   if (lastNight) {

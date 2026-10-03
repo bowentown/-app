@@ -25,7 +25,9 @@ export interface SleepRecord {
   /** 入睡潜伏期是用户实测（收尾弹窗滑块）还是系统估算（一键就寝的启发式） */
   latencyEstimated?: boolean;
   /** 记录来源：一键就寝 / 手动补录 / 手机使用提议（诚实边界用，旧数据缺省） */
-  recordSource?: 'onetap' | 'manual' | 'usage'; // time to fall asleep
+  recordSource?: 'onetap' | 'manual' | 'usage';
+  /** 这段睡眠是夜睡还是小睡。旧数据缺省视为 'night'（向后兼容）；只在 'nap' 时落字段 */
+  kind?: 'night' | 'nap'; // time to fall asleep
   wakeCount: number;
   wakingMood: WakingMood;
   preSleepHabits: string[]; // e.g. ['reading', 'screen_time', 'caffeine', 'hot_bath', 'meditation']
@@ -134,6 +136,8 @@ export interface UserProfile {
   brightnessLevel: number; // 0 - 100% app display brightness / dimming
   warmthFilter: boolean; // eye protection amber warm tint
   eyeCare?: EyeCareConfig;
+  /** 作息类型：决定自动记录（提议）的采样窗口。缺省 night 与现状一致 */
+  chronotype?: 'night' | 'day' | 'irregular';
   bedtimeReminderEnabled?: boolean; // 到点提醒我（默认关闭；开启后按作息目标弹出提醒动画）
   alarms?: CustomAlarmSetting[];
   aiConfig?: CustomAIConfig;

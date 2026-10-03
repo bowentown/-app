@@ -27,6 +27,7 @@ import {
 } from '../utils/localLlmEngine';
 import { ThemeConfig } from '../utils/themeStyles';
 import { stripMd } from '../utils/markdown';
+import { nightsOnly } from '../utils/recordFilter';
 import { attachHScroll } from '../utils/hscroll';
 import { MomentsOverlay } from './MomentsOverlay';
 
@@ -166,7 +167,7 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
   // 云端引擎注入的个人数据上下文（让云端回答引用真实数字）
   const personalCtx = useMemo(() => {
     if (records.length === 0) return '';
-    const recent = records.slice(0, 7);
+    const recent = nightsOnly(records).slice(0, 7);
     const avg = (f: (r: SleepRecord) => number) => Math.round(recent.reduce((a, r) => a + f(r), 0) / recent.length);
     const parts = [
       `用户近${recent.length}晚平均评分${avg((r) => r.sleepScore)}分、平均时长${(avg((r) => r.durationMinutes) / 60).toFixed(1)}小时、深睡占比${Math.round(
@@ -195,7 +196,7 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          recentLogs: records.slice(0, 7),
+          recentLogs: nightsOnly(records).slice(0, 7),
           userProfile,
           aiConfig: userProfile.aiConfig,
         }),
@@ -448,7 +449,7 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
         body: JSON.stringify({
           message: text,
           history: newHistory.slice(-6),
-          recentLogs: records.slice(0, 3),
+          recentLogs: nightsOnly(records).slice(0, 3),
           userProfile,
           aiConfig: userProfile.aiConfig,
         }),

@@ -79,9 +79,11 @@ public class UsageSignalPlugin extends Plugin {
     private static final class NightAgg {
         String dateKey;
         long lastActive = -1;      // 最后一次"屏幕灭"
-        long firstActive = -1;     // 晨窗第一次亮屏（早上第一次拿起手机）
+        long firstActive = -1;     // 醒来窗第一次亮屏
         long lastPickupAt = -1;    // 去重：一次拿起常同时产生亮屏+解锁两事件
         int nightPickups = 0;
+        // 窗内亮屏时刻（后处理：只数 [lastActive, firstActive) 之间的）
+        final java.util.List<Long> onTimes = new java.util.ArrayList<>();
     }
 
     @PluginMethod
@@ -93,6 +95,10 @@ public class UsageSignalPlugin extends Plugin {
         int days = call.getInt("days", 7);
         if (days < 1) days = 1;
         if (days > 14) days = 14;
+        // 作息类型切换采样窗口（第 20 轮 D3）：夜班/白睡者此前会被
+        // "自信地写错"（22:00 熄屏 → 07:00 亮屏被当成一夜）
+        String chronotype = call.getString("chronotype", "night");
+        boolean isDay = "day".equals(chronotype);
 
         try {
             Context ctx = getContext();
@@ -137,20 +143,22 @@ public class UsageSignalPlugin extends Plugin {
                 }
 
                 if (off) {
-                    // 夜窗（18:00–次日 06:00）内的熄屏 → "放下手机"（最后一次为准）
-                    if (hour >= 18 || hour < 6) agg.lastActive = t;
+                    // 熄屏 → "放下手机"（最后一次为准）。
+                    // 夜间作息：18:00–次日 06:00；白天作息：06:00–18:00
+                    if (isDay ? (hour >= 6 && hour < 18) : (hour >= 18 || hour < 6)) agg.lastActive = t;
                 } else {
-                    // 夜间拿起（22:00–次日 06:00）：一次拿起通常同时产生
-                    // 亮屏+解锁两事件，5 秒内合并计 1 次（否则双倍计数）
-                    if ((hour >= 22 || hour < 6)
-                            && (agg.lastPickupAt < 0 || t - agg.lastPickupAt >= 5000)) {
-                        agg.nightPickups++;
+                    // 拿起：一次拿起通常同时产生亮屏+解锁两事件，5s 内合并计 1 次。
+                    // 计数窗与放下窗一致（放下与拿起之间的亮屏 = 睡眠中的拿起），
+                    // 由后置的"lastActive < t < firstActive"判定收紧
+                    if (agg.lastPickupAt < 0 || t - agg.lastPickupAt >= 5000) {
+                        agg.onTimes.add(t);
                         agg.lastPickupAt = t;
                     }
-                    // 早上第一次拿起手机：晨窗（04:00–12:00）首次亮屏。
-                    // 口径刻意简单可解释——"距上次交互 ≥4h"会被半夜一瞥
-                    // 抹掉真起床（第 19 轮 §1.4），这里以首次亮屏为准
-                    if (hour >= 4 && hour < 12 && agg.firstActive < 0) {
+                    // 醒来：放下窗之后的第一次亮屏（口径简单可解释）。
+                    // 夜间作息：04:00–12:00；白天作息：12:00–20:00
+                    int wakeFrom = isDay ? 12 : 4;
+                    int wakeTo = isDay ? 20 : 12;
+                    if (hour >= wakeFrom && hour < wakeTo && agg.firstActive < 0) {
                         agg.firstActive = t;
                     }
                 }
@@ -158,12 +166,17 @@ public class UsageSignalPlugin extends Plugin {
 
             JSArray arr = new JSArray();
             for (NightAgg a : buckets.values()) {
-                if (a.lastActive < 0 && a.firstActive < 0) continue;   // 纯白天噪音，跳过
+                if (a.lastActive < 0 || a.firstActive < 0) continue;   // 未配对成一夜，跳过
+                // 拿起次数 = [放下, 醒来) 之间的亮屏（放下前的亮屏是上床前使用，不算）
+                int pickups = 0;
+                for (Long on : a.onTimes) {
+                    if (on > a.lastActive && on < a.firstActive) pickups++;
+                }
                 JSObject o = new JSObject();
                 o.put("date", a.dateKey);
-                o.put("lastActive", a.lastActive > 0 ? hm.format(new Date(a.lastActive)) : "");
-                o.put("firstActive", a.firstActive > 0 ? hm.format(new Date(a.firstActive)) : "");
-                o.put("nightPickups", a.nightPickups);
+                o.put("lastActive", hm.format(new Date(a.lastActive)));
+                o.put("firstActive", hm.format(new Date(a.firstActive)));
+                o.put("nightPickups", pickups);
                 arr.put(o);
             }
             JSObject ret = new JSObject();

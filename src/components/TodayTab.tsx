@@ -11,6 +11,8 @@ import {
 import { SleepRecord, UserProfile } from '../types/sleep';
 import { formatDurationChinese } from '../utils/sleepScore';
 import { OneTapSleepTracker } from './OneTapSleepTracker';
+import { nightsOnly, napsOnly } from '../utils/recordFilter';
+import { toLocalDateString } from '../utils/dateUtils';
 import { SoundscapePlayer } from './SoundscapePlayer';
 import { Music2 } from 'lucide-react';
 import { ThemeConfig } from '../utils/themeStyles';
@@ -52,7 +54,9 @@ export const TodayTab: React.FC<TodayTabProps> = ({
   startSignal,
   theme,
 }) => {
-  const latestRecord = records[0] || null;
+  // 首页主卡只显示夜睡（小睡另有紧凑行）——旧数据无 kind 视为夜睡
+  const latestRecord = nightsOnly(records)[0] || null;
+  const todayNaps = napsOnly(records).filter((r) => r.date === toLocalDateString());
   const [goalOpen, setGoalOpen] = useState(false);
   // 睡前提醒的悬浮窗授权态：null=未检查。此前开关只翻布尔、不申请任何权限，
   // 提醒的投递路径（悬浮窗 > 通知兜底）在 Android 13+ 上会静默全部失效
@@ -89,7 +93,22 @@ export const TodayTab: React.FC<TodayTabProps> = ({
   return (
     <div className={`space-y-4 pb-28 ${theme.textPrimary}`}>
       {/* 1. Primary One-Tap Sleep Tracker */}
-      {onSaveRecord && <OneTapSleepTracker onSaveRecord={onSaveRecord} startSignal={startSignal} theme={theme} targetDurationHours={userProfile.targetDurationHours} records={records} onOpenManualLogPrefilled={onOpenManualLogPrefilled} />}
+      {onSaveRecord && <OneTapSleepTracker onSaveRecord={onSaveRecord} startSignal={startSignal} theme={theme} targetDurationHours={userProfile.targetDurationHours} records={records} userProfile={userProfile} onOpenManualLogPrefilled={onOpenManualLogPrefilled} />}
+
+      {/* 当天小睡紧凑行（主卡只显示夜睡；小睡不顶掉主卡） */}
+      {todayNaps.length > 0 && (
+        <div className={`${theme.cardBg} rounded-2xl px-4 py-3 border ${theme.cardBorder} flex items-center gap-2 text-[11px]`}>
+          <span>😴</span>
+          <span className="font-bold text-white">
+            今天已小睡 {todayNaps.length} 次 · 共{' '}
+            {Math.floor(todayNaps.reduce((a, r) => a + r.durationMinutes, 0) / 60) > 0
+              ? `${Math.floor(todayNaps.reduce((a, r) => a + r.durationMinutes, 0) / 60)} 小时 `
+              : ''}
+            {todayNaps.reduce((a, r) => a + r.durationMinutes, 0) % 60} 分
+          </span>
+          <span className="text-slate-500 ml-auto">不计入规律度</span>
+        </div>
+      )}
 
       {/* 2. Last Sleep Overview Card with Unified Theme Colors */}
       {latestRecord ? (

@@ -1,5 +1,6 @@
 import { SleepRecord } from '../types/sleep';
 import { calculateSleepScore, generateSleepStages } from './sleepScore';
+import { deriveKind } from './recordFilter';
 
 /**
  * 记录构建器：把"就寝/醒来时刻窗"转成一条 SleepRecord。
@@ -112,6 +113,7 @@ export function buildRecordFromWindow(input: BuildInput): BuiltRecord {
     wakingMood: exactDurationMinutes < 30 ? 'tired' : 'refreshed',
     preSleepHabits: [],
     stages: stagesForRecord,
+    kind: deriveKind(effectiveStart.getHours()) === 'nap' ? 'nap' : undefined,
     ...(input.recordSource ? { recordSource: input.recordSource } : {}),
   } as SleepRecord;
 

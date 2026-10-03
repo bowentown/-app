@@ -282,7 +282,48 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         )}
       </div>
 
-      {/* 4. 大肥鱼桌宠悬浮窗（配色跟主题走——纯黑主题下是天蓝会很刺眼） */}
+            {/* 3.5 作息类型（决定自动记录提议的适用时段；选"不规律"则不做自动提议） */}
+      <div className={`${theme.cardBg} rounded-3xl p-5 border ${theme.cardBorder} shadow-xl space-y-3`}>
+        <div className="flex items-center gap-2.5">
+          <div className={`w-9 h-9 rounded-2xl ${theme.cardInnerBg} ${theme.accentText} flex items-center justify-center border ${theme.cardBorder}`}>
+            <Moon className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="text-sm font-black text-white">我的作息</h3>
+            <p className="text-[10px] text-slate-400">用来决定自动记录提议的适用时段；选"不规律"就不做自动提议</p>
+          </div>
+        </div>
+        <div className="flex gap-1.5">
+          {([
+            { key: 'night', label: '夜间为主' },
+            { key: 'day', label: '白天为主' },
+            { key: 'irregular', label: '不规律' },
+          ] as const).map((opt) => {
+            const active = (userProfile.chronotype ?? 'night') === opt.key;
+            return (
+              <button
+                key={opt.key}
+                type="button"
+                onClick={() => onUpdateProfile({ chronotype: opt.key })}
+                aria-pressed={active}
+                className={`flex-1 py-2.5 rounded-xl text-[11px] font-bold border transition-all cursor-pointer active:scale-95 ${
+                  active ? `${theme.accentText} border ${theme.accentBorder}` : 'bg-slate-800 border-slate-600 text-slate-400'
+                }`}
+                style={active ? { background: `${theme.accentHex}14` } : undefined}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+        {(userProfile.chronotype ?? 'night') === 'irregular' && (
+          <p className="text-[10px] text-slate-400 leading-relaxed">
+            已关闭自动提议：作息不规律时，自动推断更容易出错。手动补录不受影响。
+          </p>
+        )}
+      </div>
+
+{/* 4. 大肥鱼桌宠悬浮窗（配色跟主题走——纯黑主题下是天蓝会很刺眼） */}
       <div className={`${theme.cardBg} rounded-3xl p-5 border ${theme.cardBorder} shadow-xl space-y-3`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">

@@ -12,6 +12,7 @@
 import { SleepRecord } from '../types/sleep';
 import type { TravelPostcard } from '../types/travel';
 import { computeRegularity, RegularityResult } from './sleepRegularity';
+import { nightsOnly } from './recordFilter';
 import { loadTravelState } from '../services/travelService';
 import { getPostcardById, thumbUrlOf } from '../data/travelPostcards';
 
@@ -179,7 +180,7 @@ export async function renderWeeklyCard(input: WeeklyCardInput): Promise<WeeklyCa
   const records = input.records;
   const regularity = computeRegularity(records);
   const avgDurationMin = records.length > 0
-    ? Math.round(records.slice(0, 7).reduce((a, r) => a + r.durationMinutes, 0) / Math.min(7, records.length))
+    ? Math.round(nightsOnly(records).slice(0, 7).reduce((a, r) => a + r.durationMinutes, 0) / Math.min(7, nightsOnly(records).length))
     : null;
 
   const canvas = document.createElement('canvas');

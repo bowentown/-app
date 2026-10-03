@@ -15,11 +15,11 @@ function emit() {
 }
 
 /** 幂等加载：已加载/加载中直接复用；仅 native 且未加载才真的查。 */
-export function ensureUsageLoaded(days = 2): Promise<UsageDay[]> {
-  if (!isNativePlatform()) return Promise.resolve([]);
+export function ensureUsageLoaded(days = 2, chronotype: 'night' | 'day' | 'irregular' = 'night'): Promise<UsageDay[]> {
+  if (!isNativePlatform() || chronotype === 'irregular') return Promise.resolve([]);
   if (cache) return Promise.resolve(cache);
   if (loading) return loading;
-  loading = refreshUsageDays(days)
+  loading = refreshUsageDays(days, chronotype)
     .then((list) => {
       cache = list;
       emit();

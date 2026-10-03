@@ -10,7 +10,8 @@
  * 本实现通过 epoch 重建（§3.2 gate 链之后由 verify-proposal 反向注入验证）。
  */
 import { SleepRecord } from '../types/sleep';
-import { bedClockAxis, median } from './clockMath';
+import { bedClockAxis, median, shortArc, clockMinutes } from './clockMath';
+import { nightsOnly } from './recordFilter';
 import type { UsageDay } from './usageSignal';
 
 export interface Proposal {
@@ -26,6 +27,7 @@ export interface Proposal {
 
 export interface ProposalInput {
   usageDays: UsageDay[];
+  chronotype?: 'night' | 'day' | 'irregular';
   records: SleepRecord[];
   sessionActive: boolean;
   handledDate?: string | null;
@@ -48,6 +50,7 @@ function pad(n: number): string {
 
 export function computeProposal(input: ProposalInput): Proposal | null {
   const now = input.now ?? new Date();
+  if (input.chronotype === 'irregular') return null;          // gate 0：不作息者不自动提议
   if (input.sessionActive) return null;                       // gate 5：进行中不提议
   if (input.usageDays.length === 0) return null;              // 无数据（未授权/老内核）
 
@@ -78,15 +81,17 @@ export function computeProposal(input: ProposalInput): Proposal | null {
 
 
   // gate 8：置信度 = 与历史就寝中位数（近 14 晚）的偏差（用你自己的历史判据）
-  const history = input.records
+  // 置信度判据用【夜睡】历史（小睡是资产不是作息），并改用圆周短弧——
+  // 日界断点对白睡者会把高置信误判为低（D2 同源）
+  const history = nightsOnly(input.records)
     .slice(0, 14)
-    .map((r) => bedClockAxis(r.bedtime));
+    .map((r) => clockMinutes(r.bedtime));
   let confidence: 'high' | 'medium' | 'low';
   if (history.length < 3) {
     confidence = 'medium';
   } else {
     const med = median(history);
-    const diff = Math.abs(bedClockAxis(day.lastActive) - med);
+    const diff = shortArc(clockMinutes(day.lastActive), med);
     confidence = diff <= 90 ? 'high' : diff <= 180 ? 'medium' : 'low';
   }
   if (confidence === 'low') return null;                      // 低置信：不预填，走手动补录

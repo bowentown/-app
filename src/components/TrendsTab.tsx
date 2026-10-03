@@ -23,6 +23,7 @@ import {
 import { SleepRecord } from '../types/sleep';
 import { computeRegularity, regularityTier } from '../utils/sleepRegularity';
 import { ShareCardModal } from './ShareCardModal';
+import { nightsOnly, napsOnly } from '../utils/recordFilter';
 import {
   usageHasPermission,
   usageOpenSettings,
@@ -74,7 +75,7 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
 
 
   // Use up to last 7 days sorted chronologically
-  const last7Records = records.slice(0, 7).reverse();
+  const last7Records = nightsOnly(records).slice(0, 7).reverse();
   const activeRecord = hoveredRecord || last7Records[last7Records.length - 1];
 
   // Helper for SVG smooth trend line points
@@ -381,7 +382,7 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold text-white">历史记录</span>
             <span className={`text-[10px] ${textMuted} font-mono ${innerBg} px-2 py-0.5 rounded-full border ${innerBorder}`}>
-              共 {records.length} 条
+              {nightsOnly(records).length} 夜 · {napsOnly(records).length} 次小睡
             </span>
           </div>
 
@@ -525,6 +526,16 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
             <p className={`text-[11px] ${textMuted} leading-relaxed`}>
               最佳 <span className="text-white font-bold">{best.date}</span> · {best.sleepScore} 分
             </p>
+            {(() => {
+              const naps = napsOnly(records).slice(0, 7);
+              if (naps.length === 0) return null;
+              const mins = naps.reduce((a, r) => a + r.durationMinutes, 0);
+              return (
+                <p className={`text-[11px] ${textMuted} leading-relaxed`}>
+                  😴 本周小睡 {naps.length} 次，共 {Math.floor(mins / 60)} 小时 {mins % 60} 分（不计入规律度）
+                </p>
+              );
+            })()}
           </div>
         );
       })()}

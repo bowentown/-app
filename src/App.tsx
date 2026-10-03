@@ -24,6 +24,7 @@ import { consumePendingTab, syncPet } from './utils/petOverlay';
 import { LaunchSplash } from './components/LaunchSplash';
 import { BedtimeReminder, BedtimeReminderPhase } from './components/BedtimeReminder';
 import { sanitizeRecord } from './utils/recordSanitize';
+import { mergeRecord } from './utils/recordFilter';
 import { TripArrivalModal } from './components/travel/TripArrivalModal';
 import { processDailySleepScore, loadTravelState, clearPendingArrival } from './services/travelService';
 
@@ -202,6 +203,23 @@ export const App: React.FC = () => {
       console.warn('[storage] 用户档案写入失败', e);
     }
   }, [userProfile]);
+
+  // 存量体检（一次性）：旧版按 date 去重曾让午睡覆盖夜睡（D1）。被删的
+  // 无法恢复——只做一次诚实提示，指路手动补录，不自动改（防二次污染）
+  useEffect(() => {
+    try {
+      if (localStorage.getItem('somnacare_nap_overwrite_notice_shown')) return;
+      const suspect = records.filter((r) =>
+        r.durationMinutes < 180 &&
+        (() => { const h = parseInt(r.bedtime.split(':')[0], 10); return h >= 10 && h < 20; })()
+      );
+      localStorage.setItem('somnacare_nap_overwrite_notice_shown', '1');
+      if (suspect.length > 0) {
+        showToast(`发现 ${suspect.length} 条记录像白天小睡。若你的夜间记录曾消失过，可能是被它覆盖了——新版本已修复，可在偏好页手动补回`);
+      }
+    } catch { /* ignore */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // APK 启动时无条件同步一次闹钟到原生 AlarmManager（重启/重装后打开即恢复调度）
   useEffect(() => {
@@ -583,8 +601,8 @@ export const App: React.FC = () => {
 
   const handleSaveActiveSleep = (newRecord: SleepRecord) => {
     setRecords((prev) => {
-      const filtered = prev.filter((r) => r.date !== newRecord.date);
-      return [newRecord, ...filtered].sort(
+      const merged = mergeRecord(prev, newRecord);   // 夜睡按日一条、小睡可多次（D1 根治）
+      return merged.sort(
         (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
       );
     });
@@ -599,8 +617,8 @@ export const App: React.FC = () => {
 
   const handleSaveManualRecord = (newRecord: SleepRecord) => {
     setRecords((prev) => {
-      const filtered = prev.filter((r) => r.date !== newRecord.date);
-      return [newRecord, ...filtered].sort(
+      const merged = mergeRecord(prev, newRecord);   // 夜睡按日一条、小睡可多次（D1 根治）
+      return merged.sort(
         (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
       );
     });

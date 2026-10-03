@@ -122,6 +122,8 @@ export const ManualLogModal: React.FC<ManualLogModalProps> = ({
 
     const record: SleepRecord = {
       id: `manual-${Date.now()}`,
+      // 日间就寝（本地 10–19 时）归类为小睡（kind），去重与分析层据此区分
+      kind: (parseInt(bedtime.split(':')[0], 10) >= 10 && parseInt(bedtime.split(':')[0], 10) < 20) ? 'nap' as const : undefined,
       date,
       bedtime,
       wakeTime,

@@ -9,7 +9,7 @@
  * 文案红线：数据来自手机使用记录——能说"放下手机/拿起手机"，
  * 不得声称对睡眠本身进行了监测（行为性 ≠ 生理性，禁语见 verify-no-claims）。
  */
-import { clockMinutes, bedClockAxis, madFromMedian, deviationToScore } from './clockMath';
+import { clockMinutes, circularDev, deviationToScore } from './clockMath';
 import { isNativePlatform } from './nativeAlarmScheduler';
 
 export interface UsageDay {
@@ -68,12 +68,13 @@ export function usagePrompted(): boolean {
 }
 
 /** 查询并缓存聚合结果（原生失败时回退上次缓存，静默降级）。 */
-export async function refreshUsageDays(days = 7): Promise<UsageDay[]> {
+export async function refreshUsageDays(days = 7, chronotype: 'night' | 'day' | 'irregular' = 'night'): Promise<UsageDay[]> {
   const pl = usage();
   if (!pl) return cachedUsageDays();
+  if (chronotype === 'irregular') return cachedUsageDays();   // 不规律：不做自动采样
   let list: UsageDay[] | null = null;
   try {
-    const res = await pl.queryDailyUsage?.({ days });
+    const res = await pl.queryDailyUsage?.({ days, chronotype });
     if (res?.days) {
       list = (res.days as any[])
         .filter((d) => d && typeof d.date === 'string')
@@ -122,8 +123,8 @@ export function clearUsageData(): void {
 export function computeUsageRegularity(days: UsageDay[]): UsageRegularity | null {
   const usable = days.filter((d) => d.lastActive && d.firstActive);
   if (usable.length < 3) return null;
-  const bedDev = Math.round(madFromMedian(usable.map((d) => bedClockAxis(d.lastActive))));
-  const wakeDev = Math.round(madFromMedian(usable.map((d) => clockMinutes(d.firstActive))));
+  const bedDev = Math.round(circularDev(usable.map((d) => clockMinutes(d.lastActive))));
+  const wakeDev = Math.round(circularDev(usable.map((d) => clockMinutes(d.firstActive))));
   const avgDev = (bedDev + wakeDev) / 2;
   return { score: deviationToScore(avgDev), bedDev, wakeDev };
 }

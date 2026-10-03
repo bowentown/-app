@@ -333,9 +333,9 @@ export function generatePersonalInsights(records: SleepRecord[] = []): PersonalI
     arr.length ? arr.reduce((a, r) => a + f(r), 0) / arr.length : 0;
 
   if (records.length >= 3) {
-    const recent = records.slice(0, 3);
-    const earlier = records.slice(3, 7);
-    const week = records.slice(0, 7);
+    const recent = nightsOnly(records).slice(0, 3);
+    const earlier = nightsOnly(records).slice(3, 7);
+    const week = nightsOnly(records).slice(0, 7);
     const deepPct = (r: SleepRecord) => (r.durationMinutes > 0 ? (r.deepSleepMinutes / r.durationMinutes) * 100 : 0);
 
     // 1. 睡前屏幕习惯 ↔ 评分关联
@@ -546,3 +546,4 @@ if (import.meta.env?.DEV) {
     }
   }
 }
+import { nightsOnly } from './recordFilter';

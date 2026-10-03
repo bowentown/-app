@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Moon, Sun, AlertTriangle } from 'lucide-react';
-import { SleepRecord } from '../types/sleep';
+import { SleepRecord, UserProfile } from '../types/sleep';
 import { formatDurationChinese } from '../utils/sleepScore';
 import { buildRecordFromWindow } from '../utils/recordBuilder';
 import { Smartphone } from 'lucide-react';
@@ -20,11 +20,12 @@ interface OneTapSleepTrackerProps {
   targetDurationHours?: number;
   /** 规律度/提议引擎需要完整记录（同晚已有记录/置信度判据） */
   records?: SleepRecord[];
+  userProfile?: UserProfile;
   /** "改一下"通路：请求打开预填好的手动补录弹窗 */
   onOpenManualLogPrefilled?: (p: { date: string; bedtime: string; wakeTime: string }) => void;
 }
 
-export const OneTapSleepTracker: React.FC<OneTapSleepTrackerProps> = ({ onSaveRecord, startSignal, theme, targetDurationHours, records = [], onOpenManualLogPrefilled }) => {
+export const OneTapSleepTracker: React.FC<OneTapSleepTrackerProps> = ({ onSaveRecord, startSignal, theme, targetDurationHours, records = [], onOpenManualLogPrefilled, userProfile }) => {
   const [sleepStartTime, setSleepStartTime] = useState<number | null>(() => {
     const saved = localStorage.getItem('somnacare_bedtime_start');
     return saved ? Number(saved) : null;
@@ -45,9 +46,10 @@ export const OneTapSleepTracker: React.FC<OneTapSleepTrackerProps> = ({ onSaveRe
   useEffect(() => {
     if (!isNativePlatform()) return;
     const stop = subscribeUsage(setUsageDays);
-    void ensureUsageLoaded(2);
+    // 作息类型决定采样窗口（D3）：'irregular' 不做自动提议（store 层短路）
+    void ensureUsageLoaded(2, userProfile?.chronotype ?? 'night');
     return stop;
-  }, []);
+  }, [userProfile?.chronotype]);
 
   const proposal = useMemo(
     () => computeProposal({
