@@ -635,7 +635,7 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
               >
                 {stripMd(msg.content)}
               </div>
-              <span className="text-[9px] text-slate-500 mt-1 px-1 font-mono">{msg.timestamp}</span>
+              <span className="text-[9px] text-slate-400 mt-1 px-1 font-mono">{msg.timestamp}</span>
             </div>
           ))}
 

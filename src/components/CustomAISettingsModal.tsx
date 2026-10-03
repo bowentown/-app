@@ -372,7 +372,7 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
               {isNativeLlmAvailable() && (
                 <div className={`p-3 rounded-xl bg-[#0a0f1d] border border-slate-700 space-y-2`}>
                   <span className="text-[11px] font-bold text-white block">HuggingFace 访问令牌（首次下载需要）</span>
-                  <span className="text-[9px] text-slate-500 block">仅存本机浏览器存储、不经过任何服务器；建议在 HF 上创建只读（read）权限的令牌。备份导出不包含它。</span>
+                  <span className="text-[9px] text-slate-400 block">仅存本机浏览器存储、不经过任何服务器；建议在 HF 上创建只读（read）权限的令牌。备份导出不包含它。</span>
                   <input
                     type="password"
                     value={hfTokenVal}
@@ -381,7 +381,7 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
                     placeholder="hf_xxxxxxxxxxxx"
                     className={`w-full bg-[#0a0f1d] border border-slate-600 rounded-xl px-2.5 py-2 text-xs text-white font-mono placeholder-slate-500 focus:outline-none ${theme.focusRing}`}
                   />
-                  <p className="text-[10px] text-slate-500 leading-relaxed">
+                  <p className="text-[10px] text-slate-400 leading-relaxed">
                     Gemma 为门控模型：在 huggingface.co 登录 → 打开 litert-community/gemma-3-1b-it →
                     同意许可 → Settings → Access Tokens 生成只读令牌粘贴于此。令牌仅保存在本机。
                   </p>
@@ -415,7 +415,7 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
                     <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
                       <div style={{ width: `${llmProgress}%` }} className={`h-full ${theme.accentBg.split(' ')[0]} transition-all duration-300`} />
                     </div>
-                    <div className="text-right text-[10px] text-slate-500 font-mono">{llmProgress}%</div>
+                    <div className="text-right text-[10px] text-slate-400 font-mono">{llmProgress}%</div>
                   </div>
                 ) : llmCache?.cached ? (
                   <button

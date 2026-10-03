@@ -216,7 +216,7 @@ export const MomentsOverlay: React.FC<Props> = ({ records, userProfile, onClose 
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-400 to-blue-600 flex items-center justify-center text-xl shrink-0">🐋</div>
             <div className="min-w-0">
               <p className="text-xs font-black text-white leading-tight truncate">大肥鱼的朋友圈</p>
-              <p className="text-[9px] text-slate-500 truncate">蓝色大肥鱼 · 聪明但懒 · 事已至此，先吃饭吧</p>
+              <p className="text-[9px] text-slate-400 truncate">蓝色大肥鱼 · 聪明但懒 · 事已至此，先吃饭吧</p>
             </div>
           </div>
           <button
@@ -277,7 +277,7 @@ export const MomentsOverlay: React.FC<Props> = ({ records, userProfile, onClose 
       </div>
 
       {!hasAi && (
-        <p className="px-4 pt-3 text-[10px] text-slate-500 leading-relaxed shrink-0">
+        <p className="px-4 pt-3 text-[10px] text-slate-400 leading-relaxed shrink-0">
           未配置 DeepSeek API：文案走本地傲娇模板（同样基于真实数据）。
           在「AI 顾问」里配置后，她会写得更有梗。
         </p>
@@ -287,7 +287,7 @@ export const MomentsOverlay: React.FC<Props> = ({ records, userProfile, onClose 
       {/* 朋友圈时间线 */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
           {moments.length === 0 && !busy && (
-            <p className="text-center text-xs text-slate-500 pt-10">她还没发过动态……去睡一觉再来催她。</p>
+            <p className="text-center text-xs text-slate-400 pt-10">她还没发过动态……去睡一觉再来催她。</p>
           )}
           {moments.map((m) => (
             <div key={m.id} className="flex gap-2.5">
@@ -316,7 +316,7 @@ export const MomentsOverlay: React.FC<Props> = ({ records, userProfile, onClose 
                 )}
 
                 {/* 事实清单：每句都有出处 */}
-                <details className="text-[9px] text-slate-500">
+                <details className="text-[9px] text-slate-400">
                   <summary className="cursor-pointer select-none">数据来源（她不许自己编数字）</summary>
                   <div className="flex flex-wrap gap-1 pt-1">
                     {m.facts.map((f, i) => (
@@ -328,14 +328,14 @@ export const MomentsOverlay: React.FC<Props> = ({ records, userProfile, onClose 
                 </details>
 
                 <div className="flex items-center gap-4 pt-0.5">
-                  <span className="text-[9px] text-slate-500">{dayLabel(m.date)} {clockLabel(m.ts)}</span>
+                  <span className="text-[9px] text-slate-400">{dayLabel(m.date)} {clockLabel(m.ts)}</span>
                   <button
                     type="button"
                     onClick={() => toggleLike(m.id)}
                     className="flex items-center gap-1 text-[10px] font-bold cursor-pointer active:scale-90 transition-transform"
                   >
-                    <Heart className={`w-3.5 h-3.5 ${m.liked ? 'text-rose-400 fill-rose-400' : 'text-slate-500'}`} />
-                    <span className={m.liked ? 'text-rose-300' : 'text-slate-500'}>{m.liked ? '已赞' : '赞'}</span>
+                    <Heart className={`w-3.5 h-3.5 ${m.liked ? 'text-rose-400 fill-rose-400' : 'text-slate-400'}`} />
+                    <span className={m.liked ? 'text-rose-300' : 'text-slate-400'}>{m.liked ? '已赞' : '赞'}</span>
                   </button>
                   <button
                     type="button"
@@ -344,7 +344,7 @@ export const MomentsOverlay: React.FC<Props> = ({ records, userProfile, onClose 
                       setDraft('');
                       setTimeout(() => inputRef.current?.focus(), 50);
                     }}
-                    className="flex items-center gap-1 text-[10px] font-bold text-slate-500 cursor-pointer active:scale-90 transition-transform"
+                    className="flex items-center gap-1 text-[10px] font-bold text-slate-400 cursor-pointer active:scale-90 transition-transform"
                   >
                     <MessageCircle className="w-3.5 h-3.5" />
                     评论

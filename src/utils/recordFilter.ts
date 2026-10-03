@@ -56,10 +56,10 @@ export function reclassifyForChronotype(records: SleepRecord[], chronotype: Chro
   return records.map((r) => {
     if (chronotype === 'day') {
       if (r.kind !== 'nap') return r;
-      const sameDayOthers = records.filter((x) => x.date === r.date && x.id !== r.id && !isNap(x));
+      // 只恢复"该日唯一的睡"——它大概率是被误标的主睡；
+      // 同日有多条小睡的保持小睡（转成夜睡会产生同日多条夜睡的怪数据）
       const isOnlySleepOnDate = !records.some((x) => x.date === r.date && x.id !== r.id);
-      // 同一天只有这一条睡 → 大概率是主睡，恢复夜睡；已有夜睡的保持小睡
-      return isOnlySleepOnDate || sameDayOthers.length === 0 ? { ...r, kind: undefined } : r;
+      return isOnlySleepOnDate ? { ...r, kind: undefined } : r;
     }
     // night：按钟点重判
     const h = parseInt(r.bedtime.split(':')[0], 10);

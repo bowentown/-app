@@ -106,7 +106,7 @@ export const TodayTab: React.FC<TodayTabProps> = ({
               : ''}
             {todayNaps.reduce((a, r) => a + r.durationMinutes, 0) % 60} 分
           </span>
-          <span className="text-slate-500 ml-auto">不计入规律度</span>
+          <span className="text-slate-400 ml-auto">不计入规律度</span>
         </div>
       )}
 
@@ -194,7 +194,7 @@ export const TodayTab: React.FC<TodayTabProps> = ({
                   </div>
                 );
               })()}
-              <div className="pt-1 text-[10px] text-slate-500">
+              <div className="pt-1 text-[10px] text-slate-400">
                 模型估算 · 非医疗诊断
               </div>
               {(() => {
@@ -329,7 +329,7 @@ export const TodayTab: React.FC<TodayTabProps> = ({
         <div className={`${theme.cardInnerBg} border ${theme.cardInnerBorder} rounded-2xl p-3.5 flex items-center justify-between`}>
           <div>
             <span className="text-xs font-bold text-slate-200 block">到点提醒我</span>
-            <span className="text-[10px] text-slate-500">到点弹出提醒动画，早点睡</span>
+            <span className="text-[10px] text-slate-400">到点弹出提醒动画，早点睡</span>
           </div>
           <button
             type="button"

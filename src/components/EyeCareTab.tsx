@@ -184,7 +184,7 @@ export const EyeCareTab: React.FC<EyeCareTabProps> = ({ userProfile, onUpdatePro
           </button>
         )}
         {!native && (
-          <p className="text-[10px] text-slate-500">网页预览仅应用内生效；安装 APK 后全系统生效</p>
+          <p className="text-[10px] text-slate-400">网页预览仅应用内生效；安装 APK 后全系统生效</p>
         )}
       </div>
 
@@ -360,7 +360,7 @@ export const EyeCareTab: React.FC<EyeCareTabProps> = ({ userProfile, onUpdatePro
         <div className={`${theme.cardInnerBg} border ${theme.cardInnerBorder} rounded-2xl p-3.5 flex items-center justify-between`}>
           <div>
             <span className="text-xs font-bold text-slate-200 block">自动日变</span>
-            <span className="text-[10px] text-slate-500">
+            <span className="text-[10px] text-slate-400">
               白天自动减弱，{cfg.autoStart || '19:00'} 起渐强，{cfg.autoEnd || '23:00'} 起满档
             </span>
           </div>
@@ -399,7 +399,7 @@ export const EyeCareTab: React.FC<EyeCareTabProps> = ({ userProfile, onUpdatePro
                 aria-label="开始渐强时刻"
                 className="bg-slate-800 rounded-lg px-2 py-1.5 text-slate-100 font-mono"
               />
-              <span className="text-slate-500">→</span>
+              <span className="text-slate-400">→</span>
               <input
                 type="time"
                 value={cfg.autoEnd || '23:00'}
@@ -492,7 +492,7 @@ export const EyeCareTab: React.FC<EyeCareTabProps> = ({ userProfile, onUpdatePro
             </div>
           </div>
         )}
-        <p className="text-[10px] text-slate-500">
+        <p className="text-[10px] text-slate-400">
           {cfg.scheduleEnabled
             ? '到点自动开、出窗自动关，支持跨午夜时段（如 22:00 – 07:00）'
             : '开启后按设定时间段自动开关滤镜'}

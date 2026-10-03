@@ -216,7 +216,7 @@ export const OneTapSleepTracker: React.FC<OneTapSleepTrackerProps> = ({ onSaveRe
               </button>
             </div>
 
-            <p className="text-[10px] text-slate-500 leading-relaxed">
+            <p className="text-[10px] text-slate-400 leading-relaxed">
               数据来自手机使用记录（屏幕亮灭），不是睡眠监测；"放下手机"不等于入睡。
             </p>
           </div>
