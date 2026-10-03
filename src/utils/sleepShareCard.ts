@@ -82,16 +82,24 @@ export interface WeeklyLayout {
   brandY: number;
   ix: number; iy: number; iw: number; ih: number;
   statsTop: number;
-  regX: number | null;   // 规律度栏中心（null = 该栏隐藏）
+  regX: number | null;   // 规律度栏中心（null = 该栏不渲染）
   durX: number | null;   // 时长栏中心
   labelY: number; numY: number; subY: number;
   statsBottom: number;
-  quoteTop: number; quoteLineH: number; maxQuoteLines: number;
+  quoteTop: number;      // 语录首行基线（实际行数在保留带内垂直居中）
+  quoteBandH: number;    // 语录保留带高（maxQuoteLines × 行高）
+  quoteLineH: number;
+  maxQuoteLines: number;
   signatureY: number;
   footerY: number;
   maxY: number;
 }
 
+/**
+ * 布局规划（纯函数）：入参是【实际会渲染】的开关（规律度为 null 时
+ * 传 false——第 19 轮 N-1 的教训：按"开关意图"留位会留下大空洞）。
+ * 语录块按 maxQuoteLines 预算高度；短语录在渲染时于保留带内垂直居中。
+ */
 export function planWeeklyLayout(showRegularity: boolean, showDuration: boolean): WeeklyLayout {
   const both = showRegularity && showDuration;
   const any = showRegularity || showDuration;
@@ -99,21 +107,26 @@ export function planWeeklyLayout(showRegularity: boolean, showDuration: boolean)
   const iw = CARD_W - 240;
   const iy = 140;
   const ih = 620;
-  const statsTop = iy + ih + 50;                 // 810
-  // 两栏并排：中心各在 300 / 780；单栏居中 540
+  const statsTop = iy + ih + 44;                 // 804
   const regX = !showRegularity ? null : both ? 300 : CARD_W / 2;
   const durX = !showDuration ? null : both ? 780 : CARD_W / 2;
-  const labelY = statsTop + 46;                  // 856
-  const numY = statsTop + 170;                   // 980
-  const subY = statsTop + 216;                   // 1026
-  const statsBottom = statsTop + 250;            // 1060
-  const quoteTop = any ? statsBottom + 70 : statsTop + 46;
+  const labelY = statsTop + 42;                  // 846
+  const numY = statsTop + 158;                   // 962
+  const subY = statsTop + 204;                   // 1008
+  const statsBottom = statsTop + 236;            // 1040
   const quoteLineH = 58;
   const maxQuoteLines = 3;                       // 语录 ≤60 字 @40px ≈ ≤3 行（保守预算）
-  const signatureY = quoteTop + maxQuoteLines * quoteLineH + 46;
+  const quoteBandH = maxQuoteLines * quoteLineH; // 174
+  const signatureY = CARD_H - 64 - 62;           // 1314（署名基线）
   const footerY = CARD_H - 64;                   // 1376
-  const maxY = Math.max(signatureY, footerY);
-  return { brandY: 96, ix, iy, iw, ih, statsTop, regX, durX, labelY, numY, subY, statsBottom, quoteTop, quoteLineH, maxQuoteLines, signatureY, footerY, maxY };
+  // 语录保留带：有数据区 → 紧随其下；无 → 在中部留白带里垂直居中
+  const middleStart = iy + ih + 36;              // 796
+  const middleEnd = signatureY - 44;             // 1270
+  const quoteTop = any
+    ? statsBottom + 46
+    : middleStart + Math.max(0, (middleEnd - middleStart - quoteBandH) / 2);
+  const maxY = Math.max(signatureY + 46, footerY);
+  return { brandY: 96, ix, iy, iw, ih, statsTop, regX, durX, labelY, numY, subY, statsBottom, quoteTop, quoteBandH, quoteLineH, maxQuoteLines, signatureY, footerY, maxY };
 }
 
 /** 宠物周报语录：按规律度分档 + 日期哈希确定选取（傲娇，零医疗声称）。 */
@@ -175,7 +188,11 @@ export async function renderWeeklyCard(input: WeeklyCardInput): Promise<WeeklyCa
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Canvas 2D 不可用');
 
-  const L = planWeeklyLayout(input.showRegularity, input.showDuration);
+  // 生效开关 ≠ 开关意图：regularity 少于 3 晚为 null、时长无记录为 null——
+  // 按"实际会渲染"的内容规划布局，否则会留下按意图预算的大空洞
+  const effReg = input.showRegularity && !!regularity;
+  const effDur = input.showDuration && avgDurationMin !== null;
+  const L = planWeeklyLayout(effReg, effDur);
 
   // ── 背景：主题页面色 → 加深渐变 ──
   const bg = input.pageBgHex || '#0B1026';
@@ -246,9 +263,12 @@ export async function renderWeeklyCard(input: WeeklyCardInput): Promise<WeeklyCa
     ctx.fillText(`${Math.floor(avgDurationMin / 60)} 小时 ${avgDurationMin % 60} 分`, L.durX!, L.numY);
   }
 
-  // ── 宠物语录（坐标由 planner 固定，不再 cy 累加漂移）──
+  // ── 宠物语录（planner 给保留带；实际行数在带内垂直居中。
+  //    对齐纪律：每个文本块显式设 textAlign——地名签的 left 若泄漏，
+  //    居中块会从中心起笔向右跑出画布）──
+  ctx.textAlign = 'center';
   const dayKey = Number((now.getFullYear() + '' + (now.getMonth() + 1) + now.getDate()).slice(-4)) + now.getDay();
-  const quote = petWeeklyQuote(input.showRegularity ? regularity : null, dayKey);
+  const quote = petWeeklyQuote(regularity, dayKey);
   ctx.fillStyle = '#FFFFFF';
   ctx.font = '500 40px system-ui, sans-serif';
   const maxW = CARD_W - 280;
@@ -259,13 +279,15 @@ export async function renderWeeklyCard(input: WeeklyCardInput): Promise<WeeklyCa
     else cur += ch;
   }
   lines.push(cur);
-  let qy = L.quoteTop;
+  const actualH = lines.length * L.quoteLineH;
+  let qy = L.quoteTop + (L.quoteBandH - actualH) / 2 + L.quoteLineH * 0.78;
   for (const line of lines) { ctx.fillText(line, CARD_W / 2, qy); qy += L.quoteLineH; }
   ctx.fillStyle = 'rgba(255,255,255,0.7)';
   ctx.font = '600 34px system-ui, sans-serif';
   ctx.fillText('—— 蓝色大肥鱼 🐋', CARD_W / 2, L.signatureY);
 
   // ── 底部诚实边界 ──
+  ctx.textAlign = 'center';
   ctx.fillStyle = 'rgba(255,255,255,0.38)';
   ctx.font = '400 26px system-ui, sans-serif';
   ctx.fillText('数据仅存本机 · 统计为模型估算，非医疗诊断', CARD_W / 2, L.footerY);
