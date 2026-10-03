@@ -31,6 +31,8 @@ export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<NavTab>('today');
   const [isActiveSleepOpen, setIsActiveSleepOpen] = useState(false);
   const [isManualLogOpen, setIsManualLogOpen] = useState(false);
+  // 手动补录预填（提议式记录的"改一下"通路）
+  const [manualLogPrefill, setManualLogPrefill] = useState<{ date: string; bedtime: string; wakeTime: string } | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   // 朋友圈打开信号：递增触发 AIAdvicePanel 打开朋友圈（送达弹窗 CTA 用）
   const [momentsSignal, setMomentsSignal] = useState(0);
@@ -764,6 +766,7 @@ export const App: React.FC = () => {
                       userProfile={userProfile}
                       onOpenActiveSleep={() => setIsActiveSleepOpen(true)}
                       onOpenManualLog={() => setIsManualLogOpen(true)}
+                      onOpenManualLogPrefilled={(p) => { setManualLogPrefill(p); setIsManualLogOpen(true); }}
                       onUpdateProfile={(updated) => setUserProfile((prev) => ({ ...prev, ...updated }))}
                       startSignal={sleepStartSignal}
                       onNavigateToTrends={() => setActiveTab('trends')}
@@ -840,10 +843,13 @@ export const App: React.FC = () => {
       {/* Manual Sleep Log Modal */}
       <ManualLogModal
         isOpen={isManualLogOpen}
-        onClose={() => setIsManualLogOpen(false)}
+        onClose={() => { setIsManualLogOpen(false); setManualLogPrefill(null); }}
         onSaveRecord={handleSaveManualRecord}
         theme={currentTheme}
         targetDurationHours={userProfile.targetDurationHours}
+        initialDate={manualLogPrefill?.date}
+        initialBedtime={manualLogPrefill?.bedtime}
+        initialWakeTime={manualLogPrefill?.wakeTime}
       />
 
       {/* 大肥鱼漫游明信片送达仪式弹窗 */}

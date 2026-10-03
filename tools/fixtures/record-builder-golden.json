@@ -1,0 +1,854 @@
+{
+  "normal8h": {
+    "record": {
+      "id": "g-normal",
+      "date": "2026-10-02",
+      "bedtime": "23:00",
+      "wakeTime": "07:00",
+      "durationMinutes": 463,
+      "deepSleepMinutes": 94,
+      "lightSleepMinutes": 266,
+      "remSleepMinutes": 103,
+      "awakeMinutes": 17,
+      "sleepScore": 100,
+      "sleepEfficiency": 96,
+      "latencyMinutes": 12,
+      "latencyEstimated": true,
+      "wakeCount": 1,
+      "wakingMood": "refreshed",
+      "preSleepHabits": [],
+      "stages": [
+        {
+          "stage": "awake",
+          "startTime": "23:00",
+          "endTime": "23:12",
+          "durationMinutes": 12
+        },
+        {
+          "stage": "deep",
+          "startTime": "23:12",
+          "endTime": "00:08",
+          "durationMinutes": 56
+        },
+        {
+          "stage": "light",
+          "startTime": "00:08",
+          "endTime": "00:48",
+          "durationMinutes": 40
+        },
+        {
+          "stage": "rem",
+          "startTime": "00:48",
+          "endTime": "01:04",
+          "durationMinutes": 16
+        },
+        {
+          "stage": "deep",
+          "startTime": "01:04",
+          "endTime": "01:42",
+          "durationMinutes": 38
+        },
+        {
+          "stage": "light",
+          "startTime": "01:42",
+          "endTime": "02:22",
+          "durationMinutes": 40
+        },
+        {
+          "stage": "rem",
+          "startTime": "02:22",
+          "endTime": "02:57",
+          "durationMinutes": 35
+        },
+        {
+          "stage": "awake",
+          "startTime": "02:57",
+          "endTime": "03:02",
+          "durationMinutes": 5
+        },
+        {
+          "stage": "light",
+          "startTime": "03:02",
+          "endTime": "03:42",
+          "durationMinutes": 40
+        },
+        {
+          "stage": "rem",
+          "startTime": "03:42",
+          "endTime": "04:13",
+          "durationMinutes": 31
+        },
+        {
+          "stage": "light",
+          "startTime": "04:13",
+          "endTime": "04:53",
+          "durationMinutes": 40
+        },
+        {
+          "stage": "rem",
+          "startTime": "04:53",
+          "endTime": "05:07",
+          "durationMinutes": 14
+        },
+        {
+          "stage": "light",
+          "startTime": "05:07",
+          "endTime": "05:47",
+          "durationMinutes": 40
+        },
+        {
+          "stage": "rem",
+          "startTime": "05:47",
+          "endTime": "05:54",
+          "durationMinutes": 7
+        },
+        {
+          "stage": "light",
+          "startTime": "05:54",
+          "endTime": "06:34",
+          "durationMinutes": 40
+        },
+        {
+          "stage": "light",
+          "startTime": "06:34",
+          "endTime": "06:56",
+          "durationMinutes": 22
+        },
+        {
+          "stage": "light",
+          "startTime": "06:56",
+          "endTime": "07:00",
+          "durationMinutes": 4
+        }
+      ]
+    },
+    "truncated": false,
+    "windowMinutes": 480
+  },
+  "micro45m": {
+    "record": {
+      "id": "g-micro",
+      "date": "2026-10-02",
+      "bedtime": "01:00",
+      "wakeTime": "01:45",
+      "durationMinutes": 43,
+      "deepSleepMinutes": 5,
+      "lightSleepMinutes": 38,
+      "remSleepMinutes": 0,
+      "awakeMinutes": 2,
+      "sleepScore": 49,
+      "sleepEfficiency": 96,
+      "latencyMinutes": 12,
+      "latencyEstimated": true,
+      "wakeCount": 1,
+      "wakingMood": "refreshed",
+      "preSleepHabits": [],
+      "stages": [
+        {
+          "stage": "awake",
+          "startTime": "01:00",
+          "endTime": "01:02",
+          "durationMinutes": 2
+        },
+        {
+          "stage": "deep",
+          "startTime": "01:02",
+          "endTime": "01:07",
+          "durationMinutes": 5
+        },
+        {
+          "stage": "light",
+          "startTime": "01:07",
+          "endTime": "01:45",
+          "durationMinutes": 38
+        }
+      ]
+    },
+    "truncated": false,
+    "windowMinutes": 45
+  },
+  "tiny12m": {
+    "record": {
+      "id": "g-tiny",
+      "date": "2026-10-02",
+      "bedtime": "02:00",
+      "wakeTime": "02:12",
+      "durationMinutes": 10,
+      "deepSleepMinutes": 1,
+      "lightSleepMinutes": 9,
+      "remSleepMinutes": 0,
+      "awakeMinutes": 2,
+      "sleepScore": 49,
+      "sleepEfficiency": 83,
+      "latencyMinutes": 2,
+      "latencyEstimated": true,
+      "wakeCount": 0,
+      "wakingMood": "tired",
+      "preSleepHabits": [],
+      "stages": [
+        {
+          "stage": "awake",
+          "startTime": "02:00",
+          "endTime": "02:02",
+          "durationMinutes": 2
+        },
+        {
+          "stage": "deep",
+          "startTime": "02:02",
+          "endTime": "02:03",
+          "durationMinutes": 1
+        },
+        {
+          "stage": "light",
+          "startTime": "02:03",
+          "endTime": "02:12",
+          "durationMinutes": 9
+        }
+      ]
+    },
+    "truncated": false,
+    "windowMinutes": 12
+  },
+  "m14": {
+    "record": {
+      "id": "g-14m",
+      "date": "2026-10-02",
+      "bedtime": "02:00",
+      "wakeTime": "02:14",
+      "durationMinutes": 12,
+      "deepSleepMinutes": 1,
+      "lightSleepMinutes": 11,
+      "remSleepMinutes": 0,
+      "awakeMinutes": 2,
+      "sleepScore": 49,
+      "sleepEfficiency": 86,
+      "latencyMinutes": 2,
+      "latencyEstimated": true,
+      "wakeCount": 0,
+      "wakingMood": "tired",
+      "preSleepHabits": [],
+      "stages": [
+        {
+          "stage": "awake",
+          "startTime": "02:00",
+          "endTime": "02:02",
+          "durationMinutes": 2
+        },
+        {
+          "stage": "deep",
+          "startTime": "02:02",
+          "endTime": "02:03",
+          "durationMinutes": 1
+        },
+        {
+          "stage": "light",
+          "startTime": "02:03",
+          "endTime": "02:14",
+          "durationMinutes": 11
+        }
+      ]
+    },
+    "truncated": false,
+    "windowMinutes": 14
+  },
+  "exact960m": {
+    "record": {
+      "id": "g-960",
+      "date": "2026-10-01",
+      "bedtime": "00:00",
+      "wakeTime": "16:00",
+      "durationMinutes": 943,
+      "deepSleepMinutes": 166,
+      "lightSleepMinutes": 550,
+      "remSleepMinutes": 227,
+      "awakeMinutes": 17,
+      "sleepScore": 70,
+      "sleepEfficiency": 98,
+      "latencyMinutes": 12,
+      "latencyEstimated": true,
+      "wakeCount": 1,
+      "wakingMood": "refreshed",
+      "preSleepHabits": [],
+      "stages": [
+        {
+          "stage": "awake",
+          "startTime": "00:00",
+          "endTime": "00:12",
+          "durationMinutes": 12
+        },
+        {
+          "stage": "deep",
+          "startTime": "00:12",
+          "endTime": "01:52",
+          "durationMinutes": 100
+        },
+        {
+          "stage": "light",
+          "startTime": "01:52",
+          "endTime": "02:32",
+          "durationMinutes": 40
+        },
+        {
+          "stage": "rem",
+          "startTime": "02:32",
+          "endTime": "03:07",
+          "durationMinutes": 35
+        },
+        {
+          "stage": "deep",
+          "startTime": "03:07",
+          "endTime": "04:13",
+          "durationMinutes": 66
+        },
+        {
+          "stage": "light",
+          "startTime": "04:13",
+          "endTime": "04:53",
+          "durationMinutes": 40
+        },
+        {
+          "stage": "rem",
+          "startTime": "04:53",
+          "endTime": "05:28",
+          "durationMinutes": 35
+        },
+        {
+          "stage": "awake",
+          "startTime": "05:28",
+          "endTime": "05:33",
+          "durationMinutes": 5
+        },
+        {
+          "stage": "light",
+          "startTime": "05:33",
+          "endTime": "06:13",
+          "durationMinutes": 40
+        },
+        {
+          "stage": "rem",
+          "startTime": "06:13",
+          "endTime": "06:48",
+          "durationMinutes": 35
+        },
+        {
+          "stage": "light",
+          "startTime": "06:48",
+          "endTime": "07:28",
+          "durationMinutes": 40
+        },
+        {
+          "stage": "rem",
+          "startTime": "07:28",
+          "endTime": "08:03",
+          "durationMinutes": 35
+        },
+        {
+          "stage": "light",
+          "startTime": "08:03",
+          "endTime": "08:43",
+          "durationMinutes": 40
+        },
+        {
+          "stage": "rem",
+          "startTime": "08:43",
+          "endTime": "09:18",
+          "durationMinutes": 35
+        },
+        {
+          "stage": "light",
+          "startTime": "09:18",
+          "endTime": "09:58",
+          "durationMinutes": 40
+        },
+        {
+          "stage": "rem",
+          "startTime": "09:58",
+          "endTime": "10:29",
+          "durationMinutes": 31
+        },
+        {
+          "stage": "light",
+          "startTime": "10:29",
+          "endTime": "11:09",
+          "durationMinutes": 40
+        },
+        {
+          "stage": "rem",
+          "startTime": "11:09",
+          "endTime": "11:23",
+          "durationMinutes": 14
+        },
+        {
+          "stage": "light",
+          "startTime": "11:23",
+          "endTime": "12:03",
+          "durationMinutes": 40
+        },
+        {
+          "stage": "rem",
+          "startTime": "12:03",
+          "endTime": "12:10",
+          "durationMinutes": 7
+        },
+        {
+          "stage": "light",
+          "startTime": "12:10",
+          "endTime": "12:50",
+          "durationMinutes": 40
+        },
+        {
+          "stage": "light",
+          "startTime": "12:50",
+          "endTime": "13:30",
+          "durationMinutes": 40
+        },
+        {
+          "stage": "light",
+          "startTime": "13:30",
+          "endTime": "14:10",
+          "durationMinutes": 40
+        },
+        {
+          "stage": "light",
+          "startTime": "14:10",
+          "endTime": "14:50",
+          "durationMinutes": 40
+        },
+        {
+          "stage": "light",
+          "startTime": "14:50",
+          "endTime": "15:30",
+          "durationMinutes": 40
+        },
+        {
+          "stage": "light",
+          "startTime": "15:30",
+          "endTime": "15:55",
+          "durationMinutes": 25
+        },
+        {
+          "stage": "light",
+          "startTime": "15:55",
+          "endTime": "16:00",
+          "durationMinutes": 5
+        }
+      ]
+    },
+    "truncated": false,
+    "windowMinutes": 960
+  },
+  "m961": {
+    "record": {
+      "id": "g-961",
+      "date": "2026-10-01",
+      "bedtime": "00:01",
+      "wakeTime": "16:01",
+      "durationMinutes": 943,
+      "deepSleepMinutes": 166,
+      "lightSleepMinutes": 550,
+      "remSleepMinutes": 227,
+      "awakeMinutes": 17,
+      "sleepScore": 70,
+      "sleepEfficiency": 98,
+      "latencyMinutes": 12,
+      "latencyEstimated": true,
+      "wakeCount": 1,
+      "wakingMood": "refreshed",
+      "preSleepHabits": [],
+      "stages": [
+        {
+          "stage": "awake",
+          "startTime": "00:01",
+          "endTime": "00:13",
+          "durationMinutes": 12
+        },
+        {
+          "stage": "deep",
+          "startTime": "00:13",
+          "endTime": "01:53",
+          "durationMinutes": 100
+        },
+        {
+          "stage": "light",
+          "startTime": "01:53",
+          "endTime": "02:33",
+          "durationMinutes": 40
+        },
+        {
+          "stage": "rem",
+          "startTime": "02:33",
+          "endTime": "03:08",
+          "durationMinutes": 35
+        },
+        {
+          "stage": "deep",
+          "startTime": "03:08",
+          "endTime": "04:14",
+          "durationMinutes": 66
+        },
+        {
+          "stage": "light",
+          "startTime": "04:14",
+          "endTime": "04:54",
+          "durationMinutes": 40
+        },
+        {
+          "stage": "rem",
+          "startTime": "04:54",
+          "endTime": "05:29",
+          "durationMinutes": 35
+        },
+        {
+          "stage": "awake",
+          "startTime": "05:29",
+          "endTime": "05:34",
+          "durationMinutes": 5
+        },
+        {
+          "stage": "light",
+          "startTime": "05:34",
+          "endTime": "06:14",
+          "durationMinutes": 40
+        },
+        {
+          "stage": "rem",
+          "startTime": "06:14",
+          "endTime": "06:49",
+          "durationMinutes": 35
+        },
+        {
+          "stage": "light",
+          "startTime": "06:49",
+          "endTime": "07:29",
+          "durationMinutes": 40
+        },
+        {
+          "stage": "rem",
+          "startTime": "07:29",
+          "endTime": "08:04",
+          "durationMinutes": 35
+        },
+        {
+          "stage": "light",
+          "startTime": "08:04",
+          "endTime": "08:44",
+          "durationMinutes": 40
+        },
+        {
+          "stage": "rem",
+          "startTime": "08:44",
+          "endTime": "09:19",
+          "durationMinutes": 35
+        },
+        {
+          "stage": "light",
+          "startTime": "09:19",
+          "endTime": "09:59",
+          "durationMinutes": 40
+        },
+        {
+          "stage": "rem",
+          "startTime": "09:59",
+          "endTime": "10:30",
+          "durationMinutes": 31
+        },
+        {
+          "stage": "light",
+          "startTime": "10:30",
+          "endTime": "11:10",
+          "durationMinutes": 40
+        },
+        {
+          "stage": "rem",
+          "startTime": "11:10",
+          "endTime": "11:24",
+          "durationMinutes": 14
+        },
+        {
+          "stage": "light",
+          "startTime": "11:24",
+          "endTime": "12:04",
+          "durationMinutes": 40
+        },
+        {
+          "stage": "rem",
+          "startTime": "12:04",
+          "endTime": "12:11",
+          "durationMinutes": 7
+        },
+        {
+          "stage": "light",
+          "startTime": "12:11",
+          "endTime": "12:51",
+          "durationMinutes": 40
+        },
+        {
+          "stage": "light",
+          "startTime": "12:51",
+          "endTime": "13:31",
+          "durationMinutes": 40
+        },
+        {
+          "stage": "light",
+          "startTime": "13:31",
+          "endTime": "14:11",
+          "durationMinutes": 40
+        },
+        {
+          "stage": "light",
+          "startTime": "14:11",
+          "endTime": "14:51",
+          "durationMinutes": 40
+        },
+        {
+          "stage": "light",
+          "startTime": "14:51",
+          "endTime": "15:31",
+          "durationMinutes": 40
+        },
+        {
+          "stage": "light",
+          "startTime": "15:31",
+          "endTime": "15:56",
+          "durationMinutes": 25
+        },
+        {
+          "stage": "light",
+          "startTime": "15:56",
+          "endTime": "16:01",
+          "durationMinutes": 5
+        }
+      ]
+    },
+    "truncated": true,
+    "windowMinutes": 961
+  },
+  "m3000": {
+    "record": {
+      "id": "g-3000",
+      "date": "2026-10-03",
+      "bedtime": "10:00",
+      "wakeTime": "02:00",
+      "durationMinutes": 943,
+      "deepSleepMinutes": 166,
+      "lightSleepMinutes": 550,
+      "remSleepMinutes": 227,
+      "awakeMinutes": 17,
+      "sleepScore": 70,
+      "sleepEfficiency": 98,
+      "latencyMinutes": 12,
+      "latencyEstimated": true,
+      "wakeCount": 1,
+      "wakingMood": "refreshed",
+      "preSleepHabits": [],
+      "stages": [
+        {
+          "stage": "awake",
+          "startTime": "10:00",
+          "endTime": "10:12",
+          "durationMinutes": 12
+        },
+        {
+          "stage": "deep",
+          "startTime": "10:12",
+          "endTime": "11:52",
+          "durationMinutes": 100
+        },
+        {
+          "stage": "light",
+          "startTime": "11:52",
+          "endTime": "12:32",
+          "durationMinutes": 40
+        },
+        {
+          "stage": "rem",
+          "startTime": "12:32",
+          "endTime": "13:07",
+          "durationMinutes": 35
+        },
+        {
+          "stage": "deep",
+          "startTime": "13:07",
+          "endTime": "14:13",
+          "durationMinutes": 66
+        },
+        {
+          "stage": "light",
+          "startTime": "14:13",
+          "endTime": "14:53",
+          "durationMinutes": 40
+        },
+        {
+          "stage": "rem",
+          "startTime": "14:53",
+          "endTime": "15:28",
+          "durationMinutes": 35
+        },
+        {
+          "stage": "awake",
+          "startTime": "15:28",
+          "endTime": "15:33",
+          "durationMinutes": 5
+        },
+        {
+          "stage": "light",
+          "startTime": "15:33",
+          "endTime": "16:13",
+          "durationMinutes": 40
+        },
+        {
+          "stage": "rem",
+          "startTime": "16:13",
+          "endTime": "16:48",
+          "durationMinutes": 35
+        },
+        {
+          "stage": "light",
+          "startTime": "16:48",
+          "endTime": "17:28",
+          "durationMinutes": 40
+        },
+        {
+          "stage": "rem",
+          "startTime": "17:28",
+          "endTime": "18:03",
+          "durationMinutes": 35
+        },
+        {
+          "stage": "light",
+          "startTime": "18:03",
+          "endTime": "18:43",
+          "durationMinutes": 40
+        },
+        {
+          "stage": "rem",
+          "startTime": "18:43",
+          "endTime": "19:18",
+          "durationMinutes": 35
+        },
+        {
+          "stage": "light",
+          "startTime": "19:18",
+          "endTime": "19:58",
+          "durationMinutes": 40
+        },
+        {
+          "stage": "rem",
+          "startTime": "19:58",
+          "endTime": "20:29",
+          "durationMinutes": 31
+        },
+        {
+          "stage": "light",
+          "startTime": "20:29",
+          "endTime": "21:09",
+          "durationMinutes": 40
+        },
+        {
+          "stage": "rem",
+          "startTime": "21:09",
+          "endTime": "21:23",
+          "durationMinutes": 14
+        },
+        {
+          "stage": "light",
+          "startTime": "21:23",
+          "endTime": "22:03",
+          "durationMinutes": 40
+        },
+        {
+          "stage": "rem",
+          "startTime": "22:03",
+          "endTime": "22:10",
+          "durationMinutes": 7
+        },
+        {
+          "stage": "light",
+          "startTime": "22:10",
+          "endTime": "22:50",
+          "durationMinutes": 40
+        },
+        {
+          "stage": "light",
+          "startTime": "22:50",
+          "endTime": "23:30",
+          "durationMinutes": 40
+        },
+        {
+          "stage": "light",
+          "startTime": "23:30",
+          "endTime": "00:10",
+          "durationMinutes": 40
+        },
+        {
+          "stage": "light",
+          "startTime": "00:10",
+          "endTime": "00:50",
+          "durationMinutes": 40
+        },
+        {
+          "stage": "light",
+          "startTime": "00:50",
+          "endTime": "01:30",
+          "durationMinutes": 40
+        },
+        {
+          "stage": "light",
+          "startTime": "01:30",
+          "endTime": "01:55",
+          "durationMinutes": 25
+        },
+        {
+          "stage": "light",
+          "startTime": "01:55",
+          "endTime": "02:00",
+          "durationMinutes": 5
+        }
+      ]
+    },
+    "truncated": true,
+    "windowMinutes": 3000
+  },
+  "crossMidnight": {
+    "record": {
+      "id": "g-xmid",
+      "date": "2026-10-02",
+      "bedtime": "23:50",
+      "wakeTime": "00:10",
+      "durationMinutes": 18,
+      "deepSleepMinutes": 2,
+      "lightSleepMinutes": 16,
+      "remSleepMinutes": 0,
+      "awakeMinutes": 2,
+      "sleepScore": 49,
+      "sleepEfficiency": 90,
+      "latencyMinutes": 12,
+      "latencyEstimated": true,
+      "wakeCount": 1,
+      "wakingMood": "tired",
+      "preSleepHabits": [],
+      "stages": [
+        {
+          "stage": "awake",
+          "startTime": "23:50",
+          "endTime": "23:52",
+          "durationMinutes": 2
+        },
+        {
+          "stage": "deep",
+          "startTime": "23:52",
+          "endTime": "23:54",
+          "durationMinutes": 2
+        },
+        {
+          "stage": "light",
+          "startTime": "23:54",
+          "endTime": "00:10",
+          "durationMinutes": 16
+        }
+      ]
+    },
+    "truncated": false,
+    "windowMinutes": 20
+  }
+}

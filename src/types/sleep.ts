@@ -23,7 +23,9 @@ export interface SleepRecord {
   sleepEfficiency: number; // percentage, e.g. 92%
   latencyMinutes: number;
   /** 入睡潜伏期是用户实测（收尾弹窗滑块）还是系统估算（一键就寝的启发式） */
-  latencyEstimated?: boolean; // time to fall asleep
+  latencyEstimated?: boolean;
+  /** 记录来源：一键就寝 / 手动补录 / 手机使用提议（诚实边界用，旧数据缺省） */
+  recordSource?: 'onetap' | 'manual' | 'usage'; // time to fall asleep
   wakeCount: number;
   wakingMood: WakingMood;
   preSleepHabits: string[]; // e.g. ['reading', 'screen_time', 'caffeine', 'hot_bath', 'meditation']

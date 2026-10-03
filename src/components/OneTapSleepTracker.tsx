@@ -1,10 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Moon, Sun, AlertTriangle } from 'lucide-react';
 import { SleepRecord } from '../types/sleep';
-import { calculateSleepScore, generateSleepStages, formatDurationChinese } from '../utils/sleepScore';
+import { formatDurationChinese } from '../utils/sleepScore';
+import { buildRecordFromWindow } from '../utils/recordBuilder';
+import { Smartphone } from 'lucide-react';
+import { computeProposal } from '../utils/proposal';
+import { ensureUsageLoaded, subscribeUsage, getCachedUsageDays } from '../utils/usageStore';
+import { isNativePlatform } from '../utils/nativeAlarmScheduler';
 import { ThemeConfig } from '../utils/themeStyles';
 import { useModalA11y } from '../utils/modalA11y';
+
 
 interface OneTapSleepTrackerProps {
   /** 到点提醒'好的'后的开始监测信号（时间戳 ms，变化即开始记录） */
@@ -12,9 +18,13 @@ interface OneTapSleepTrackerProps {
   onSaveRecord: (record: SleepRecord) => void;
   theme: ThemeConfig;
   targetDurationHours?: number;
+  /** 规律度/提议引擎需要完整记录（同晚已有记录/置信度判据） */
+  records?: SleepRecord[];
+  /** "改一下"通路：请求打开预填好的手动补录弹窗 */
+  onOpenManualLogPrefilled?: (p: { date: string; bedtime: string; wakeTime: string }) => void;
 }
 
-export const OneTapSleepTracker: React.FC<OneTapSleepTrackerProps> = ({ onSaveRecord, startSignal, theme, targetDurationHours }) => {
+export const OneTapSleepTracker: React.FC<OneTapSleepTrackerProps> = ({ onSaveRecord, startSignal, theme, targetDurationHours, records = [], onOpenManualLogPrefilled }) => {
   const [sleepStartTime, setSleepStartTime] = useState<number | null>(() => {
     const saved = localStorage.getItem('somnacare_bedtime_start');
     return saved ? Number(saved) : null;
@@ -25,6 +35,62 @@ export const OneTapSleepTracker: React.FC<OneTapSleepTrackerProps> = ({ onSaveRe
   const [completedRecord, setCompletedRecord] = useState<SleepRecord | null>(null);
   const summaryModalA11y = useModalA11y(!!showSummaryModal, () => setShowSummaryModal(false), '睡眠完成小结');
   const [sessionTruncated, setSessionTruncated] = useState(false);
+
+  // ── 提议式记录（P3）：昨晚的手机使用 → 一条待确认的睡眠记录 ──
+  const [usageDays, setUsageDays] = useState(() => getCachedUsageDays());
+  const [handledDate, setHandledDate] = useState<string | null>(() => {
+    try { return localStorage.getItem('somnacare_proposal_handled'); } catch { return null; }
+  });
+
+  useEffect(() => {
+    if (!isNativePlatform()) return;
+    const stop = subscribeUsage(setUsageDays);
+    void ensureUsageLoaded(2);
+    return stop;
+  }, []);
+
+  const proposal = useMemo(
+    () => computeProposal({
+      usageDays,
+      records,
+      sessionActive: sleepStartTime !== null,
+      handledDate,
+    }),
+    [usageDays, records, sleepStartTime, handledDate]
+  );
+
+  const markHandled = () => {
+    if (!proposal) return;
+    try { localStorage.setItem('somnacare_proposal_handled', proposal.targetDate); } catch { /* ignore */ }
+    setHandledDate(proposal.targetDate);
+  };
+
+  // 确认：用共享构建器落库（recordSource: 'usage'），完成小结与一键就寝同款
+  const handleAcceptProposal = () => {
+    if (!proposal) return;
+    const built = buildRecordFromWindow({
+      sleepStartMs: proposal.bedtimeMs,
+      wakeMs: proposal.wakeMs,
+      targetDurationHours,
+      id: `usage-${Date.now()}`,
+      recordSource: 'usage',
+    });
+    markHandled();
+    setCompletedRecord(built.record);
+    setSessionTruncated(built.truncated);
+    setShowSummaryModal(true);
+    onSaveRecord(built.record);
+  };
+
+  const handleEditProposal = () => {
+    if (!proposal) return;
+    onOpenManualLogPrefilled?.({
+      date: proposal.targetDate,
+      bedtime: proposal.bedtime,
+      wakeTime: proposal.wakeTime,
+    });
+    markHandled();
+  };
 
   useEffect(() => {
     if (!sleepStartTime) {
@@ -59,92 +125,17 @@ export const OneTapSleepTracker: React.FC<OneTapSleepTrackerProps> = ({ onSaveRe
   const handleWakeUp = () => {
     if (!sleepStartTime) return;
 
-    const wakeDate = new Date();
-
-    // 会话时长上限 16 小时：忘记结束的会话（如放了几天）不产生多天时长的荒谬记录；
-    // 截断时入睡时刻按"醒来 − 16h"反推，保证分期推演窗口与记录时长一致
-    const rawDurationMinutes = Math.max(1, Math.round((wakeDate.getTime() - sleepStartTime) / 60000));
-    const exactDurationMinutes = Math.min(960, rawDurationMinutes);
-    const sessionTruncated = rawDurationMinutes > 960;
-    const effectiveStart = new Date(wakeDate.getTime() - exactDurationMinutes * 60000);
-
-    const bedtimeStr = `${String(effectiveStart.getHours()).padStart(2, '0')}:${String(
-      effectiveStart.getMinutes()
-    ).padStart(2, '0')}`;
-    const wakeTimeStr = `${String(wakeDate.getHours()).padStart(2, '0')}:${String(
-      wakeDate.getMinutes()
-    ).padStart(2, '0')}`;
-
-    // 启发式潜伏期：生成与评分必须用同一个值，否则分期图与记录字段互相矛盾
-    const latencyEst = exactDurationMinutes < 15 ? 2 : 12;
-    const wakeCountEst = exactDurationMinutes < 15 ? 0 : 1;
-    const generated = generateSleepStages(bedtimeStr, wakeTimeStr, latencyEst, wakeCountEst);
-
-    // If sleep is genuinely short (< 60m, e.g. quick test or micro-nap), accurately scale stages
-    let deepMin = generated.deepMinutes;
-    let remMin = generated.remMinutes;
-    let awakeMin = generated.awakeMinutes;
-    let lightMin = generated.lightMinutes;
-
-    if (exactDurationMinutes < 90) {
-      // Micro-sleep or brief testing
-      deepMin = Math.max(0, Math.round(exactDurationMinutes * 0.1));
-      remMin = 0;
-      awakeMin = Math.min(2, exactDurationMinutes);
-      lightMin = Math.max(1, exactDurationMinutes - deepMin - awakeMin);
-    }
-
-    // 统一语义：durationMinutes = 纯睡眠（卧床窗 − 觉醒段），与手动补录/演示数据一致
-    const sleepMinutes = Math.max(1, exactDurationMinutes - awakeMin);
-    const { score, efficiency } = calculateSleepScore(
-      sleepMinutes,
-      deepMin,
-      remMin,
-      awakeMin,
-      wakeCountEst,
-      latencyEst,
-      Math.round((targetDurationHours || 8) * 60)
-    );
-
-    // 短会话（<90 分钟）构建与字段一致的简单分段（长会话沿用节律推演分段，
-    // 各分段总和 = durationMinutes + awakeMinutes）
-    const fmtClock = (base: Date, min: number) => {
-      const d = new Date(base.getTime() + min * 60000);
-      return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-    };
-    const stagesForRecord =
-      exactDurationMinutes < 90
-        ? [
-            { stage: 'awake' as const, startTime: fmtClock(effectiveStart, 0), endTime: fmtClock(effectiveStart, awakeMin), durationMinutes: awakeMin },
-            { stage: 'deep' as const, startTime: fmtClock(effectiveStart, awakeMin), endTime: fmtClock(effectiveStart, awakeMin + deepMin), durationMinutes: deepMin },
-            { stage: 'light' as const, startTime: fmtClock(effectiveStart, awakeMin + deepMin), endTime: fmtClock(effectiveStart, exactDurationMinutes), durationMinutes: lightMin },
-          ]
-        : generated.stages;
-
-    // 本地日期（此前 toISOString 是 UTC：早 6-9 点醒来会落到 UTC 前一天，跨夜记录互相覆盖）
-    const nowLocal = new Date();
-    const recordDate = `${nowLocal.getFullYear()}-${String(nowLocal.getMonth() + 1).padStart(2, '0')}-${String(nowLocal.getDate()).padStart(2, '0')}`;
-
-    const newRecord: SleepRecord = {
+    // 记录构建已抽取为共享 recordBuilder（一键就寝与手机使用提议共用，
+    // 黄金样本护栏保证行为一致）；wake=now 与原实现相同
+    const built = buildRecordFromWindow({
+      sleepStartMs: sleepStartTime,
+      wakeMs: Date.now(),
+      targetDurationHours,
       id: `onetap-${Date.now()}`,
-      date: recordDate,
-      bedtime: bedtimeStr,
-      wakeTime: wakeTimeStr,
-      durationMinutes: sleepMinutes,
-      deepSleepMinutes: deepMin,
-      lightSleepMinutes: lightMin,
-      remSleepMinutes: remMin,
-      awakeMinutes: awakeMin,
-      sleepScore: score,
-      sleepEfficiency: efficiency,
-      // 一键就寝没有输入入口，这个潜伏期是按总时长的启发式估算，如实标注
-      latencyMinutes: exactDurationMinutes < 15 ? 2 : 12,
-      latencyEstimated: true,
-      wakeCount: exactDurationMinutes < 15 ? 0 : 1,
-      wakingMood: exactDurationMinutes < 30 ? 'tired' : 'refreshed',
-      preSleepHabits: [],
-      stages: stagesForRecord,
-    };
+      recordSource: 'onetap',
+    });
+    const newRecord = built.record;
+    const sessionTruncated = built.truncated;
 
     localStorage.removeItem('somnacare_bedtime_start');
     setSleepStartTime(null);
@@ -169,7 +160,62 @@ export const OneTapSleepTracker: React.FC<OneTapSleepTrackerProps> = ({ onSaveRe
   return (
     <>
       <div className={`${theme.cardBg} rounded-3xl p-5 border ${theme.cardBorder} shadow-lg transition-all relative overflow-hidden`}>
-        {!sleepStartTime ? (
+        {!sleepStartTime && proposal ? (
+          /* ── 提议态：昨晚手机使用 → 待确认（P3）。确认 = 1 次点击 ── */
+          <div className="space-y-3.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className={`w-11 h-11 rounded-2xl ${theme.cardInnerBg} border ${theme.cardBorder} flex items-center justify-center shadow-inner shrink-0`}>
+                  <Smartphone className={`w-5 h-5 ${theme.accentText}`} />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-base font-black tracking-wide text-white">昨晚的手机使用</h3>
+                  <p className={`text-xs ${theme.textMuted} mt-0.5`}>确认一下，省去手动记录</p>
+                </div>
+              </div>
+            </div>
+
+            <div className={`${theme.cardInnerBg} border ${theme.cardBorder} rounded-2xl p-4 flex items-center justify-between gap-2`}>
+              <span className="text-sm font-black font-mono text-white">{proposal.bedtime} 放下</span>
+              <span className={`${theme.accentText} font-black`}>→</span>
+              <span className="text-sm font-black font-mono text-white">{proposal.wakeTime} 拿起</span>
+            </div>
+
+            <div className="flex items-center justify-between text-[11px] text-slate-300 px-1">
+              <span>约 {formatDurationChinese(proposal.windowMinutes)}</span>
+              {proposal.nightPickups > 0 && <span>夜间拿起手机 {proposal.nightPickups} 次</span>}
+            </div>
+
+            <button
+              type="button"
+              onClick={handleAcceptProposal}
+              className={`w-full py-3.5 px-5 rounded-2xl ${theme.accentBg} ${theme.accentFg} font-black text-xs tracking-wider flex items-center justify-center gap-2 active:scale-[0.99] transition-all cursor-pointer shadow-lg`}
+            >
+              <span>✓ 记为这次睡眠</span>
+            </button>
+
+            <div className="flex gap-2.5">
+              <button
+                type="button"
+                onClick={handleEditProposal}
+                className="flex-1 py-2.5 rounded-xl bg-slate-800/70 text-slate-200 text-[11px] font-bold cursor-pointer active:scale-[0.98] transition-transform"
+              >
+                改一下
+              </button>
+              <button
+                type="button"
+                onClick={markHandled}
+                className="flex-1 py-2.5 rounded-xl bg-slate-800/70 text-slate-400 text-[11px] font-bold cursor-pointer active:scale-[0.98] transition-transform"
+              >
+                忽略
+              </button>
+            </div>
+
+            <p className="text-[10px] text-slate-500 leading-relaxed">
+              数据来自手机使用记录（屏幕亮灭），不是睡眠监测；"放下手机"不等于入睡。
+            </p>
+          </div>
+        ) : !sleepStartTime ? (
           <div className="space-y-3.5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">

@@ -21,6 +21,7 @@ interface TodayTabProps {
   userProfile: UserProfile;
   onOpenActiveSleep: () => void;
   onOpenManualLog: () => void;
+  onOpenManualLogPrefilled?: (p: { date: string; bedtime: string; wakeTime: string }) => void;
   onNavigateToTrends?: () => void;
   onSaveRecord?: (record: SleepRecord) => void;
   onUpdateProfile: (updated: Partial<UserProfile>) => void;
@@ -44,6 +45,7 @@ export const TodayTab: React.FC<TodayTabProps> = ({
   userProfile,
   onOpenActiveSleep,
   onOpenManualLog,
+    onOpenManualLogPrefilled,
   onNavigateToTrends,
   onSaveRecord,
   onUpdateProfile,
@@ -87,7 +89,7 @@ export const TodayTab: React.FC<TodayTabProps> = ({
   return (
     <div className={`space-y-4 pb-28 ${theme.textPrimary}`}>
       {/* 1. Primary One-Tap Sleep Tracker */}
-      {onSaveRecord && <OneTapSleepTracker onSaveRecord={onSaveRecord} startSignal={startSignal} theme={theme} targetDurationHours={userProfile.targetDurationHours} />}
+      {onSaveRecord && <OneTapSleepTracker onSaveRecord={onSaveRecord} startSignal={startSignal} theme={theme} targetDurationHours={userProfile.targetDurationHours} records={records} onOpenManualLogPrefilled={onOpenManualLogPrefilled} />}
 
       {/* 2. Last Sleep Overview Card with Unified Theme Colors */}
       {latestRecord ? (

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState  } from 'react';
 import { X, Moon, Clock, Sparkles, Check, Smartphone, Coffee, Bath, Flower2, BookOpen, Dumbbell, Wine, Utensils } from 'lucide-react';
 import { HABIT_OPTIONS as HABIT_CATALOG_LIST } from '../utils/habitCatalog';
 
@@ -14,6 +14,10 @@ interface ManualLogModalProps {
   onSaveRecord: (record: SleepRecord) => void;
   theme?: ThemeConfig;
   targetDurationHours?: number;
+  /** 预填（提议式记录的"改一下"通路）：打开时应用到表单 */
+  initialDate?: string;
+  initialBedtime?: string;
+  initialWakeTime?: string;
 }
 
 // id/label 与 ActiveSleepModal 共用 habitCatalog；图标是本文件的展示层
@@ -39,6 +43,9 @@ export const ManualLogModal: React.FC<ManualLogModalProps> = ({
   onSaveRecord,
   theme,
   targetDurationHours,
+  initialDate,
+  initialBedtime,
+  initialWakeTime,
 }) => {
   const [date, setDate] = useState(() => {
     const d = new Date();
@@ -46,6 +53,19 @@ export const ManualLogModal: React.FC<ManualLogModalProps> = ({
   });
   const [bedtime, setBedtime] = useState('23:30');
   const [wakeTime, setWakeTime] = useState('07:30');
+  // 打开时应用预填（无预填则回默认值）——组件常挂，useState 初始值只跑一次，
+  // 且顺带修掉"上次打开的表单残留"漏到下一次的问题
+  useEffect(() => {
+    if (!isOpen) return;
+    if (initialDate) { setDate(initialDate); }
+    else {
+      const d = new Date();
+      setDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+    }
+    setBedtime(initialBedtime ?? '23:30');
+    setWakeTime(initialWakeTime ?? '07:30');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, initialDate, initialBedtime, initialWakeTime]);
   const [wakeCount, setWakeCount] = useState(1);
   const [latencyMinutes, setLatencyMinutes] = useState(15);
   const [selectedMood, setSelectedMood] = useState<WakingMood>('refreshed');

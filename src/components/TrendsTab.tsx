@@ -514,7 +514,7 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
                   {regularityTier(reg.score) === 'steady' ? '作息很稳' : regularityTier(reg.score) === 'ok' ? '基本规律' : '作息波动大'}
                 </p>
                 <p className="text-[10px] text-slate-400 leading-relaxed">
-                  按你自己记录的作息计算，不是测量值
+                  按你的作息起止点计算，不是测量值
                 </p>
               </div>
             ) : (

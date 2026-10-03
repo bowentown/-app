@@ -67,6 +67,22 @@ try {
   try { unlinkSync(probe); } catch { /* ignore */ }
 }
 
+// 定向扫描：使用行为信号文件（P3）——"放下手机 ≠ 入睡"的红线，
+// 这些文件里连注释都不允许出现入睡/醒来类生理措辞（防复制进文案）
+{
+  const usageFile = join(SRC, 'usageSignal.ts');
+  try {
+    const t = readFileSync(usageFile, 'utf-8');
+    for (const phrase of ['入睡', '你夜间醒来', '睡眠监测']) {
+      if (t.includes(phrase)) {
+        failures++;
+        const line = t.slice(0, t.indexOf(phrase)).split('\n').length;
+        console.error(`✗ usageSignal.ts:${line} 使用行为文件出现生理性措辞「${phrase}」（放下手机 ≠ 入睡）`);
+      }
+    }
+  } catch { /* 文件不存在时由 verify-wiring 报告 */ }
+}
+
 if (failures > 0) {
   console.error('   规则：数字是模型估算/统计量，不是医疗结论；文献结论不进 App 文案');
   process.exit(1);
