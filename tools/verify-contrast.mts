@@ -94,6 +94,24 @@ for (const [name, theme] of Object.entries(APP_THEMES)) {
   }
 }
 
+// 调用点扫描 #2：已知不达标的硬编码 hex 文字色（第 22 轮 #3——
+// 类名清扫 text-slate-500 漏掉了等价 hex 形式）
+{
+  const BAD_HEX = ['text-[#475569]', 'text-[#64748b]'];
+  const walk2 = (d: string): string[] => readdirSync(d).flatMap((n) => {
+    const p = j2(d, n);
+    return statSync(p).isDirectory() ? walk2(p) : (/\.tsx?$/.test(n) ? [p] : []);
+  });
+  for (const f of walk2(fileURLToPath(new URL('../src', import.meta.url)))) {
+    const t = readFileSync(f, 'utf-8');
+    for (const bad of BAD_HEX) {
+      if (t.includes(bad)) {
+        problems.push(`${f.split('/').pop()}: 硬编码 ${bad}（实测 <4.5:1，改 text-slate-400）`);
+      }
+    }
+  }
+}
+
 if (problems.length > 0) {
   console.error('✗ 对比度护栏：');
   for (const p of problems) console.error('  ' + p);

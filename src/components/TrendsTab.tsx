@@ -21,7 +21,8 @@ import {
   Smartphone,
 } from 'lucide-react';
 import { SleepRecord } from '../types/sleep';
-import { computeRegularity, regularityTier } from '../utils/sleepRegularity';
+import { regularityTier } from '../utils/sleepRegularity';
+import { summarizeWeek } from '../utils/weekSummary';
 import { ShareCardModal } from './ShareCardModal';
 import { nightsOnly, napsOnly } from '../utils/recordFilter';
 import {
@@ -407,6 +408,7 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-white text-xs">{r.date}</span>
+                      {r.kind === 'nap' && <span className="text-[8px] font-black text-sky-300 bg-[#082f49]/80 px-1 py-0.5 rounded">😴 小睡</span>}
                       <span className={`font-mono ${accentText} font-bold text-xs`}>{r.sleepScore}分</span>
                     </div>
                     <div className={`text-[11px] ${textMuted} flex items-center gap-2 mt-0.5 font-mono`}>
@@ -454,12 +456,13 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
       {/* 本周睡眠小结：填充留白 + 周维度可读洞察 */}
       {records.length > 0 && (() => {
         // 周小结只聚合夜睡（第 21 轮 #3：混入午睡会少报时长；全小睡时优雅降级）
+        // 聚合收敛到 summarizeWeek（唯一实现，空列表安全）——
+        // 第 22 轮：页面上曾有一份平行聚合，全小睡输入时 best=undefined 白屏
+        const sum = summarizeWeek(records);
         const wk = nightsOnly(records).slice(0, 7);
-        const reg = computeRegularity(records);
-        const avgScoreWk = Math.round(wk.reduce((a, r) => a + r.sleepScore, 0) / wk.length);
-        const avgDurWk = Math.round(wk.reduce((a, r) => a + r.durationMinutes, 0) / wk.length);
-        const avgDeepWk = Math.round(wk.reduce((a, r) => a + r.deepSleepMinutes, 0) / wk.length);
-        const best = wk.reduce((a, r) => (r.sleepScore > a.sleepScore ? r : a), wk[0]);
+        const avgScoreWk = sum.avgScore!;
+        const avgDurWk = sum.avgDurationMin!;
+        const avgDeepWk = sum.avgDeepMin!;
         return (
           <div
             role="button"
@@ -478,7 +481,7 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
                 type="button"
                 onClick={(e) => { e.stopPropagation(); setShowShare(true); }}
                 aria-label="生成每周睡眠分享卡"
-                className={`ml-auto mr-1 flex items-center gap-1 px-2.5 py-2.5 -my-2 -my-1.5 rounded-full ${theme.accentBg} ${theme.accentFg} text-[10px] font-bold cursor-pointer active:scale-95 transition-transform`}
+                className={`ml-auto mr-1 flex items-center gap-1 px-2.5 py-2.5 -my-2 rounded-full ${theme.accentBg} ${theme.accentFg} text-[10px] font-bold cursor-pointer active:scale-95 transition-transform`}
               >
                 <Share2 className="w-3.5 h-3.5" />
                 <span>分享</span>
@@ -509,17 +512,17 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
               </div>
             </div>
             )}
-            {reg ? (
+            {sum.regularity ? (
               <div className={`${innerBg} border ${innerBorder} rounded-2xl p-3.5 space-y-1.5`}>
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-bold text-slate-200">作息规律度</span>
                   <span className={`font-mono font-black text-lg ${
-                    reg.score >= 80 ? 'text-emerald-400' : reg.score >= 50 ? 'text-amber-400' : 'text-rose-400'
-                  }`}>{reg.score}</span>
+                    sum.regularity.score >= 80 ? 'text-emerald-400' : sum.regularity.score >= 50 ? 'text-amber-400' : 'text-rose-400'
+                  }`}>{sum.regularity.score}</span>
                 </div>
                 <p className="text-[10px] text-slate-400 leading-relaxed">
-                  就寝 ±{reg.bedDev} 分钟 · 起床 ±{reg.wakeDev} 分钟 ·{' '}
-                  {regularityTier(reg.score) === 'steady' ? '作息很稳' : regularityTier(reg.score) === 'ok' ? '基本规律' : '作息波动大'}
+                  就寝 ±{sum.regularity.bedDev} 分钟 · 起床 ±{sum.regularity.wakeDev} 分钟 ·{' '}
+                  {regularityTier(sum.regularity.score) === 'steady' ? '作息很稳' : regularityTier(sum.regularity.score) === 'ok' ? '基本规律' : '作息波动大'}
                 </p>
                 <p className="text-[10px] text-slate-400 leading-relaxed">
                   按你的作息起止点计算，不是测量值
@@ -530,19 +533,16 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
                 📊 记录满 3 晚后，这里会显示作息规律度（就寝与起床的稳定程度）
               </p>
             )}
-            <p className={`text-[11px] ${textMuted} leading-relaxed`}>
-              最佳 <span className="text-white font-bold">{best.date}</span> · {best.sleepScore} 分
-            </p>
-            {(() => {
-              const naps = napsOnly(records).slice(0, 7);
-              if (naps.length === 0) return null;
-              const mins = naps.reduce((a, r) => a + r.durationMinutes, 0);
-              return (
-                <p className={`text-[11px] ${textMuted} leading-relaxed`}>
-                  😴 本周小睡 {naps.length} 次，共 {Math.floor(mins / 60)} 小时 {mins % 60} 分（不计入规律度）
-                </p>
-              );
-            })()}
+            {sum.best && (
+              <p className={`text-[11px] ${textMuted} leading-relaxed`}>
+                最佳 <span className="text-white font-bold">{sum.best.date}</span> · {sum.best.sleepScore} 分
+              </p>
+            )}
+            {sum.napCount > 0 && (
+              <p className={`text-[11px] ${textMuted} leading-relaxed`}>
+                😴 本周小睡 {sum.napCount} 次，共 {Math.floor(sum.napMinutes / 60)} 小时 {sum.napMinutes % 60} 分（不计入规律度）
+              </p>
+            )}
           </div>
         );
       })()}

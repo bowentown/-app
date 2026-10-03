@@ -868,6 +868,7 @@ export const App: React.FC = () => {
         initialDate={manualLogPrefill?.date}
         initialBedtime={manualLogPrefill?.bedtime}
         initialWakeTime={manualLogPrefill?.wakeTime}
+        chronotype={userProfile.chronotype ?? 'night'}
       />
 
       {/* 大肥鱼漫游明信片送达仪式弹窗 */}

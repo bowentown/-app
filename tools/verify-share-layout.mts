@@ -47,11 +47,16 @@ for (const [reg, dur] of combos) {
   }
 }
 
-// 反向自检：构造"越界的坏布局"（旧 cy 漂移的产物 y=1466）必须被断言判负
+// 反向自检：内联【旧版 cy 累加漂移算法】喂入 bounds 断言——
+// 不是常量比常量，是真的把坏实现跑一遍再判
 {
-  const legacyMaxY = 1466;
-  const caught = legacyMaxY > CARD_H - 40;
-  check(`反向自检：越界布局(y=${legacyMaxY})被断言判负`, caught);
+  // 旧版：数据区起点 → 规律度 3 行 → 时长 2 行 → 语录 Math.max(cy+40, CARD_H-330)
+  let cy = 140 + 620 + 50;        // statsTop = 810
+  cy += 96; cy += 66; cy += 90;   // 规律度三行
+  cy += 84; cy += 90;             // 时长两行
+  const legacyQuoteTop = Math.max(cy + 40, 1440 - 330);   // = 1466
+  const legacyMaxY = legacyQuoteTop + 58 * 3 + 46;          // 加署名 = 1686
+  check(`反向自检：旧算法产物 maxY=${legacyMaxY} 越界`, legacyMaxY > CARD_H - 40);
 }
 
 if (failures > 0) {

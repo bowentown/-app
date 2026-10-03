@@ -1,6 +1,7 @@
 import React, { useEffect, useState  } from 'react';
 import { X, Moon, Clock, Sparkles, Check, Smartphone, Coffee, Bath, Flower2, BookOpen, Dumbbell, Wine, Utensils } from 'lucide-react';
 import { HABIT_OPTIONS as HABIT_CATALOG_LIST } from '../utils/habitCatalog';
+import { deriveKind } from '../utils/recordFilter';
 
 const habitCatalogById: Record<string, { id: string; label: string }> = Object.fromEntries(HABIT_CATALOG_LIST.map((h) => [h.id, h]));
 import { SleepRecord, WakingMood } from '../types/sleep';
@@ -18,6 +19,7 @@ interface ManualLogModalProps {
   initialDate?: string;
   initialBedtime?: string;
   initialWakeTime?: string;
+  chronotype?: 'night' | 'day' | 'irregular';
 }
 
 // id/label 与 ActiveSleepModal 共用 habitCatalog；图标是本文件的展示层
@@ -46,6 +48,7 @@ export const ManualLogModal: React.FC<ManualLogModalProps> = ({
   initialDate,
   initialBedtime,
   initialWakeTime,
+  chronotype = 'night',
 }) => {
   const [date, setDate] = useState(() => {
     const d = new Date();
@@ -123,7 +126,7 @@ export const ManualLogModal: React.FC<ManualLogModalProps> = ({
     const record: SleepRecord = {
       id: `manual-${Date.now()}`,
       // 日间就寝（本地 10–19 时）归类为小睡（kind），去重与分析层据此区分
-      kind: (parseInt(bedtime.split(':')[0], 10) >= 10 && parseInt(bedtime.split(':')[0], 10) < 20) ? 'nap' as const : undefined,
+      kind: deriveKind(parseInt(bedtime.split(':')[0], 10), chronotype) === 'nap' ? 'nap' as const : undefined,
       date,
       bedtime,
       wakeTime,

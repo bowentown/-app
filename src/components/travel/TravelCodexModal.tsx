@@ -222,7 +222,7 @@ export const TravelCodexModal: React.FC<Props> = ({ onClose }) => {
                     )}
                   </div>
                 ) : (
-                  <div className="w-full flex-1 rounded-xl bg-slate-950/80 border border-slate-800/50 flex flex-col items-center justify-center gap-1.5 text-[#475569]">
+                  <div className="w-full flex-1 rounded-xl bg-slate-950/80 border border-slate-800/50 flex flex-col items-center justify-center gap-1.5 text-slate-400">
                     <Lock className="w-5 h-5" />
                     <span className="text-[9px] font-mono font-bold tracking-wider">LOCKED</span>
                   </div>
@@ -252,7 +252,7 @@ export const TravelCodexModal: React.FC<Props> = ({ onClose }) => {
           {ALL_POSTCARDS.some((c) => !ART_READY_CONTINENTS.includes(c.continent)) && (
             <div
               aria-hidden
-              className="aspect-[157/245] rounded-2xl border border-dashed border-slate-700/70 bg-slate-900/30 flex flex-col items-center justify-center gap-1.5 text-[#64748b]"
+              className="aspect-[157/245] rounded-2xl border border-dashed border-slate-700/70 bg-slate-900/30 flex flex-col items-center justify-center gap-1.5 text-slate-400"
             >
               <Compass className="w-5 h-5" />
               <span className="text-[9px] font-bold">更多大洲</span>
@@ -273,7 +273,7 @@ export const TravelCodexModal: React.FC<Props> = ({ onClose }) => {
             <span>伴手礼行囊：还没有特产，攒能量出发就有了</span>
           )}
         </div>
-        <span className="text-[9px] text-[#64748b]">点击卡片背面可重温手写日记</span>
+        <span className="text-[9px] text-slate-400">点击卡片背面可重温手写日记</span>
       </div>
 
       {/* 详情放大模态层（3D 翻转卡片） */}
