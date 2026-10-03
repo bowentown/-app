@@ -130,8 +130,10 @@ public class UsageSignalPlugin extends Plugin {
                 cal.setTimeInMillis(t);
                 int hour = cal.get(Calendar.HOUR_OF_DAY);
 
-                // 事件归属"哪一夜"：12:00 前的事件归前一天夜里（00:30 的熄屏属于昨晚）
-                cal.add(Calendar.HOUR_OF_DAY, hour < 12 ? -12 : 0);
+                // 事件归属"哪一夜"：夜间作息 12:00 前的事件归前一天夜里（00:30 的熄屏属于昨晚）；
+                // 白天作息主睡在白天（放下 06–18 / 醒来 12–20），必须按自然日分桶，
+                // 否则同一觉的放下（如 08:30）和醒来（16:30）会被拆进两个桶，永远配不成对
+                if (!isDay && hour < 12) cal.add(Calendar.HOUR_OF_DAY, -12);
                 String dateKey = df.format(cal.getTime());
                 cal.setTimeInMillis(t);   // 恢复，后面还要用 hour
 

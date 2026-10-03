@@ -66,10 +66,14 @@ jobs:
 
       - name: Verify Generated CSS Classes
         run: npm run verify:css
-      - name: Install Capacitor Core & Android & Local Notifications Plugin
+      - name: Install Capacitor CLI / Core / Android (pinned major)
         run: |
-          npm install --save-dev @capacitor/cli @capacitor/core @capacitor/android @capacitor/local-notifications @capacitor/filesystem @capacitor/share
-          # 本地原生插件：MediaPipe LLM Inference（Gemma .task 端侧推理）
+          # 三个运行时插件（local-notifications/filesystem/share）已在 package.json
+          # dependencies 里随第一步装好，这里只补 cap 三件套。
+          # 必须显式 pin 主版本 + --legacy-peer-deps：无锁安装会整树重解析，
+          # Capacitor 出新主版本后模板漂移会让下面所有 sed 静默失配
+          npm install --legacy-peer-deps --save-dev @capacitor/cli@^8 @capacitor/core@^8 @capacitor/android@^8
+          # 本地原生插件：MediaPipe LLM Inference（Gemma .task 端侧推理）+ 使用行为信号
           npm install --legacy-peer-deps --save-dev ./plugins/cap-gemma-llm ./plugins/cap-usage-signal
 
       - name: Configure Capacitor for 100% Local Offline App
@@ -121,6 +125,14 @@ jobs:
           # MediaPipe 要求 minSdk ≥ 24（Capacitor 模板默认 23）
           sed -i 's/minSdkVersion = 23/minSdkVersion = 24/' android/variables.gradle
 
+          # sed 注入必须命中断言：模板结构变化导致静默不命中时，权限/服务缺失
+          # 只会在运行期表现为"闹钟不响/滤镜打不开"——必须在 CI 就拦住
+          grep -q 'SCHEDULE_EXACT_ALARM' android/app/src/main/AndroidManifest.xml
+          grep -q 'com.somnacare.gemmallm.PetOverlayService' android/app/src/main/AndroidManifest.xml
+          grep -q 'com.somnacare.gemmallm.AlarmRingService' android/app/src/main/AndroidManifest.xml
+          grep -q 'com.somnacare.gemmallm.BootReceiver' android/app/src/main/AndroidManifest.xml
+          grep -q 'minSdkVersion = 24' android/variables.gradle
+
           # 注入闹钟铃声资源（30 秒渐弱钟声，通知通道用；息屏响铃依赖它）
           # 注入启动屏（深色，消灭白屏闪现）与通知栏白色月亮小图标
           mkdir -p android/app/src/main/res/raw android/app/src/main/res/drawable
@@ -132,16 +144,17 @@ jobs:
           mkdir -p android/app/src/main/res/mipmap-anydpi-v26
           cp native-resources/adaptive/ic_launcher.xml android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
           cp native-resources/adaptive/ic_launcher_round.xml android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
-          # 自适应图标底色：Capacitor 7 模板将 ic_launcher_background 定义在独立文件中
+          # 自适应图标底色：Capacitor 模板将 ic_launcher_background 定义在独立文件或 colors.xml 中；
+          # rm 只允许发生在"新建了 ic_launcher_background.xml"的分支——此前无条件 rm
+          # 会把 elif 分支刚写进 colors.xml 的底色删掉，图标底色静默回退白色
           if [ -f android/app/src/main/res/values/ic_launcher_background.xml ]; then
             sed -i 's/#FFFFFF/#0B1026/' android/app/src/main/res/values/ic_launcher_background.xml
           elif [ -f android/app/src/main/res/values/colors.xml ]; then
             sed -i 's/#FFFFFF/#0B1026/' android/app/src/main/res/values/colors.xml
           else
             printf '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <color name="ic_launcher_background">#0B1026</color>\n</resources>\n' > android/app/src/main/res/values/ic_launcher_background.xml
+            rm -f android/app/src/main/res/values/colors.xml
           fi
-          # 防御：若上一步误创建了 colors.xml 导致的重复定义，删除多余的 colors.xml
-          rm -f android/app/src/main/res/values/colors.xml
           mkdir -p android/app/src/main/res/drawable-night
           cp native-resources/splash.png android/app/src/main/res/drawable-night/splash.png
           # 冷启动背景改纯深色：原生静止图不再出现，直接衔接 Web 三段式开屏动画

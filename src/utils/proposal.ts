@@ -35,12 +35,13 @@ export interface ProposalInput {
 }
 
 /** 单个 HH:mm + 夜归属键 → epoch（凌晨事件归 dateKey 的次一日历日）。 */
-export function epochOfEvent(dateKey: string, hhmm: string, kind: 'lastActive' | 'firstActive'): number {
+export function epochOfEvent(dateKey: string, hhmm: string, kind: 'lastActive' | 'firstActive', isDay = false): number {
   const [y, mo, d] = dateKey.split('-').map(Number);
   const [h, mi] = hhmm.split(':').map(Number);
-  // firstActive 恒在晨窗（04–12 点）→ 日历日 = dateKey + 1；
-  // lastActive：18–24 点 = dateKey 当天，0–6 点 = dateKey + 1
-  const dayShift = kind === 'firstActive' ? 1 : h >= 18 ? 0 : 1;
+  // 夜间作息：firstActive 恒在晨窗（04–12 点）→ 日历日 = dateKey + 1；
+  // lastActive：18–24 点 = dateKey 当天，0–6 点 = dateKey + 1。
+  // 白天作息：原生端按自然日分桶（放下 06–18 / 醒来 12–20 都在 dateKey 当天）→ 不平移
+  const dayShift = isDay ? 0 : kind === 'firstActive' ? 1 : h >= 18 ? 0 : 1;
   return new Date(y, mo - 1, d + dayShift, h, mi, 0, 0).getTime();
 }
 
@@ -60,13 +61,18 @@ export function computeProposal(input: ProposalInput): Proposal | null {
 
   if (!day.lastActive || !day.firstActive) return null;       // gate 1：信号不全不编数字
 
-  // gate 7（防御性复验，Java 已保证；缓存数据可能陈旧畸形）
+  // gate 7（防御性复验，Java 已保证；缓存数据可能陈旧畸形）。
+  // 窗口必须跟原生端 UsageSignalPlugin 的采样窗口同源——day 作息此前被
+  // 硬编码的夜间窗口整段拒绝，设置页宣称的"白天为主自动提议"实际从不触发
+  const isDay = input.chronotype === 'day';
   const bedH = parseInt(day.lastActive.split(':')[0], 10);
   const wakeH = parseInt(day.firstActive.split(':')[0], 10);
-  if (!(bedH >= 18 || bedH < 6) || !(wakeH >= 4 && wakeH < 12)) return null;
+  const bedOk = isDay ? bedH >= 6 && bedH < 18 : bedH >= 18 || bedH < 6;
+  const wakeOk = isDay ? wakeH >= 12 && wakeH < 20 : wakeH >= 4 && wakeH < 12;
+  if (!bedOk || !wakeOk) return null;
 
-  const bedtimeMs = epochOfEvent(day.date, day.lastActive, 'lastActive');
-  const wakeMs = epochOfEvent(day.date, day.firstActive, 'firstActive');
+  const bedtimeMs = epochOfEvent(day.date, day.lastActive, 'lastActive', isDay);
+  const wakeMs = epochOfEvent(day.date, day.firstActive, 'firstActive', isDay);
   if (!(wakeMs > bedtimeMs)) return null;                     // 时序防御
 
   const windowMinutes = Math.round((wakeMs - bedtimeMs) / 60000);
@@ -76,7 +82,9 @@ export function computeProposal(input: ProposalInput): Proposal | null {
   const w = new Date(wakeMs);
   const targetDate = `${w.getFullYear()}-${pad(w.getMonth() + 1)}-${pad(w.getDate())}`;
 
-  if (input.records.some((r) => r.date === targetDate)) return null;  // gate 4：已有记录
+  // gate 4：已有夜睡记录 → 不提议。必须只看夜睡——小睡与夜睡共存是合法状态
+  // （mergeRecord 契约），下午记了午睡不该把"昨晚还没确认"的提议挡掉
+  if (nightsOnly(input.records).some((r) => r.date === targetDate)) return null;
   if (input.handledDate === targetDate) return null;                  // gate 6：已处理过
 
 

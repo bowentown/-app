@@ -41,6 +41,9 @@ public class BedtimeOverlayService extends Service {
 
     private static final String CHANNEL_ID = "somnacare-bedtime";
     private static final int NOTIFICATION_ID = 20260929;
+    // 兜底通知（无悬浮窗权限时发普通通知）必须用独立 id：+1 曾恰好撞上
+    // PetOverlayService 的前台通知 id（20260930），把桌宠常驻通知顶掉串台
+    private static final int FALLBACK_NOTIFICATION_ID = 20260927;
     private static final int MOON_COLOR_LIT = 0xFFA8E6FF;
     private static final int MOON_COLOR_DEEP = 0xFF2563EB;
 
@@ -388,7 +391,7 @@ public class BedtimeOverlayService extends Service {
                     .setContentIntent(pi)
                     .setAutoCancel(true)
                     .build();
-            nm.notify(NOTIFICATION_ID + 1, notif);
+            nm.notify(FALLBACK_NOTIFICATION_ID, notif);
         } catch (Exception ignored) {
         }
     }

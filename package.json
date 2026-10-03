@@ -11,7 +11,7 @@
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
     "verify": "tsx tools/verify-guards-wired.mts && tsx tools/verify-wiring.mts && tsx tools/verify-theme-classes.mts && tsx tools/verify-contrast.mts && tsx tools/verify-a11y.mts && tsx tools/verify-css-usage.mts && tsx tools/verify-regularity.mts && tsx tools/verify-no-claims.mts && tsx tools/verify-backup.mts && tsx tools/verify-share-layout.mts && tsx tools/verify-share-privacy.mts && tsx tools/verify-record-builder.mts && tsx tools/verify-proposal.mts && tsx tools/verify-record-kind.mts && tsx tools/verify-week-summary.mts",
-    "verify:css": "tsx tools/verify-class-gen.mts && tsx tools/verify-no-oklch.mts"
+    "verify:css": "tsx tools/verify-class-gen.mts && tsx tools/verify-no-oklch.mts && tsx tools/verify-transform-compat.mts"
   },
   "dependencies": {
     "@capacitor/filesystem": "^8.1.3",

@@ -70,8 +70,11 @@ public class AlarmRingService extends Service {
             stopRing();
             return START_NOT_STICKY;
         }
-        // 两条闹钟落在同一分钟会二次投递：先释放旧 player/vibrator/wakelock，
-        // 否则旧 MediaPlayer 仍在循环且无引用可达——停铃与超时都停不掉它
+        // 两条闹钟落在同一分钟会二次投递：先撤掉上一轮的 5 分钟自动收场回调，
+        // 否则旧回调先到时会把新一轮响铃一并停掉（上限缩成"第一次投递起 5 分钟"）；
+        // 再释放旧 player/vibrator/wakelock——旧 MediaPlayer 仍在循环且无引用可达时，
+        // 停铃与超时都停不掉它
+        main.removeCallbacks(autoStop);
         releaseRingResources();
         String label = intent.getStringExtra("label");
         String time = intent.getStringExtra("time");

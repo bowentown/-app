@@ -61,9 +61,9 @@
 1. 打开 [Releases 页面](../../releases/latest)；
 2. 下载 `SomnaCare-vX.X.X.apk`；
 3. 手机上点开安装（需允许"安装未知来源应用"）；
-4. 从旧版本升级：**先卸载再安装**（桌面会缓存旧图标）。
+4. 从旧版本升级：**直接覆盖安装即可，睡眠数据、图鉴进度全部保留**（固定 release 签名，versionCode 随构建号递增）。
 
-> APK 为 CI 自动构建的 debug 签名，适合个人与朋友间分发；上架商店需自行配置正式签名。
+> APK 使用固定 release 签名（密钥经 GitHub Secrets 注入 CI，`tools/android-signing.gradle` 可审阅）；仅当 Actions 未配置签名 Secrets 时回退 debug 签名（此时更新才需先卸载）。仅从早期"每次构建签名不同"的版本升级时需先卸载一次。
 
 ## 🔒 隐私与诚实声明
 
@@ -80,7 +80,7 @@
 | `POST_NOTIFICATIONS` | 闹钟铃声通道 / 护眼与提醒常驻通知 |
 | `WAKE_LOCK` | 息屏后维持响铃流程 |
 | `RECORD_AUDIO` | 仅床头监测页声级采样（点按开启、可拒绝、诚实降级） |
-| `RECEIVE_BOOT_COMPLETED` | 预留：重启后恢复闹钟调度 |
+| `RECEIVE_BOOT_COMPLETED` | 重启后自动恢复闹钟与提醒调度（BootReceiver 已实现） |
 | `SYSTEM_ALERT_WINDOW` | 护眼全局滤镜 / 到点提醒悬浮动画 |
 | `FOREGROUND_SERVICE(+SPECIAL_USE)` | 护眼滤镜、就寝提醒前台服务 |
 

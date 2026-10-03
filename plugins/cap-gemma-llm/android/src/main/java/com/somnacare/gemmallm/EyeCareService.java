@@ -92,6 +92,13 @@ public class EyeCareService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         try {
+            // 铁律先行：startForegroundService 拉起的实例（含 ACTION_STOP——
+            // PetOverlayService.toggleEyeCare() 对开/关两种 action 统一用
+            // startForegroundService 投递）必须先进入前台态，5 秒内不
+            // startForeground 系统会 RemoteServiceException 强杀进程。
+            // 此前 STOP 分支直接 stopSelf，进程被杀后重开 App 关滤镜可复现崩溃
+            startForegroundCompat();
+
             String action = intent != null ? intent.getAction() : ACTION_APPLY;
             if (ACTION_STOP.equals(action)) {
                 removeOverlayInternal();
@@ -107,7 +114,6 @@ public class EyeCareService extends Service {
             float warmAlpha = intent != null ? clamp01(intent.getFloatExtra(EXTRA_WARM_ALPHA, 0f)) : 0f;
             float dimAlpha = intent != null ? clamp01(intent.getFloatExtra(EXTRA_DIM_ALPHA, 0f)) : 0f;
 
-            startForegroundCompat();
             applyOverlay(this, warmColor, warmAlpha, dimAlpha);
         } catch (Exception ignored) {
             // 服务内任何异常都不允许带崩应用进程

@@ -434,7 +434,16 @@ public class GemmaLLMPlugin extends Plugin {
 
     /** 稳定请求码：同一条闹钟重复调度时 FLAG_UPDATE_CURRENT 原地替换 */
     private static int ringRequestCode(String id, int isoDay) {
-        return 2_000_000 + Math.abs((id + ":" + isoDay).hashCode()) % 1_000_000;
+        // 纯函数（取消/重排必得同码）+ 大码空间：此前 100 万空间在
+        // "30 条闹钟 × 7 天"的规模下约 2% 哈希碰撞，碰撞即静默顶掉先调度
+        // 的那条闹钟（某天不响）。扩大到 1000 万并加一轮整数混淆
+        int h = (id + ":" + isoDay).hashCode();
+        h ^= h >>> 16;
+        h *= 0x7feb352d;
+        h ^= h >>> 15;
+        h *= 0x846ca68b;
+        h ^= h >>> 16;
+        return 2_000_000 + (h & 0x7fffffff) % 10_000_000;
     }
 
     /** 按闹钟表重排响铃闹钟；json 为空/格式坏时视为全取消。Boot 重排复用。 */
@@ -835,6 +844,10 @@ public class GemmaLLMPlugin extends Plugin {
     @PluginMethod
     public void isModelDownloaded(PluginCall call) {
         String filename = call.getString("filename");
+        if (filename == null || filename.isEmpty()) {
+            call.reject("缺少 filename 参数");
+            return;
+        }
         File f = new File(getContext().getFilesDir(), filename);
         JSObject ret = new JSObject();
         ret.put("downloaded", f.exists() && f.length() > 0);
@@ -846,6 +859,10 @@ public class GemmaLLMPlugin extends Plugin {
     @PluginMethod
     public void deleteModel(PluginCall call) {
         String filename = call.getString("filename");
+        if (filename == null || filename.isEmpty()) {
+            call.reject("缺少 filename 参数");
+            return;
+        }
         File f = new File(getContext().getFilesDir(), filename);
         unloadInternal();
         JSObject ret = new JSObject();
@@ -858,6 +875,10 @@ public class GemmaLLMPlugin extends Plugin {
     @PluginMethod
     public void loadModel(PluginCall call) {
         String filename = call.getString("filename");
+        if (filename == null || filename.isEmpty()) {
+            call.reject("缺少 filename 参数");
+            return;
+        }
         int maxTokens = call.getInt("maxTokens", 1024);
         File f = new File(getContext().getFilesDir(), filename);
         if (!f.exists() || f.length() == 0) {

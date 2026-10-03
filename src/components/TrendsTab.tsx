@@ -29,12 +29,13 @@ import {
   usageHasPermission,
   usageOpenSettings,
   usagePrompted,
-  refreshUsageDays,
-  cachedUsageDays,
   clearUsageData,
   computeUsageRegularity,
   type UsageDay,
 } from '../utils/usageSignal';
+// 使用行为查询统一走共享 store：缓存/在途去重/过期都在那里管，
+// 且查询结果回流给提议侧（此前这里直连 usageSignal，两套数据源不互通）
+import { forceRefreshUsage, getCachedUsageDays } from '../utils/usageStore';
 import { isNativePlatform } from '../utils/nativeAlarmScheduler';
 import { formatDurationChinese } from '../utils/sleepScore';
 import { ThemeConfig } from '../utils/themeStyles';
@@ -43,11 +44,13 @@ interface TrendsTabProps {
   records: SleepRecord[];
   onDeleteRecord?: (id: string) => void;
   theme: ThemeConfig;
+  /** 作息类型：使用信号按作息窗口采样，查询必须带上（否则拿夜窗数据当白窗用） */
+  chronotype?: 'night' | 'day' | 'irregular';
 }
 
 type MetricViewMode = 'quality' | 'stages' | 'circadian';
 
-export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, theme }) => {
+export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, theme, chronotype = 'night' }) => {
   const innerBg = theme?.cardInnerBg || 'bg-[#0a0f1d]';
   const innerBorder = theme?.cardInnerBorder || 'border-slate-700/80';
   const accentText = theme?.accentText || 'text-indigo-400';
@@ -61,7 +64,7 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
   const [showShare, setShowShare] = useState(false);
   // ── 手机使用对照（P3）：native-only，权限/数据/引导标记 ──
   const [usagePerm, setUsagePerm] = useState<'checking' | 'granted' | 'denied'>('checking');
-  const [usageDays, setUsageDays] = useState<UsageDay[]>(() => cachedUsageDays());
+  const [usageDays, setUsageDays] = useState<UsageDay[]>(() => getCachedUsageDays());
   const [usagePromptedOnce, setUsagePromptedOnce] = useState(() => usagePrompted());
 
   useEffect(() => {
@@ -69,9 +72,9 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
     void (async () => {
       const granted = await usageHasPermission();
       setUsagePerm(granted ? 'granted' : 'denied');
-      if (granted) setUsageDays(await refreshUsageDays(7));
+      if (granted) setUsageDays(await forceRefreshUsage(7, chronotype));
     })();
-  }, []);
+  }, [chronotype]);
   const [historyLimit, setHistoryLimit] = useState(50);
 
 
@@ -109,7 +112,7 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
               className={`px-3 py-2 rounded-lg font-bold transition-all cursor-pointer ${
                 viewMode === 'quality'
                   ? accentBg + ' ' + accentFg + ' shadow'
-                  : 'text-slate-400 hover:text-white'
+                  : `${textMuted} hover:text-white`
               }`}
             >
               得分曲线
@@ -120,7 +123,7 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
               className={`px-3 py-2 rounded-lg font-bold transition-all cursor-pointer ${
                 viewMode === 'stages'
                   ? accentBg + ' ' + accentFg + ' shadow'
-                  : 'text-slate-400 hover:text-white'
+                  : `${textMuted} hover:text-white`
               }`}
             >
               分期比例
@@ -131,7 +134,7 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
               className={`px-3 py-2 rounded-lg font-bold transition-all cursor-pointer ${
                 viewMode === 'circadian'
                   ? accentBg + ' ' + accentFg + ' shadow'
-                  : 'text-slate-400 hover:text-white'
+                  : `${textMuted} hover:text-white`
               }`}
             >
               起卧时段
@@ -494,18 +497,18 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
             ) : (
             <div className="grid grid-cols-3 gap-2.5">
               <div className={`${innerBg} border ${innerBorder} rounded-2xl p-3`}>
-                <span className="text-[10px] text-slate-400 block mb-0.5">平均评分</span>
+                <span className={`text-[10px] ${textMuted} block mb-0.5`}>平均评分</span>
                 <span className={`text-xl font-black font-mono ${theme.accentText} tabular-nums`}>{avgScoreWk}</span>
               </div>
               <div className={`${innerBg} border ${innerBorder} rounded-2xl p-3`}>
-                <span className="text-[10px] text-slate-400 block mb-0.5">日均时长</span>
+                <span className={`text-[10px] ${textMuted} block mb-0.5`}>日均时长</span>
                 <span className="text-xl font-black font-mono text-white tabular-nums">
                   {Math.floor(avgDurWk / 60)}<span className="text-sm">H</span>
                   {avgDurWk % 60}<span className="text-sm">M</span>
                 </span>
               </div>
               <div className={`${innerBg} border ${innerBorder} rounded-2xl p-3`}>
-                <span className="text-[10px] text-slate-400 block mb-0.5">场均深睡</span>
+                <span className={`text-[10px] ${textMuted} block mb-0.5`}>场均深睡</span>
                 <span className="text-xl font-black font-mono text-emerald-400 tabular-nums">
                   {avgDeepWk}<span className="text-sm">M</span>
                 </span>
@@ -520,11 +523,11 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
                     sum.regularity.score >= 80 ? 'text-emerald-400' : sum.regularity.score >= 50 ? 'text-amber-400' : 'text-rose-400'
                   }`}>{sum.regularity.score}</span>
                 </div>
-                <p className="text-[10px] text-slate-400 leading-relaxed">
+                <p className={`text-[10px] ${textMuted} leading-relaxed`}>
                   就寝 ±{sum.regularity.bedDev} 分钟 · 起床 ±{sum.regularity.wakeDev} 分钟 ·{' '}
                   {regularityTier(sum.regularity.score) === 'steady' ? '作息很稳' : regularityTier(sum.regularity.score) === 'ok' ? '基本规律' : '作息波动大'}
                 </p>
-                <p className="text-[10px] text-slate-400 leading-relaxed">
+                <p className={`text-[10px] ${textMuted} leading-relaxed`}>
                   按你的作息起止点计算，不是测量值
                 </p>
               </div>
@@ -560,7 +563,7 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
               <button
                 type="button"
                 onClick={() => { clearUsageData(); setUsageDays([]); }}
-                className="text-[10px] text-slate-400 hover:text-slate-300 underline cursor-pointer py-1.5 -my-1.5"
+                className={`text-[10px] ${textMuted} hover:text-slate-300 underline cursor-pointer py-1.5 -my-1.5`}
               >
                 清除手机使用数据
               </button>
@@ -597,7 +600,7 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
                     void usageOpenSettings().then(async () => {
                       const granted = await usageHasPermission();
                       setUsagePerm(granted ? 'granted' : 'denied');
-                      if (granted) setUsageDays(await refreshUsageDays(7));
+                      if (granted) setUsageDays(await forceRefreshUsage(7, chronotype));
                     });
                   }}
                   className={`w-full py-2.5 rounded-xl ${theme.accentText} border ${theme.accentBorder} text-xs font-bold cursor-pointer active:scale-[0.98] transition-transform`}
@@ -632,7 +635,7 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
                     <span className={`${textMuted} font-medium shrink-0`}>夜间拿起 {d.nightPickups} 次</span>
                   </div>
                 ))}
-                <p className="text-[10px] text-slate-400 leading-relaxed">
+                <p className={`text-[10px] ${textMuted} leading-relaxed`}>
                   基于手机使用记录（屏幕亮灭），不是睡眠监测；"放下手机"不等于入睡。
                 </p>
               </div>

@@ -179,8 +179,12 @@ export async function renderWeeklyCard(input: WeeklyCardInput): Promise<WeeklyCa
   const now = input.now ?? new Date();
   const records = input.records;
   const regularity = computeRegularity(records);
-  const avgDurationMin = records.length > 0
-    ? Math.round(nightsOnly(records).slice(0, 7).reduce((a, r) => a + r.durationMinutes, 0) / Math.min(7, nightsOnly(records).length))
+  // 全小睡输入的防线（第 23 轮 P1）：门控必须用【夜睡】的长度而不是
+  // records.length——夜睡为空时 reduce/min 产出 0/0 = NaN，而
+  // NaN !== null 会逃过下面的布局门控，把"NaN 小时 NaN 分"画进成品图
+  const nights7 = nightsOnly(records).slice(0, 7);
+  const avgDurationMin = nights7.length > 0
+    ? Math.round(nights7.reduce((a, r) => a + r.durationMinutes, 0) / nights7.length)
     : null;
 
   const canvas = document.createElement('canvas');

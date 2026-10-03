@@ -67,30 +67,32 @@ export const App: React.FC = () => {
   // Persistence for user logs: Empty by default for new users, prevents overwriting corrupt data
   const [records, setRecords] = useState<SleepRecord[]>(() => {
     const saved = localStorage.getItem('somnacare_sleep_records');
-    if (saved) {
-      // 备份放在 parse 成功之后、任何 return 之前：合法 JSON 但结构不对
-      // （null / 非数组 / 全部清洗失败）此前会静默清空日记并被挂载写回覆盖
-      try { localStorage.setItem('somnacare_sleep_records_backup_corrupted', saved); } catch { /* ignore */ }
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          // 与导入路径共用同一条清洗：畸形记录（缺 bedtime / null 项 / 坏值）
-          // 此前会直接把首页打崩（.split 抛错）或产出 NaN。
-          // 排序与导入路径同契约：records[0] 必须是最近一晚——升序存储
-          // （早期版本/外部播种）会让趋势轴反转、首页指向最老一条
-          return parsed
-            .map(sanitizeRecord)
-            .filter((r): r is SleepRecord => r !== null)
-            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        }
-      } catch (e) {
-        console.error('Failed to parse saved records, backed up corrupted key:', e);
-        return [];
+    if (!saved) return [];
+    // 与导入路径共用同一条清洗：畸形记录（缺 bedtime / null 项 / 坏值）
+    // 此前会直接把首页打崩（.split 抛错）或产出 NaN。
+    // 排序与导入路径同契约：records[0] 必须是最近一晚——升序存储
+    // （早期版本/外部播种）会让趋势轴反转、首页指向最老一条
+    let loaded: SleepRecord[] | null = null;
+    try {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed)) {
+        loaded = parsed
+          .map(sanitizeRecord)
+          .filter((r): r is SleepRecord => r !== null)
+          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       }
-      console.warn('[storage] 记录结构异常，已备份后清空');
-      return [];
+    } catch (e) {
+      console.error('Failed to parse saved records:', e);
     }
-    // New user starts with empty clean diary by default (can explicitly load demo data in Settings)
+    if (loaded) {
+      // 数据恢复正常后，上次启动留的"损坏备份"不再有价值（白占同源配额）
+      try { localStorage.removeItem('somnacare_sleep_records_backup_corrupted'); } catch { /* ignore */ }
+      return loaded;
+    }
+    // 仅在 JSON 损坏/结构非法时落备份：挂载写回会覆盖原值，不备份就永远找不回；
+    // 合法数据每次启动都镜像一份会白吃 ~MB 级 localStorage 配额
+    try { localStorage.setItem('somnacare_sleep_records_backup_corrupted', saved); } catch { /* ignore */ }
+    console.warn('[storage] 记录结构异常，已备份后清空');
     return [];
   });
 
@@ -735,8 +737,8 @@ export const App: React.FC = () => {
         document.body,
       )}
       {toastMessage && (
-        <div className={`fixed top-5 left-0 right-0 mx-auto w-fit z-[90] px-5 py-3 rounded-2xl ${currentTheme.accentBg.split(' ')[0]} ${currentTheme.accentFg} text-xs font-black shadow-2xl flex items-center gap-2.5 animate-bounce border border-white/10`}>
-          <CheckCircle2 className="w-5 h-5 text-white/90" />
+        <div className={`fixed top-5 left-0 right-0 mx-auto w-fit z-[350] px-5 py-3 rounded-2xl ${currentTheme.accentBg.split(' ')[0]} ${currentTheme.accentFg} text-xs font-black shadow-2xl flex items-center gap-2.5 animate-bounce border border-white/10`}>
+          <CheckCircle2 className="w-5 h-5 opacity-90" />
           <span>{toastMessage}</span>
         </div>
       )}
@@ -747,10 +749,10 @@ export const App: React.FC = () => {
         <header className={`px-5 pt-5 pb-3.5 flex items-center justify-between border-b ${currentTheme.cardBorder} shrink-0`}>
           <div className="flex items-center gap-2.5">
             <div
-              className="w-9 h-9 rounded-2xl text-white flex items-center justify-center shadow-md"
+              className={`w-9 h-9 rounded-2xl ${currentTheme.accentFg} flex items-center justify-center shadow-md`}
               style={{ background: `linear-gradient(135deg, ${currentTheme.accentHex}, ${currentTheme.accentHex}55)` }}
             >
-              <Moon className="w-5 h-5 fill-white/50" />
+              <Moon className="w-5 h-5 fill-current opacity-90" />
             </div>
             <h1 className="text-xl font-black tracking-tight text-white">
               极光睡眠
@@ -798,6 +800,7 @@ export const App: React.FC = () => {
                       records={records}
                       onDeleteRecord={handleDeleteRecord}
                       theme={currentTheme}
+                      chronotype={userProfile.chronotype ?? 'night'}
                     />
                   )}
 
@@ -832,6 +835,12 @@ export const App: React.FC = () => {
                         setRecords(sorted);
                         showToast(`已成功导入 ${imported.length} 条睡眠记录`);
                       }}
+                      onReplaceRecords={(next) => {
+                        // 作息类型切换的存量重归类专用通路：不走 onImportRecords
+                        // （那条路弹"导入将替换"确认框，取消会让 profile 与数据
+                        // 永久不一致）。顺序不变（records 本就是降序）
+                        setRecords(next);
+                      }}
                       theme={currentTheme}
                     />
                   )}
@@ -856,6 +865,7 @@ export const App: React.FC = () => {
         onFinishSleep={handleSaveActiveSleep}
         theme={currentTheme}
         targetDurationHours={userProfile.targetDurationHours}
+        chronotype={userProfile.chronotype ?? 'night'}
       />
 
       {/* Manual Sleep Log Modal */}

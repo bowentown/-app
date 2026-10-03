@@ -261,7 +261,8 @@ export const OneTapSleepTracker: React.FC<OneTapSleepTrackerProps> = ({ onSaveRe
               </button>
             </div>
 
-            {/* 两行布局：一行 flex 塞不下"图标+文案+CTA"三块，硬塞会把副标题挤折行 */}
+            {/* 两行布局：一行 flex 塞不下"图标+文案+CTA"三块，硬塞会把副标题挤折行。
+                琥珀色是有意保留的"晨光"语义（醒来 = 早晨），不随主题强调色变化 */}
             <button
               type="button"
               onClick={handleWakeUp}

@@ -104,6 +104,27 @@ const baseRecords = [
   check('gate 0：不规律作息 → 完全不提议', p8 === null);
 }
 
+// ── day 作息链路 + gate 4 小睡豁免（第 23 轮） ──
+{
+  // day 作息：08:30 放下 → 16:30 拿起（原生自然日分桶，date 键 = 事件当日）
+  const dayUsage = [{ date: '2026-10-03', lastActive: '08:30', firstActive: '16:30', nightPickups: 1 }];
+  const dayHistory = [rec('2026-10-02', '08:40'), rec('2026-10-01', '08:35'), rec('2026-09-30', '08:30')];
+  const pd = computeProposal({ usageDays: dayUsage, records: dayHistory, sessionActive: false, chronotype: 'day' });
+  check('day 作息：产出提议（此前链路整段是死的）', pd !== null);
+  check('day 作息：targetDate = 当天(10-03)，不平移', pd?.targetDate === '2026-10-03', pd?.targetDate);
+  check('day 作息：窗口 = 480 分钟', pd !== null && pd.windowMinutes === 480, `w=${pd?.windowMinutes}`);
+  // 反向：同样的白昼数据在 night 口径（缺省）下必须被防御门拒绝
+  const pn = computeProposal({ usageDays: dayUsage, records: baseRecords, sessionActive: false });
+  check('反向：day 数据 + night 口径 → 防御性拒绝', pn === null);
+  // gate 4 只看夜睡：下午记了午睡不能挡住"昨晚还没确认"的提议
+  const nap = { ...rec('2026-10-03', '13:00'), id: 'nap-1', kind: 'nap', wakeTime: '13:40' };
+  const pnap = computeProposal({ usageDays: [baseDay], records: [...baseRecords, nap], sessionActive: false });
+  check('gate 4 豁免：同日仅小睡 → 仍提议昨晚', pnap !== null && pnap.targetDate === '2026-10-03', `p=${pnap?.targetDate}`);
+  // 反向：同日的夜睡记录照旧挡住
+  const pnight = computeProposal({ usageDays: [baseDay], records: [...baseRecords, rec('2026-10-03', '22:00')], sessionActive: false });
+  check('反向：同日有夜睡 → 照旧不提议', pnight === null);
+}
+
 if (failures > 0) {
   console.error(`\n${failures} 项失败——提议引擎口径不符`);
   process.exit(1);

@@ -59,6 +59,8 @@ interface SettingsTabProps {
   onUpdateProfile: (updated: Partial<UserProfile>) => void;
   onResetDemoData: () => void;
   onImportRecords?: (imported: SleepRecord[]) => void;
+  /** 作息切换的存量重归类专用通路（静默替换，不弹导入确认框） */
+  onReplaceRecords?: (records: SleepRecord[]) => void;
   theme: ThemeConfig;
 }
 
@@ -68,6 +70,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   onUpdateProfile,
   onResetDemoData,
   onImportRecords,
+  onReplaceRecords,
   theme,
 }) => {
   const [themeOpen, setThemeOpen] = useState(false);
@@ -206,7 +209,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         const skipped = confirm(
           `全量备份导入将覆盖当前的睡眠记录、朋友圈与聊天历史（图鉴与档案按文件内容恢复）。\n` +
           `包含：记录 ${parsed.data.records.length} 条 · 朋友圈 ${parsed.data.moments.length} 条 · 聊天 ${parsed.data.chat.length} 条。\n` +
-          `API 密钥不包含在备份中：覆盖安装会保留本机已填的值；卸载/换机迁移后需重新填写（DeepSeek / 自建 Key / HF token）。继续？`,
+          `API 密钥不包含在备份中：覆盖安装会保留本机已填的值；卸载/换机迁移后需重新填写（DeepSeek / 自建 Key / HF token）。\n` +
+          `手机使用信号数据也不参与备份，换机后需重新积累。继续？`,
         );
         if (!skipped) return;
         const r = restoreFullBackup(parsed.data);
@@ -307,12 +311,15 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 type="button"
                 onClick={() => {
                   // 切换作息类型：存量小睡按新类型重归类（只改 kind，不删数据）
-                  // ——白天为主者此前的主睡被误标 nap，改设置后必须生效
+                  // ——白天为主者此前的主睡被误标 nap，改设置后必须生效。
+                  // 重归类走 onReplaceRecords 专用通路：此前混在 onImportRecords
+                  // 里，那条路会弹"导入将替换当前的 N 条记录"确认框——用户
+                  // 取消时 profile 已切换而数据没重分类，两边永久不一致
                   const reclassified = reclassifyForChronotype(records, opt.key);
                   const changed = JSON.stringify(reclassified.map((r) => r.kind)) !== JSON.stringify(records.map((r) => r.kind));
                   onUpdateProfile({ chronotype: opt.key });
-                  if (changed && onImportRecords) {
-                    onImportRecords(reclassified);
+                  if (changed && onReplaceRecords) {
+                    onReplaceRecords(reclassified);
                   }
                 }}
                 aria-pressed={active}

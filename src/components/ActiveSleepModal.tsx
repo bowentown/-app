@@ -4,7 +4,7 @@ import { Bell, Volume2, Sparkles, X, ChevronRight, Check, CloudRain, Waves, Flow
 import MoonDisc from './MoonDisc';
 import { getMoonInfo } from '../utils/moonPhase';
 import { sleepAudio } from '../utils/audioSynth';
-import { calculateSleepScore, generateSleepStages } from '../utils/sleepScore';
+import { buildRecordFromWindow } from '../utils/recordBuilder';
 import { SleepRecord, WakingMood } from '../types/sleep';
 import { HABIT_OPTIONS } from '../utils/habitCatalog';
 import { ThemeConfig } from '../utils/themeStyles';
@@ -16,6 +16,8 @@ interface ActiveSleepModalProps {
   onFinishSleep: (record: SleepRecord) => void;
   theme: ThemeConfig;
   targetDurationHours?: number;
+  /** 作息类型：kind 归类（夜间作息用户白天记的短睡是小睡，不能顶掉当晚夜睡） */
+  chronotype?: 'night' | 'day' | 'irregular';
 }
 
 export const ActiveSleepModal: React.FC<ActiveSleepModalProps> = ({
@@ -24,6 +26,7 @@ export const ActiveSleepModal: React.FC<ActiveSleepModalProps> = ({
   onFinishSleep,
   theme,
   targetDurationHours,
+  chronotype,
 }) => {
   const [currentTime, setCurrentTime] = useState('');
   const [currentDate, setCurrentDate] = useState('');
@@ -263,55 +266,27 @@ export const ActiveSleepModal: React.FC<ActiveSleepModalProps> = ({
     setIsAudioPlaying(false);
 
     const endTime = new Date();
-    // Use actual real duration in minutes (minimum 1 minute), no fake 7.5h overwrite
-    const effectiveMinutes = Math.max(1, Math.round(elapsedSeconds / 60));
 
-    const bHour = String(startTime.getHours()).padStart(2, '0');
-    const bMin = String(startTime.getMinutes()).padStart(2, '0');
-    const wHour = String(endTime.getHours()).padStart(2, '0');
-    const wMin = String(endTime.getMinutes()).padStart(2, '0');
-
-    const bedtimeStr = `${bHour}:${bMin}`;
-    const wakeTimeStr = `${wHour}:${wMin}`;
-
-    const stagesData = generateSleepStages(bedtimeStr, wakeTimeStr, latencyMinutes, wakeCount);
-    // 统一语义：durationMinutes = 纯睡眠（卧床窗 − 觉醒段），与其他记录入口一致
-    const sleepMinutes = Math.max(1, effectiveMinutes - stagesData.awakeMinutes);
-    const { score, efficiency } = calculateSleepScore(
-      sleepMinutes,
-      stagesData.deepMinutes,
-      stagesData.remMinutes,
-      stagesData.awakeMinutes,
-      wakeCount,
-      14,
-      Math.round((targetDurationHours || 8) * 60)
-    );
-
-    const now = new Date();
-    const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-
-    const newRecord: SleepRecord = {
+    // 共享构建器（recordBuilder）：16h 截断 / kind 归类 / "分期-评分-字段同源"
+    // 都只在那一处实现。此前这里留了第三份内联构建：无 kind 的"夜睡"会在
+    // 同日 merge 时把一键就寝落库的真实夜睡顶掉（D1 数据丢失复发），
+    // 且评分用硬编码 latency=14、落库却是用户滑块值，详情页自相矛盾。
+    const built = buildRecordFromWindow({
+      sleepStartMs: startTime.getTime(),
+      wakeMs: endTime.getTime(),
+      targetDurationHours,
       id: `sleep-${Date.now()}`,
-      date: dateStr,
-      bedtime: bedtimeStr,
-      wakeTime: wakeTimeStr,
-      durationMinutes: sleepMinutes,
-      deepSleepMinutes: stagesData.deepMinutes,
-      lightSleepMinutes: stagesData.lightMinutes,
-      remSleepMinutes: stagesData.remMinutes,
-      awakeMinutes: stagesData.awakeMinutes,
-      sleepScore: score,
-      sleepEfficiency: efficiency,
-      latencyMinutes,
-      latencyEstimated: !latencyTouched,
-      wakeCount,
-      wakingMood: selectedMood,
-      preSleepHabits: selectedHabits,
-      dreamNotes: dreamNotes.trim() || undefined,
-      stages: stagesData.stages,
-    };
+      recordSource: 'onetap',
+      chronotype,
+      userLatencyMinutes: latencyMinutes,
+      userLatencyEstimated: !latencyTouched,
+      userWakeCount: wakeCount,
+      userWakingMood: selectedMood,
+      userPreSleepHabits: selectedHabits,
+      userDreamNotes: dreamNotes.trim() || undefined,
+    });
 
-    onFinishSleep(newRecord);
+    onFinishSleep(built.record);
     onClose();
   };
 
@@ -324,7 +299,7 @@ export const ActiveSleepModal: React.FC<ActiveSleepModalProps> = ({
 
   // portal 到 body：分区滑动容器带 translate3d，fixed 退化 → 跨页
   return createPortal(
-    <div ref={a11yRef} {...dialogProps} className={`fixed inset-0 z-50 ${theme.pageBg} ${theme.textPrimary} flex flex-col justify-between p-6 select-none overflow-y-auto`}>
+    <div ref={a11yRef} {...dialogProps} className={`fixed inset-0 z-[100] ${theme.pageBg} ${theme.textPrimary} flex flex-col justify-between p-6 select-none overflow-y-auto`}>
       {/* 氛围背景：星点闪烁 + 顶部主题色极光辉光 */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
         {stars.map((s, i) => (
@@ -607,7 +582,7 @@ export const ActiveSleepModal: React.FC<ActiveSleepModalProps> = ({
               onChange={(e) => setDreamNotes(e.target.value)}
               placeholder="还记得做过的梦吗？输入几个关键词或画面..."
               rows={2}
-              className={`w-full ${theme.cardInnerBg} border ${theme.cardInnerBorder} rounded-xl p-3 text-xs ${theme.textSecondary} placeholder-slate-500 focus:outline-none ${theme.focusRing}`}
+              className={`w-full ${theme.cardInnerBg} border ${theme.cardInnerBorder} rounded-xl p-3 text-xs ${theme.textSecondary} placeholder-slate-400 focus:outline-none ${theme.focusRing}`}
             />
           </div>
 
@@ -629,7 +604,7 @@ export const ActiveSleepModal: React.FC<ActiveSleepModalProps> = ({
             onClick={() => setIsWakingUp(true)}
             className={`w-full py-3.5 px-4 rounded-2xl ${theme.accentBg} ${theme.accentFg} font-semibold text-sm shadow-xl flex items-center justify-center gap-2 active:scale-[0.98] transition-all`}
           >
-            <Sparkles className="w-4 h-4 text-white/80" />
+            <Sparkles className="w-4 h-4 opacity-80" />
             <span>我醒了 · 结束睡眠</span>
           </button>
           <p className={`text-[11px] ${theme.textMuted} text-center`}>屏幕保持亮起 · 手机放置枕边效果最佳</p>

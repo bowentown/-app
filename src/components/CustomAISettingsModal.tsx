@@ -379,7 +379,7 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
                     onChange={(e) => setHfTokenVal(e.target.value)}
                     onBlur={() => setHfToken(hfTokenVal.trim())}   // 失焦才落盘：此前每敲一键写一次存储
                     placeholder="hf_xxxxxxxxxxxx"
-                    className={`w-full bg-[#0a0f1d] border border-slate-600 rounded-xl px-2.5 py-2 text-xs text-white font-mono placeholder-slate-500 focus:outline-none ${theme.focusRing}`}
+                    className={`w-full bg-[#0a0f1d] border border-slate-600 rounded-xl px-2.5 py-2 text-xs text-white font-mono placeholder-slate-400 focus:outline-none ${theme.focusRing}`}
                   />
                   <p className="text-[10px] text-slate-400 leading-relaxed">
                     Gemma 为门控模型：在 huggingface.co 登录 → 打开 litert-community/gemma-3-1b-it →
@@ -607,7 +607,7 @@ export const CustomAISettingsModal: React.FC<CustomAISettingsModalProps> = ({
               value={systemPersona}
               onChange={(e) => setSystemPersona(e.target.value)}
               placeholder="设定顾问身份与风格..."
-              className={`w-full bg-[#0a0f1d] border border-slate-600 rounded-xl p-2.5 text-xs text-white placeholder-slate-500 focus:outline-none ${theme.focusRing} leading-relaxed`}
+              className={`w-full bg-[#0a0f1d] border border-slate-600 rounded-xl p-2.5 text-xs text-white placeholder-slate-400 focus:outline-none ${theme.focusRing} leading-relaxed`}
             />
             <p className="text-[10px] text-slate-400 leading-relaxed">
               回复篇幅与格式由应用统一约束（≤150 字、先结论后建议、纯文本），此处只需设定顾问身份与语气。

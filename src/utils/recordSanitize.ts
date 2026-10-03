@@ -60,6 +60,11 @@ export function sanitizeRecord(raw: unknown): SleepRecord | null {
     latencyEstimated: typeof r.latencyEstimated === 'boolean' ? r.latencyEstimated : undefined,
     // 白名单加 kind：nap-only 落字段（'night'/缺省不写，旧数据 JSON 形状一字不变）
     kind: r.kind === 'nap' ? 'nap' : undefined,
+    // 白名单补 recordSource（第 23 轮）：挂载写回曾把"来源标注"静默抹掉，
+    // 与 latencyEstimated 同一类缺陷
+    recordSource: ['onetap', 'manual', 'usage'].includes(r.recordSource as string)
+      ? (r.recordSource as SleepRecord['recordSource'])
+      : undefined,
     wakeCount: Math.max(0, Math.round(numOr(r.wakeCount, 0))),
     wakingMood: (['refreshed', 'neutral', 'tired', 'groggy'].includes(r.wakingMood as string)
       ? r.wakingMood

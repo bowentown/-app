@@ -111,7 +111,9 @@ export const ManualLogModal: React.FC<ManualLogModalProps> = ({
     if (endMs <= startMs) {
       endMs += 24 * 60 * 60 * 1000;
     }
-    const totalDurationMinutes = Math.max(60, Math.round((endMs - startMs) / 60000) - stagesData.awakeMinutes);
+    // 下限与其他入口一致（recordBuilder 的 Math.max(1,…)）：20 分钟的真实小睡
+    // 不能被抬成 60 分钟——"按实际时长如实记录"是全应用口径
+    const totalDurationMinutes = Math.max(1, Math.round((endMs - startMs) / 60000) - stagesData.awakeMinutes);
 
     const { score, efficiency } = calculateSleepScore(
       totalDurationMinutes,
@@ -125,6 +127,7 @@ export const ManualLogModal: React.FC<ManualLogModalProps> = ({
 
     const record: SleepRecord = {
       id: `manual-${Date.now()}`,
+      recordSource: 'manual' as const,
       // 日间就寝（本地 10–19 时）归类为小睡（kind），去重与分析层据此区分
       kind: deriveKind(parseInt(bedtime.split(':')[0], 10), chronotype) === 'nap' ? 'nap' as const : undefined,
       date,

@@ -6,22 +6,37 @@
 import { refreshUsageDays, cachedUsageDays, type UsageDay } from './usageSignal';
 import { isNativePlatform } from './nativeAlarmScheduler';
 
+// 缓存必须会过期：App 常驻过夜的用户第二天早上要能查到新一晚的信号，
+// 否则提议永远不出现（此前必须杀进程才刷新）。半小时足够去重多处挂载。
+const CACHE_TTL_MS = 30 * 60 * 1000;
+
 let cache: UsageDay[] | null = null;
+let cacheKey = '';
+let cacheAt = 0;
 let loading: Promise<UsageDay[]> | null = null;
+let loadingKey = '';
 const subscribers = new Set<(days: UsageDay[]) => void>();
+
+function keyOf(days: number, chronotype: 'night' | 'day' | 'irregular'): string {
+  return `${days}|${chronotype}`;
+}
 
 function emit() {
   if (cache) for (const fn of subscribers) fn(cache);
 }
 
-/** 幂等加载：已加载/加载中直接复用；仅 native 且未加载才真的查。 */
-export function ensureUsageLoaded(days = 2, chronotype: 'night' | 'day' | 'irregular' = 'night'): Promise<UsageDay[]> {
-  if (!isNativePlatform() || chronotype === 'irregular') return Promise.resolve([]);
-  if (cache) return Promise.resolve(cache);
-  if (loading) return loading;
+function load(days: number, chronotype: 'night' | 'day' | 'irregular'): Promise<UsageDay[]> {
+  const key = keyOf(days, chronotype);
+  // 在途查询按参数去重：首页 2 天与趋势页 7 天是两个不同的请求，
+  // 不能互相复用对方的 promise（否则趋势卡会拿到 2 天的数据）
+  if (loading && loadingKey === key) return loading;
+  loadingKey = key;
   loading = refreshUsageDays(days, chronotype)
     .then((list) => {
+      loading = null;
       cache = list;
+      cacheKey = key;
+      cacheAt = Date.now();
       emit();
       return list;
     })
@@ -30,6 +45,21 @@ export function ensureUsageLoaded(days = 2, chronotype: 'night' | 'day' | 'irreg
       return cachedUsageDays();
     });
   return loading;
+}
+
+/** 幂等加载：同参数且未过期直接复用；仅 native 且未加载才真的查。 */
+export function ensureUsageLoaded(days = 2, chronotype: 'night' | 'day' | 'irregular' = 'night'): Promise<UsageDay[]> {
+  if (!isNativePlatform() || chronotype === 'irregular') return Promise.resolve([]);
+  if (cache && cacheKey === keyOf(days, chronotype) && Date.now() - cacheAt < CACHE_TTL_MS) {
+    return Promise.resolve(cache);
+  }
+  return load(days, chronotype);
+}
+
+/** 强制重查（趋势页"刷新"入口）：成功后回流共享缓存，提议侧同步拿到新数据。 */
+export function forceRefreshUsage(days: number, chronotype: 'night' | 'day' | 'irregular'): Promise<UsageDay[]> {
+  if (!isNativePlatform() || chronotype === 'irregular') return Promise.resolve([]);
+  return load(days, chronotype);
 }
 
 export function subscribeUsage(fn: (days: UsageDay[]) => void): () => void {

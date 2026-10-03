@@ -145,7 +145,9 @@ export function buildSleepFacts(
   const facts: string[] = [];
   const bedtime = profile?.targetBedtime ?? '23:30';
   const today = todayStr(now);
-  const lastNight = records.find((r) => r.date === today);
+  // "昨晚"只看夜睡：同日既有夜睡又有小睡时，find 会先命中前插的小睡，
+  // 把午睡的时长/评分/潜伏期讲成"昨晚"（第 23 轮）
+  const lastNight = nightsOnly(records as SleepRecord[]).find((r) => r.date === today);
   const week = nightsOnly(records as SleepRecord[]).slice(0, 7);
 
   facts.push(`就寝目标 ${bedtime}`);
@@ -396,7 +398,8 @@ export async function ensureTodayMoment(
   const facts = buildSleepFacts(records, profile, now);
   const cfg = profile?.aiConfig;
   // 本地兜底模板需要原始数值字段（骂人段按实测潜伏期判断，见 localMoment）
-  const lastNight = records.find((r) => r.date === today);
+  // 与 buildSleepFacts 同口径：只看夜睡，别把午睡数值塞进骂人模板
+  const lastNight = nightsOnly(records as SleepRecord[]).find((r) => r.date === today);
   let text: string | null = null;
   let comments: MomentComment[] = [];
   let cards: MomentCard[] = [];

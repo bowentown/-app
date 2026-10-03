@@ -694,7 +694,7 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
               if (e.key === 'Enter') handleSendMessage();
             }}
             placeholder="输入睡眠疑问..."
-            className={`flex-1 ${theme.cardInnerBg} border ${theme.cardInnerBorder} rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none ${theme.focusRing} font-medium`}
+            className={`flex-1 ${theme.cardInnerBg} border ${theme.cardInnerBorder} rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-400 focus:outline-none ${theme.focusRing} font-medium`}
           />
           <button
             type="button"

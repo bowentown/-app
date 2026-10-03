@@ -26,6 +26,15 @@ export interface BuildInput {
   recordSource?: 'onetap' | 'manual' | 'usage';
   /** 作息类型：决定 kind 归类（第 21 轮 #1——白天为主者的主睡不是小睡） */
   chronotype?: 'night' | 'day' | 'irregular';
+  // ── 结束面板的用户输入（整夜监测有滑块/夜醒计数/心情/习惯/梦记）。
+  //    提供时覆盖启发式值——分期、评分与落库字段必须同源，否则详情页
+  //    互相矛盾（第 23 轮：这里曾硬编码 latency=14 评分、存值却是用户的 45）
+  userLatencyMinutes?: number;
+  userLatencyEstimated?: boolean;
+  userWakeCount?: number;
+  userWakingMood?: SleepRecord['wakingMood'];
+  userPreSleepHabits?: string[];
+  userDreamNotes?: string;
 }
 
 export interface BuiltRecord {
@@ -51,10 +60,11 @@ export function buildRecordFromWindow(input: BuildInput): BuiltRecord {
     wakeDate.getMinutes()
   ).padStart(2, '0')}`;
 
-  // 启发式潜伏期：生成与评分必须用同一个值，否则分期图与记录字段互相矛盾
-  const latencyEst = exactDurationMinutes < 15 ? 2 : 12;
-  const wakeCountEst = exactDurationMinutes < 15 ? 0 : 1;
-  const generated = generateSleepStages(bedtimeStr, wakeTimeStr, latencyEst, wakeCountEst);
+  // 启发式潜伏期：生成与评分必须用同一个值，否则分期图与记录字段互相矛盾；
+  // 用户在结束面板声明的值优先（仍保持"同一值贯穿分期/评分/字段"）
+  const latencyUsed = input.userLatencyMinutes ?? (exactDurationMinutes < 15 ? 2 : 12);
+  const wakeCountUsed = input.userWakeCount ?? (exactDurationMinutes < 15 ? 0 : 1);
+  const generated = generateSleepStages(bedtimeStr, wakeTimeStr, latencyUsed, wakeCountUsed);
 
   let deepMin = generated.deepMinutes;
   let remMin = generated.remMinutes;
@@ -76,8 +86,8 @@ export function buildRecordFromWindow(input: BuildInput): BuiltRecord {
     deepMin,
     remMin,
     awakeMin,
-    wakeCountEst,
-    latencyEst,
+    wakeCountUsed,
+    latencyUsed,
     Math.round((input.targetDurationHours || 8) * 60)
   );
 
@@ -109,11 +119,12 @@ export function buildRecordFromWindow(input: BuildInput): BuiltRecord {
     awakeMinutes: awakeMin,
     sleepScore: score,
     sleepEfficiency: efficiency,
-    latencyMinutes: exactDurationMinutes < 15 ? 2 : 12,
-    latencyEstimated: true,
-    wakeCount: exactDurationMinutes < 15 ? 0 : 1,
-    wakingMood: exactDurationMinutes < 30 ? 'tired' : 'refreshed',
-    preSleepHabits: [],
+    latencyMinutes: latencyUsed,
+    latencyEstimated: input.userLatencyEstimated ?? true,
+    wakeCount: wakeCountUsed,
+    wakingMood: input.userWakingMood ?? (exactDurationMinutes < 30 ? 'tired' : 'refreshed'),
+    preSleepHabits: input.userPreSleepHabits ?? [],
+    ...(input.userDreamNotes ? { dreamNotes: input.userDreamNotes } : {}),
     stages: stagesForRecord,
     kind: deriveKind(effectiveStart.getHours(), input.chronotype) === 'nap' ? 'nap' : undefined,
     ...(input.recordSource ? { recordSource: input.recordSource } : {}),
