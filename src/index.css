@@ -319,7 +319,7 @@ html {
 .bg-gradient-to-tr { --tw-gradient-position: to top right; }
 
 /* ===== 旧 WebView 兼容：scale/rotate 独立变换属性 =====
-   Tailwind v4 把 scale-*/rotate-* 编译成独立属性 scale:/rotate:（Chrome 104+
+   Tailwind v4 把 scale-星/rotate-星 编译成独立属性 scale:/rotate:（Chrome 104+
    才支持），Chrome 90–103 整条丢弃——呼吸引导球静止、首屏得分环从 3 点钟起画。
    写法说明：不能用 "@supports not (scale: 1)" 包裹——构建期 CSS 优化器按
    现代目标把该条件判为恒假，整块静默剪掉。改为直接重声明同名类：

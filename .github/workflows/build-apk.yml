@@ -124,8 +124,12 @@ jobs:
           sed -i 's|</application>|<service android:name="com.somnacare.gemmallm.EyeCareService" android:exported="false" android:foregroundServiceType="specialUse"><property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="eye_care_overlay_filter"/></service><service android:name="com.somnacare.gemmallm.BedtimeOverlayService" android:exported="false" android:foregroundServiceType="specialUse"><property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="bedtime_reminder_overlay"/></service><service android:name="com.somnacare.gemmallm.PetOverlayService" android:exported="false" android:foregroundServiceType="specialUse"><property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="desktop_pet_overlay"/></service><receiver android:name="com.somnacare.gemmallm.BedtimeAlarmReceiver" android:exported="false" /><receiver android:name="com.somnacare.gemmallm.AlarmRingReceiver" android:exported="false" /><service android:name="com.somnacare.gemmallm.AlarmRingService" android:exported="false" android:foregroundServiceType="specialUse"><property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="alarm_ring_loop"/></service><receiver android:name="com.somnacare.gemmallm.BootReceiver" android:exported="false"><intent-filter><action android:name="android.intent.action.BOOT_COMPLETED" /></intent-filter></receiver><service android:name="com.somnacare.gemmallm.EyeCareTileService" android:label="护眼滤镜" android:permission="android.permission.BIND_QUICK_SETTINGS_TILE" android:exported="true"><intent-filter><action android:name="android.service.quicksettings.action.QS_TILE" /></intent-filter></service></application>|' android/app/src/main/AndroidManifest.xml
 
 
-          # MediaPipe 要求 minSdk ≥ 24（宽匹配：不同 CLI 大版本的模板默认值可能是 23 或更高）
-          sed -i 's/minSdkVersion = [0-9]*/minSdkVersion = 24/' android/variables.gradle
+          # MediaPipe 要求 minSdk ≥ 24。只升不降：模板默认值将来可能高于 24，
+          # 无条件 sed 会把 26 降回 24，而"== 24"断言恰好确认被降级的值
+          cur_minSdk=$(grep -oE 'minSdkVersion = [0-9]+' android/variables.gradle | grep -oE '[0-9]+$' | head -1)
+          if [ -z "$cur_minSdk" ] || [ "$cur_minSdk" -lt 24 ]; then
+            sed -i 's/minSdkVersion = [0-9]*/minSdkVersion = 24/' android/variables.gradle
+          fi
 
           # sed 注入必须命中断言：模板结构变化导致静默不命中时，权限/服务缺失
           # 只会在运行期表现为"闹钟不响/滤镜打不开"——必须在 CI 就拦住
@@ -133,7 +137,8 @@ jobs:
           grep -q 'com.somnacare.gemmallm.PetOverlayService' android/app/src/main/AndroidManifest.xml
           grep -q 'com.somnacare.gemmallm.AlarmRingService' android/app/src/main/AndroidManifest.xml
           grep -q 'com.somnacare.gemmallm.BootReceiver' android/app/src/main/AndroidManifest.xml
-          grep -q 'minSdkVersion = 24' android/variables.gradle
+          # 断言 ≥ 24（而非 == 24：相等断言会"确认"被降级后的值）
+          grep -qE 'minSdkVersion = (2[4-9]|[3-9][0-9])' android/variables.gradle
 
           # 注入闹钟铃声资源（30 秒渐弱钟声，通知通道用；息屏响铃依赖它）
           # 注入启动屏（深色，消灭白屏闪现）与通知栏白色月亮小图标

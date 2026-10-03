@@ -55,10 +55,12 @@ export function collectCompatClasses(css: string): string[] {
   return [...names];
 }
 
-/** 返回产物用到但兼容块缺失的类名。 */
-export function missingCompat(distCss: string, compatCss: string): string[] {
-  const used = collectScaleRotateClasses(distCss);
-  const have = new Set(collectCompatClasses(compatCss));
+/** 返回"产物用到、但 compatCss 里没有回退"的类名。两个参数都应喂
+ *  构建产物：本护栏要防的是【回退块本身被优化器剪掉】——用源码当回退
+ *  清单会犯"检查对象 ≠ 要保护的对象"的错误（第 24 轮盲区修复）。 */
+export function missingCompat(cssWithUsage: string, cssWithCompat: string): string[] {
+  const used = collectScaleRotateClasses(cssWithUsage);
+  const have = new Set(collectCompatClasses(cssWithCompat));
   return used.filter((n) => !have.has(n));
 }
 
@@ -82,11 +84,17 @@ const check = (name: string, ok: boolean, detail = '') => {
     missing.includes(fakeBed) && missing.includes(fakeRot) && missing.length === 2,
     JSON.stringify(missing));
   check('反向自检：已覆盖类不误报', missingCompat('.scale-90{scale:90%}', fakeCompat).length === 0);
+  // ★ 第 24 轮盲区的反向自检：产物里的回退块被剪掉（这正是本护栏存在的
+  // 唯一理由）——此刻产物既是"用方"又是"回退方"，必须报红
+  const stripped = '.scale-90{--tw-scale-x:90%;scale:var(--tw-scale-x)}';
+  const caught = missingCompat(stripped, stripped);
+  check('反向自检：产物回退被优化器剪掉 → 报红', caught.length === 1 && caught[0] === 'scale-90',
+    JSON.stringify(caught));
   check('反向自检：transition-property 里的 scale 不算独立属性',
     collectScaleRotateClasses('.a{transition-property:transform,translate,scale,rotate}').length === 0);
 }
 
-// ── 2) 真实产物对照 ──
+// ── 2) 真实产物对照（用方与回退方都取自产物）──
 {
   const distDir = new URL('../dist/assets', import.meta.url);
   let distCss = '';
@@ -97,10 +105,18 @@ const check = (name: string, ok: boolean, detail = '') => {
     console.log('○ 未找到 dist/（本地未构建）——跳过产物对照（CI 在 build 之后运行本护栏）');
   }
   if (distCss) {
-    const compatCss = readFileSync(new URL('../src/index.css', import.meta.url), 'utf8');
-    const missing = missingCompat(distCss, compatCss);
-    check('产物中每个 scale/rotate 类都有旧内核 transform 回退', missing.length === 0,
+    const missing = missingCompat(distCss, distCss);
+    check('产物中每个 scale/rotate 类都有旧内核 transform 回退（回退取自产物）', missing.length === 0,
       missing.length ? `缺: ${missing.join(', ')}` : `${collectScaleRotateClasses(distCss).length} 个类全部覆盖`);
+
+    // 源码兼容块 ⊆ 产物回退：源码里写了、产物里没了 = 优化器剪掉了
+    // （覆盖"被剪的类恰好当前没被使用"的角落——used⊆have 抓不到它）
+    const compatCss = readFileSync(new URL('../src/index.css', import.meta.url), 'utf8');
+    const srcCompat = collectCompatClasses(compatCss);
+    const distCompat = new Set(collectCompatClasses(distCss));
+    const strippedFromDist = srcCompat.filter((n) => !distCompat.has(n));
+    check('源码兼容块完整进入产物（未被剪掉）', strippedFromDist.length === 0,
+      strippedFromDist.length ? `被剪: ${strippedFromDist.join(', ')}` : `${srcCompat.length} 条全部在产物中`);
   }
 }
 

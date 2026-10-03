@@ -179,6 +179,21 @@ export const TodayTab: React.FC<TodayTabProps> = ({
                 </span>
               </div>
               {userProfile.targetBedtime && (() => {
+                // 白天主睡者 vs 夜间口径的默认目标（23:30）不在同一作息日历上：
+                // 差 690 分钟既非"晚"也无行动意义，标红只会误导——诚实降级为提示，
+                // 引导把就寝目标改成白天的目标时刻（设置后此处恢复真实对比）
+                const nightCalibratedDefault =
+                  userProfile.chronotype === 'day' && userProfile.targetBedtime === '23:30';
+                if (nightCalibratedDefault) {
+                  return (
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-slate-300 font-bold">就寝 vs 目标</span>
+                      <span className="font-mono font-bold text-xs text-slate-400">
+                        目标仍为夜间口径 · 建议改设置
+                      </span>
+                    </div>
+                  );
+                }
                 const [bh, bm] = latestRecord.bedtime.split(':').map(Number);
                 const [th, tm] = userProfile.targetBedtime.split(':').map(Number);
                 let diff = bh * 60 + bm - (th * 60 + tm);

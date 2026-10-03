@@ -458,14 +458,11 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
 
       {/* 本周睡眠小结：填充留白 + 周维度可读洞察 */}
       {records.length > 0 && (() => {
-        // 周小结只聚合夜睡（第 21 轮 #3：混入午睡会少报时长；全小睡时优雅降级）
-        // 聚合收敛到 summarizeWeek（唯一实现，空列表安全）——
-        // 第 22 轮：页面上曾有一份平行聚合，全小睡输入时 best=undefined 白屏
+        // 周小结只聚合夜睡（第 21 轮 #3：混入午睡会少报时长）；聚合唯一实现
+        // summarizeWeek（第 22 轮：页面上曾有一份平行聚合，全小睡输入时
+        // best=undefined 白屏）。第 24 轮：不再平行推导 nightsOnly，
+        // 也不用 ! 断言（全小睡时三个均值确实是 null——用空值收窄消费）
         const sum = summarizeWeek(records);
-        const wk = nightsOnly(records).slice(0, 7);
-        const avgScoreWk = sum.avgScore!;
-        const avgDurWk = sum.avgDurationMin!;
-        const avgDeepWk = sum.avgDeepMin!;
         return (
           <div
             role="button"
@@ -478,7 +475,7 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
             <div className="flex items-center gap-2">
               <Sparkles className={`w-4 h-4 ${theme.accentText}`} />
               <h3 className="text-sm font-bold text-white">本周睡眠小结</h3>
-              <span className={`text-[10px] ${textMuted} font-mono`}>近 {wk.length} 晚</span>
+              <span className={`text-[10px] ${textMuted} font-mono`}>近 {sum.nights} 晚</span>
               {/* 分享卡入口：插画家+宠物语录+聚合数字，生成前可预览可勾选 */}
               <button
                 type="button"
@@ -490,7 +487,7 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
                 <span>分享</span>
               </button>
             </div>
-            {wk.length === 0 ? (
+            {sum.avgScore === null || sum.avgDurationMin === null || sum.avgDeepMin === null ? (
               <p className={`text-[11px] ${textMuted} leading-relaxed`}>
                 还没有夜睡记录——白天的午睡不计入周小结。
               </p>
@@ -498,19 +495,19 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
             <div className="grid grid-cols-3 gap-2.5">
               <div className={`${innerBg} border ${innerBorder} rounded-2xl p-3`}>
                 <span className={`text-[10px] ${textMuted} block mb-0.5`}>平均评分</span>
-                <span className={`text-xl font-black font-mono ${theme.accentText} tabular-nums`}>{avgScoreWk}</span>
+                <span className={`text-xl font-black font-mono ${theme.accentText} tabular-nums`}>{sum.avgScore}</span>
               </div>
               <div className={`${innerBg} border ${innerBorder} rounded-2xl p-3`}>
                 <span className={`text-[10px] ${textMuted} block mb-0.5`}>日均时长</span>
                 <span className="text-xl font-black font-mono text-white tabular-nums">
-                  {Math.floor(avgDurWk / 60)}<span className="text-sm">H</span>
-                  {avgDurWk % 60}<span className="text-sm">M</span>
+                  {Math.floor(sum.avgDurationMin / 60)}<span className="text-sm">H</span>
+                  {sum.avgDurationMin % 60}<span className="text-sm">M</span>
                 </span>
               </div>
               <div className={`${innerBg} border ${innerBorder} rounded-2xl p-3`}>
                 <span className={`text-[10px] ${textMuted} block mb-0.5`}>场均深睡</span>
                 <span className="text-xl font-black font-mono text-emerald-400 tabular-nums">
-                  {avgDeepWk}<span className="text-sm">M</span>
+                  {sum.avgDeepMin}<span className="text-sm">M</span>
                 </span>
               </div>
             </div>
