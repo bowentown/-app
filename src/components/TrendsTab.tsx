@@ -66,6 +66,14 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
   const [usagePerm, setUsagePerm] = useState<'checking' | 'granted' | 'denied'>('checking');
   const [usageDays, setUsageDays] = useState<UsageDay[]>(() => getCachedUsageDays());
   const [usagePromptedOnce, setUsagePromptedOnce] = useState(() => usagePrompted());
+  // 手机使用对照折叠：持久化——收过的人不必每次展开整块
+  const [usageOpen, setUsageOpen] = useState(() => localStorage.getItem('somnacare_usage_card_open') !== '0');
+  const toggleUsageOpen = () => {
+    setUsageOpen((v) => {
+      try { localStorage.setItem('somnacare_usage_card_open', v ? '0' : '1'); } catch { /* ignore */ }
+      return !v;
+    });
+  };
 
   useEffect(() => {
     if (!isNativePlatform()) return;
@@ -552,11 +560,17 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
       {isNativePlatform() && (
         <div className={`${theme.cardBg} rounded-3xl p-5 border ${theme.cardBorder} shadow-xl space-y-3`}>
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={toggleUsageOpen}
+              aria-expanded={usageOpen}
+              className="flex items-center gap-2 cursor-pointer"
+            >
               <Smartphone className={`w-4 h-4 ${theme.accentText}`} />
               <h3 className="text-sm font-bold text-white">手机使用对照</h3>
-            </div>
-            {usagePerm === 'granted' && (
+              <ChevronDown className={`w-4 h-4 ${textMuted} transition-transform ${usageOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {usagePerm === 'granted' && usageOpen && (
               <button
                 type="button"
                 onClick={() => { clearUsageData(); setUsageDays([]); }}
@@ -567,11 +581,11 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
             )}
           </div>
 
-          {usagePerm === 'checking' && (
+          {usageOpen && usagePerm === 'checking' && (
             <p className={`text-[11px] ${textMuted}`}>检查使用情况访问权限…</p>
           )}
 
-          {usagePerm === 'denied' && (
+          {usageOpen && usagePerm === 'denied' && (
             usagePromptedOnce ? (
               <p className={`text-[11px] ${textMuted} leading-relaxed`}>
                 使用情况访问未开启。
@@ -609,7 +623,7 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
             )
           )}
 
-          {usagePerm === 'granted' && (() => {
+          {usageOpen && usagePerm === 'granted' && (() => {
             const uReg = computeUsageRegularity(usageDays);
             const shown = usageDays.filter((d) => d.lastActive).slice(0, 7);
             return (

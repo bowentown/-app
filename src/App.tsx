@@ -10,6 +10,7 @@ import { getInitialSleepLogs } from './utils/sleepScore';
 import { TodayTab } from './components/TodayTab';
 import { TrendsTab } from './components/TrendsTab';
 import { AIAdvicePanel } from './components/AIAdvicePanel';
+import { OnboardingCard } from './components/OnboardingCard';
 import { SettingsTab } from './components/SettingsTab';
 import { EyeCareTab } from './components/EyeCareTab';
 import { BottomNavBar, NavTab } from './components/BottomNavBar';
@@ -37,6 +38,26 @@ export const App: React.FC = () => {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   // 朋友圈打开信号：递增触发 AIAdvicePanel 打开朋友圈（送达弹窗 CTA 用）
   const [momentsSignal, setMomentsSignal] = useState(0);
+  // AI 聊天输入聚焦：打字时隐藏底部导航（否则导航条悬在键盘上方占一行）。
+  // 失焦延迟回弹：点"发送"会先 blur，立即弹回会在键盘收起前闪一下
+  const [chatTyping, setChatTyping] = useState(false);
+  const chatBlurTimerRef = useRef<number | null>(null);
+  const handleChatFocusChange = (focused: boolean) => {
+    if (chatBlurTimerRef.current !== null) {
+      window.clearTimeout(chatBlurTimerRef.current);
+      chatBlurTimerRef.current = null;
+    }
+    if (focused) setChatTyping(true);
+    else chatBlurTimerRef.current = window.setTimeout(() => setChatTyping(false), 280);
+  };
+  // 首次引导（两步卡，localStorage 一次性门控；冷启动第二次不再出现）
+  const [onboardingOpen, setOnboardingOpen] = useState(() => {
+    try { return localStorage.getItem('somnacare_onboarded_v1') !== '1'; } catch { return false; }
+  });
+  const finishOnboarding = () => {
+    try { localStorage.setItem('somnacare_onboarded_v1', '1'); } catch { /* ignore */ }
+    setOnboardingOpen(false);
+  };
   const [pendingPostcardId, setPendingPostcardId] = useState<string | null>(() => {
     return loadTravelState().pendingArrival || null;
   });
@@ -669,6 +690,14 @@ export const App: React.FC = () => {
         />
       </div>
       <LaunchSplash theme={currentTheme} />
+      {/* 首次引导：z 在开屏(200)之下——开屏播完自然露出，两步可全跳过 */}
+      {onboardingOpen && (
+        <OnboardingCard
+          theme={currentTheme}
+          allowAutoRecordStep={isNativePlatform()}
+          onFinish={finishOnboarding}
+        />
+      )}
       {/* 夜间护眼：原生端由系统悬浮窗全局生效，应用内不再叠加（避免双重滤镜）；
           Web/PWA 端回退为应用内滤镜层 */}
       {!isNativePlatform() && (eyeCareCfg.enabled
@@ -805,7 +834,7 @@ export const App: React.FC = () => {
                   )}
 
                   {id === 'coach' && (
-                    <AIAdvicePanel records={records} userProfile={userProfile} theme={currentTheme} openMomentsSignal={momentsSignal} />
+                    <AIAdvicePanel records={records} userProfile={userProfile} theme={currentTheme} openMomentsSignal={momentsSignal} onChatFocusChange={handleChatFocusChange} />
                   )}
 
                   {id === 'eyecare' && (
@@ -851,12 +880,14 @@ export const App: React.FC = () => {
         </main>
       </div>
 
-      {/* Bottom Navigation: Permanently fixed at screen bottom with theme styles */}
-      <BottomNavBar
-        activeTab={activeTab}
-        onChangeTab={setActiveTab}
-        theme={currentTheme}
-      />
+      {/* Bottom Navigation: 打字时隐藏（键盘上方不再悬着导航条） */}
+      {!chatTyping && (
+        <BottomNavBar
+          activeTab={activeTab}
+          onChangeTab={setActiveTab}
+          theme={currentTheme}
+        />
+      )}
 
       {/* Floating Active Sleep Modal (Live Bedside Monitor) */}
       <ActiveSleepModal

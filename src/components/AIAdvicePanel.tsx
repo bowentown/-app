@@ -16,6 +16,9 @@ import {
   ChevronDown,
   Info,
   Camera,
+  Plus,
+  Trash2,
+  X,
 } from 'lucide-react';
 import { SleepRecord, SleepAnalysisResult, ChatMessage, UserProfile } from '../types/sleep';
 import { generateLocalClinicalAnalysis, generateLocalChatReply, classifyIntent, generatePersonalInsights, PersonalInsight } from '../utils/clinicalSleepEngine';
@@ -29,6 +32,16 @@ import { ThemeConfig } from '../utils/themeStyles';
 import { stripMd } from '../utils/markdown';
 import { nightsOnly } from '../utils/recordFilter';
 import { attachHScroll } from '../utils/hscroll';
+import { useModalA11y } from '../utils/modalA11y';
+import {
+  ChatState,
+  ChatSession,
+  deriveTitle,
+  freshSession,
+  loadChatState,
+  persistChatState,
+  sessionTimeLabel,
+} from '../utils/chatStore';
 import { MomentsOverlay } from './MomentsOverlay';
 
 // 输出契约：固定追加在 persona 尾部、随 system 一起走前缀缓存（恒定段，
@@ -52,9 +65,11 @@ interface AIAdvicePanelProps {
   theme: ThemeConfig;
   /** 递增信号：外部（如明信片送达弹窗）请求打开朋友圈，+1 即开一次 */
   openMomentsSignal?: number;
+  /** 聊天输入框聚焦状态上报：App 在打字时隐藏底部导航（否则导航条悬在键盘上方） */
+  onChatFocusChange?: (focused: boolean) => void;
 }
 
-export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfile, theme, openMomentsSignal }) => {
+export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfile, theme, openMomentsSignal, onChatFocusChange }) => {
   const [analysis, setAnalysis] = useState<SleepAnalysisResult | null>(null);
   const [isLoadingAnalysis, setIsLoadingAnalysis] = useState(false);
   const [showMoments, setShowMoments] = useState(false);
@@ -78,45 +93,71 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
   });
 
   // Chat consultation state
-  // 会话持久化：分区是条件渲染，切 Tab 即卸载——此前整段对话随组件销毁。
-  // 存 localStorage（上限 120 条），切 Tab 与重启都不丢
-  const CHAT_KEY = 'somnacare_chat_history';
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => {
-    try {
-      const saved = localStorage.getItem(CHAT_KEY);
-      if (saved) {
-        const list = JSON.parse(saved);
-        if (Array.isArray(list)) {
-          return list
-            .filter((m) => m && typeof m.content === 'string' &&
-              m.content.trim() !== '' && m.content.trim() !== '……' &&
-              (m.role === 'user' || m.role === 'assistant'))
-            .slice(-120);
-        }
-      }
-    } catch { /* 损坏则回到欢迎语 */ }
-    return [
-      {
-        id: 'welcome',
-        role: 'assistant',
-        content: '您好，我是您的睡眠顾问。今晚有什么睡眠困扰？',
-        timestamp: '刚刚',
-      },
-    ];
-  });
+  // 多会话（第 25 轮）：一段对话一张卡太挤，且无法整理删除。
+  // 会话持久化沿用 somnacare_chat_history 键（形状升级，旧平铺数据自动迁移，
+  // 备份/恢复链路零改动）。分区是条件渲染，切 Tab 即卸载——存 localStorage
+  const [chat, setChat] = useState<ChatState>(() => loadChatState());
+  const activeSession: ChatSession =
+    chat.sessions.find((s) => s.id === chat.activeId) ?? chat.sessions[0];
+  const chatMessages = activeSession?.messages ?? [];
+  // 活跃会话消息更新：所有旧调用点继续用 setChatMessages(fn | array)
+  const setChatMessages = (updater: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) => {
+    setChat((prev) => ({
+      ...prev,
+      sessions: prev.sessions.map((s) =>
+        s.id === prev.activeId
+          ? { ...s, messages: typeof updater === 'function' ? updater(s.messages) : updater, updatedAt: Date.now() }
+          : s
+      ),
+    }));
+  };
   useEffect(() => {
-    // 300ms 防抖：流式生成时每个 token 都会改 chatMessages，
+    // 300ms 防抖：流式生成时每个 token 都会改 messages，
     // 逐次同步 stringify+setItem 约 220 次/生成，全压在打字机路径上
-    const t = setTimeout(() => {
-      try {
-        localStorage.setItem(CHAT_KEY, JSON.stringify(chatMessages.slice(-120)));
-      } catch { /* 配额满时保内存即可 */ }
-    }, 300);
+    const t = setTimeout(() => persistChatState(chat), 300);
     return () => clearTimeout(t);
-  }, [chatMessages]);
+  }, [chat]);
   const [inputText, setInputText] = useState('');
   const [isSendingChat, setIsSendingChat] = useState(false);
   const [showAssessment, setShowAssessment] = useState(false);
+
+  // ── 会话管理（第 25 轮）──
+  const [showSessions, setShowSessions] = useState(false);
+  const sessionsA11y = useModalA11y(showSessions, () => setShowSessions(false), '会话列表');
+
+  const handleNewSession = () => {
+    setChat((prev) => {
+      const active = prev.sessions.find((s) => s.id === prev.activeId);
+      if (active && active.messages.length === 0) return prev;   // 已是空会话，不重复建
+      const s = freshSession();
+      return { sessions: [s, ...prev.sessions], activeId: s.id };
+    });
+  };
+
+  const handleSwitchSession = (id: string) => {
+    setChat((prev) => (prev.activeId === id ? prev : { ...prev, activeId: id }));
+    setShowSessions(false);
+  };
+
+  const handleDeleteSession = (id: string) => {
+    const target = chat.sessions.find((s) => s.id === id);
+    if (!window.confirm(`删除对话「${target?.title ?? ''}」？删除后不可恢复。`)) return;
+    setChat((prev) => {
+      const sessions = prev.sessions.filter((s) => s.id !== id);
+      if (sessions.length === 0) {
+        const s = freshSession();
+        return { sessions: [s], activeId: s.id };
+      }
+      return { sessions, activeId: prev.activeId === id ? sessions[0].id : prev.activeId };
+    });
+  };
+
+  const handleClearSessions = () => {
+    if (!window.confirm('清空全部对话？所有会话将被删除，不可恢复。')) return;
+    const s = freshSession();
+    setChat({ sessions: [s], activeId: s.id });
+    setShowSessions(false);
+  };
 
   // 数据驱动的个性化洞察（本地推导，随记录更新）+ 动态快捷问题
   const insights = useMemo(() => generatePersonalInsights(records), [records]);
@@ -233,6 +274,13 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
 
     const newHistory = [...chatMessages, userMsg];
     setChatMessages(newHistory);
+    // 会话标题 = 首条用户提问（仅"新对话"占位时改名，不靠模型）
+    setChat((prev) => ({
+      ...prev,
+      sessions: prev.sessions.map((s) =>
+        s.id === prev.activeId && s.title === '新对话' ? { ...s, title: deriveTitle([userMsg]) } : s
+      ),
+    }));
     setInputText('');
     chatInputRef.current?.focus();   // 连续追问时键盘不掉
     setIsSendingChat(true);
@@ -597,7 +645,30 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
       </div>
 
       {/* 2. Interactive AI Consultation Chat */}
-      <div className={`${theme.cardBg} rounded-3xl p-4 border ${theme.cardBorder} flex flex-col h-[460px]`}>
+      <div className={`${theme.cardBg} rounded-3xl p-4 border ${theme.cardBorder} flex flex-col h-[560px]`}>
+        {/* 会话栏：点标题开列表（切换/删除），右侧新建。
+            此前整段对话挤在一张卡里无法整理——多会话 + 抽屉管理 */}
+        <div className="flex items-center justify-between pb-2.5 border-b border-slate-700/50 shrink-0">
+          <button
+            type="button"
+            onClick={() => setShowSessions(true)}
+            aria-label="查看会话列表"
+            className="flex items-center gap-2 min-w-0 cursor-pointer group"
+          >
+            <MessageSquare className={`w-4 h-4 ${theme.accentText} shrink-0`} />
+            <span className="text-xs font-bold text-white truncate max-w-[190px]">{activeSession?.title ?? '新对话'}</span>
+            <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0 group-hover:text-white transition-colors" />
+          </button>
+          <button
+            type="button"
+            onClick={handleNewSession}
+            aria-label="开始新对话"
+            className={`p-2 rounded-xl ${theme.cardInnerBg} border ${theme.cardInnerBorder} ${theme.accentText} hover:opacity-80 transition-all cursor-pointer shrink-0`}
+          >
+            <Plus className="w-4 h-4" />
+          </button>
+        </div>
+
         {/* 消息流：嵌套纵向滚动容器。
             swipe-nested 让浏览器不再为它单独做滚动方向判定，横滑立刻透给分区轨道
             （否则内层容器的滚动仲裁会延迟 pointer 事件，真机上表现为"框内滑不动"）。*/}
@@ -609,7 +680,7 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
           }}
           className="flex-1 overflow-y-auto py-2 space-y-3 pr-1 text-xs no-scrollbar swipe-nested"
         >
-          {chatMessages.length <= 1 && (
+          {chatMessages.length === 0 && (
             <div className="flex flex-col items-center justify-center py-7 gap-3 select-none" aria-hidden>
               <div className="relative">
                 <div
@@ -690,6 +761,8 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
             type="text"
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
+            onFocus={() => onChatFocusChange?.(true)}
+            onBlur={() => onChatFocusChange?.(false)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') handleSendMessage();
             }}
@@ -707,6 +780,83 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
           </button>
         </div>
       </div>
+
+      {/* 会话列表抽屉：切换 / 删除 / 清空。portal 到 body——外层滑动容器
+          带 translate3d，fixed 会退化成相对它定位 */}
+      {showSessions &&
+        createPortal(
+          <div
+            ref={sessionsA11y.ref}
+            {...sessionsA11y.dialogProps}
+            onClick={(e) => { if (e.target === e.currentTarget) setShowSessions(false); }}
+            className="fixed inset-0 z-[120] bg-black/85 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
+          >
+            <div className={`w-full max-w-md ${theme.cardBg} border-2 ${theme.accentBorder} rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[80dvh] flex flex-col overflow-hidden`}>
+              <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-slate-700/50 shrink-0">
+                <div className="flex items-center gap-2">
+                  <MessageSquare className={`w-4 h-4 ${theme.accentText}`} />
+                  <h3 className="text-sm font-bold text-white">会话列表</h3>
+                  <span className={`text-[10px] ${theme.textMuted} font-mono`}>{chat.sessions.length} 段</span>
+                </div>
+                <button
+                  type="button"
+                  aria-label="关闭会话列表"
+                  onClick={() => setShowSessions(false)}
+                  className="p-2 rounded-xl text-slate-400 hover:text-white transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto no-scrollbar px-4 py-3 space-y-2">
+                {chat.sessions.map((s) => {
+                  const isActive = s.id === chat.activeId;
+                  return (
+                    <div
+                      key={s.id}
+                      className={`flex items-center gap-1.5 rounded-2xl border p-3 ${
+                        isActive ? `${theme.accentBorder} bg-black/25` : theme.cardInnerBorder
+                      }`}
+                      style={isActive ? { background: `${theme.accentHex}14` } : undefined}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => handleSwitchSession(s.id)}
+                        className="flex-1 min-w-0 text-left cursor-pointer"
+                      >
+                        <p className={`text-xs font-bold truncate ${isActive ? theme.accentText : 'text-white'}`}>
+                          {s.title}
+                        </p>
+                        <p className={`text-[9px] ${theme.textMuted} mt-0.5 font-mono`}>
+                          {sessionTimeLabel(s.updatedAt)} · {s.messages.length} 条
+                        </p>
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`删除对话：${s.title}`}
+                        onClick={() => handleDeleteSession(s.id)}
+                        className="p-2 rounded-lg text-slate-400 hover:text-rose-400 transition-colors cursor-pointer shrink-0"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="px-5 py-3 border-t border-slate-700/50 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleClearSessions}
+                  className="text-[11px] text-slate-400 hover:text-rose-400 underline cursor-pointer py-1.5 -my-1.5"
+                >
+                  清空全部对话
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
 
       {/* 大肥鱼的朋友圈：portal 到 body——外层滑动容器带 translate3d，
           fixed 定位会退化成相对它定位，弹窗就会"横跨几个区" */}
