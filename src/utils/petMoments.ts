@@ -44,6 +44,42 @@ export const AI_FRIENDS = [
 
 const MAX_MOMENTS = 30;
 
+/**
+ * 朋友圈容量（用户可调，明信片动态永不滑出）：
+ * 容量只约束【每日动态】；旅行明信片是收集资产，一律保留。
+ */
+export const MOMENTS_CAP_PRESETS: number[] = [30, 60, 90, 120, 200];
+const CAP_KEY = 'somnacare_moments_cap';
+
+export function getMomentsCap(): number {
+  try {
+    const v = Number(localStorage.getItem(CAP_KEY));
+    return (MOMENTS_CAP_PRESETS as readonly number[]).includes(v) ? v : MAX_MOMENTS;
+  } catch {
+    return MAX_MOMENTS;
+  }
+}
+
+export function setMomentsCap(cap: number): void {
+  try {
+    if ((MOMENTS_CAP_PRESETS as readonly number[]).includes(cap)) {
+      localStorage.setItem(CAP_KEY, String(cap));
+    }
+  } catch { /* ignore */ }
+}
+
+/** 容量裁剪：按原顺序保留全部明信片动态，每日动态只保留最近 cap 条。 */
+export function capMoments(list: Moment[]): Moment[] {
+  const cap = getMomentsCap();
+  let regular = 0;
+  return list.filter((m) => {
+    if (m.postcardId) return true;
+    if (regular >= cap) return false;
+    regular++;
+    return true;
+  });
+}
+
 export function loadMoments(): Moment[] {
   try {
     const raw = localStorage.getItem(KEY);
@@ -83,7 +119,7 @@ function sanitizeComments(v: unknown): MomentComment[] {
 
 function saveMoments(list: Moment[]): void {
   try {
-    localStorage.setItem(KEY, JSON.stringify(list.slice(0, MAX_MOMENTS)));
+    localStorage.setItem(KEY, JSON.stringify(capMoments(list)));
   } catch { /* ignore */ }
 }
 
@@ -333,7 +369,7 @@ function upsert(list: Moment[], m: Moment): Moment[] {
   // 按 date 去重，但只去重【每日动态】——明信片动态（带 postcardId）与
   // 今日动态同日期共存，此前整条按 date 顶掉，"生成今日动态"会删掉
   // 早上发的旅行明信片
-  return [m, ...list.filter((x) => (x.postcardId ? true : x.date !== m.date))].slice(0, MAX_MOMENTS);
+  return capMoments([m, ...list.filter((x) => (x.postcardId ? true : x.date !== m.date))]);
 }
 
 /**
@@ -692,7 +728,7 @@ export function createPostcardMoment(postcard: {
     replies: [],
   };
 
-  const updated = [newMoment, ...moments].slice(0, MAX_MOMENTS);
+  const updated = capMoments([newMoment, ...moments]);
   saveMoments(updated);
   return updated;
 }

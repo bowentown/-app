@@ -9,6 +9,10 @@ import {
   loadMoments,
   type Moment,
   type MomentCard,
+  MOMENTS_CAP_PRESETS,
+  capMoments,
+  getMomentsCap,
+  setMomentsCap,
 } from '../utils/petMoments';
 import { getPetSkin } from '../utils/petOverlay';
 import { stripMd } from '../utils/markdown';
@@ -139,6 +143,7 @@ export const MomentsOverlay: React.FC<Props> = ({ records, userProfile, onClose 
   const [note, setNote] = useState<string | null>(null);
   const [showCodex, setShowCodex] = useState(false);
   const [showShareCard, setShowShareCard] = useState(false);
+  const [momentsCap, setMomentsCapState] = useState(() => getMomentsCap());
   const inputRef = useRef<HTMLInputElement>(null);
 
   const travelProgress = getTravelProgress();
@@ -212,6 +217,29 @@ export const MomentsOverlay: React.FC<Props> = ({ records, userProfile, onClose 
           </div>
         </div>
         <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setShowShareCard(true)}
+            className="px-2.5 py-1.5 rounded-full bg-indigo-950/80 border border-indigo-700/60 text-[10px] font-bold text-indigo-200 flex items-center gap-1 cursor-pointer active:scale-95 transition-transform"
+          >
+            <span>🖼️</span>
+            <span>睡眠卡</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const i = MOMENTS_CAP_PRESETS.indexOf(momentsCap);
+              const next = MOMENTS_CAP_PRESETS[(i + 1) % MOMENTS_CAP_PRESETS.length];
+              setMomentsCap(next);
+              setMomentsCapState(next);
+              setMoments(capMoments(loadMoments()));
+            }}
+            className="px-2.5 py-1.5 rounded-full bg-white/10 border border-white/20 text-[10px] font-bold text-white flex items-center gap-1 cursor-pointer active:scale-95 transition-transform"
+            aria-label={`朋友圈容量 ${momentsCap} 条，点击切换到下一档`}
+          >
+            <span>📦</span>
+            <span>容量 {momentsCap}</span>
+          </button>
           <button
             type="button"
             onClick={() => setShowCodex(true)}
