@@ -5,8 +5,9 @@ import { SleepRecord, UserProfile } from '../types/sleep';
 import { formatDurationChinese } from '../utils/sleepScore';
 import { buildRecordFromWindow } from '../utils/recordBuilder';
 import { Smartphone } from 'lucide-react';
-import { computeProposal } from '../utils/proposal';
+import { computeProposal, computeModelProposal, type Proposal } from '../utils/proposal';
 import { ensureUsageLoaded, subscribeUsage, getCachedUsageDays } from '../utils/usageStore';
+import { queryScreenOnEvents } from '../utils/usageSignal';
 import { isNativePlatform } from '../utils/nativeAlarmScheduler';
 import { ThemeConfig } from '../utils/themeStyles';
 import { useModalA11y } from '../utils/modalA11y';
@@ -51,7 +52,44 @@ export const OneTapSleepTracker: React.FC<OneTapSleepTrackerProps> = ({ onSaveRe
     return stop;
   }, [userProfile?.chronotype]);
 
-  const proposal = useMemo(
+  // ── 模型化提议（第 26 轮）：SensibleSleep 贝叶斯模型优先，旧启发式作回退 ──
+  // decided=false 仅当模型【跑不了】（非 native / 查询失败 / 数据不足）→ 回退旧算法；
+  // 模型【跑出了结论但被闸门拒绝】→ proposal=null 且不回退（通宵用机等场景
+  // 旧启发式会把"整晚没睡"报成一次睡眠，正是换模型要根治的问题）
+  const chronotype = userProfile?.chronotype ?? 'night';
+  const sessionActive = sleepStartTime !== null;
+  const [modelResult, setModelResult] = useState<{ decided: boolean; proposal: Proposal | null }>({
+    decided: false,
+    proposal: null,
+  });
+
+  useEffect(() => {
+    if (!isNativePlatform() || chronotype === 'irregular') {
+      setModelResult({ decided: false, proposal: null });
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const ev = await queryScreenOnEvents(14);
+      if (!ev || cancelled) return;   // 查询失败：保持回退态
+      const res = computeModelProposal({
+        events: ev.events,
+        observedUntil: ev.observedUntil,
+        chronotype,
+        records,
+        sessionActive,
+        handledDate,
+      });
+      if (!cancelled) {
+        setModelResult(res.fallbackAllowed
+          ? { decided: false, proposal: null }
+          : { decided: true, proposal: res.proposal });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [usageDays, records, handledDate, chronotype, sessionActive]);
+
+  const heuristicProposal = useMemo(
     () => computeProposal({
       usageDays,
       records,
@@ -61,6 +99,7 @@ export const OneTapSleepTracker: React.FC<OneTapSleepTrackerProps> = ({ onSaveRe
     }),
     [usageDays, records, sleepStartTime, handledDate, userProfile?.chronotype]
   );
+  const proposal = modelResult.decided ? modelResult.proposal : heuristicProposal;
 
   const markHandled = () => {
     if (!proposal) return;
@@ -196,7 +235,7 @@ export const OneTapSleepTracker: React.FC<OneTapSleepTrackerProps> = ({ onSaveRe
               onClick={handleAcceptProposal}
               className={`w-full py-3.5 px-5 rounded-2xl ${theme.accentBg} ${theme.accentFg} font-black text-xs tracking-wider flex items-center justify-center gap-2 active:scale-[0.99] transition-all cursor-pointer shadow-lg`}
             >
-              <span>✓ 记为这次睡眠</span>
+              <span>✓ 记为这次就寝</span>
             </button>
 
             <div className="flex gap-2.5">

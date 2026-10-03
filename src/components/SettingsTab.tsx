@@ -295,7 +295,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           </div>
           <div>
             <h3 className="text-sm font-black text-white">我的作息</h3>
-            <p className="text-[10px] text-slate-400">用来决定自动记录提议的适用时段；选"不规律"就不做自动提议</p>
+            <p className="text-[10px] text-slate-400">决定自动记录的判定基准（哪段算主睡）；选"不规律"就不做自动提议</p>
           </div>
         </div>
         <div className="flex gap-1.5">

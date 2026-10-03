@@ -12,6 +12,7 @@
 import { SleepRecord } from '../types/sleep';
 import { bedClockAxis, median, shortArc, clockMinutes } from './clockMath';
 import { nightsOnly } from './recordFilter';
+import { fitSleepModel } from './sleepModel';
 import type { UsageDay } from './usageSignal';
 
 export interface Proposal {
@@ -113,5 +114,92 @@ export function computeProposal(input: ProposalInput): Proposal | null {
     windowMinutes,
     confidence,
     nightPickups: day.nightPickups,
+  };
+}
+
+/**
+ * 模型化提议（第 26 轮）：用 SensibleSleep 贝叶斯切换点模型替代
+ * "固定窗内最后一次熄屏"的启发式（起夜会把就寝顶到后半夜的结构性缺陷）。
+ *
+ * 回退策略（关键设计）：
+ *  - fallbackAllowed=true 仅当【模型跑不了】（数据不足/非 native）——此时回退
+ *    computeProposal 是既有行为
+ *  - 模型【跑出了结论但被闸门拒绝】（通宵用机/作息可疑/观测未到起床）→
+ *    proposal=null 且 fallbackAllowed=false——绝不回退，否则旧算法会把
+ *    "通宵没睡"报成一次睡眠，正是本方案要根治的场景
+ *
+ * 先验中心（模型的命门，§4.2）：优先用用户确认的夜睡记录中位数（近 14 晚），
+ * 其次用作息类型默认值。模型推断中位数偏离先验 >3h 会在模型层直接拒绝
+ * （不静默改先验——错误会自我强化）。
+ */
+export interface ModelProposalInput {
+  events: number[];
+  observedUntil: number;
+  chronotype: 'night' | 'day' | 'irregular';
+  records: SleepRecord[];
+  sessionActive: boolean;
+  handledDate?: string | null;
+  now?: Date;
+}
+
+export interface ModelProposalResult {
+  proposal: Proposal | null;
+  fallbackAllowed: boolean;
+}
+
+export function computeModelProposal(input: ModelProposalInput): ModelProposalResult {
+  if (input.chronotype === 'irregular') return { proposal: null, fallbackAllowed: false };  // gate 0
+  if (input.sessionActive) return { proposal: null, fallbackAllowed: false };               // gate 5
+
+  // 先验中心：确认夜睡中位数（≥3 晚）→ 作息类型默认
+  const nights = nightsOnly(input.records).slice(0, 14);
+  const hasHabit = nights.length >= 3;
+  const habitBedMin = hasHabit ? median(nights.map((r) => clockMinutes(r.bedtime))) : undefined;
+  const habitWakeMin = hasHabit ? median(nights.map((r) => clockMinutes(r.wakeTime))) : undefined;
+
+  const fit = fitSleepModel({
+    events: input.events,
+    observedUntil: input.observedUntil,
+    chronotype: input.chronotype === 'day' ? 'day' : 'night',
+    habitBedMin,
+    habitWakeMin,
+    now: (input.now ?? new Date()).getTime(),
+  });
+  if (fit.status === 'insufficient') {
+    return { proposal: null, fallbackAllowed: true };   // 跑不了模型 → 旧算法顶上
+  }
+  if (fit.status === 'rejected') {
+    return { proposal: null, fallbackAllowed: false };  // 模型明确拒绝 → 不回退
+  }
+
+  const targetDate = fit.targetDate;
+  if (nightsOnly(input.records).some((r) => r.date === targetDate)) {
+    return { proposal: null, fallbackAllowed: false };  // gate 4：已有记录
+  }
+  if (input.handledDate === targetDate) {
+    return { proposal: null, fallbackAllowed: false };  // gate 6：已处理过
+  }
+
+  const windowMinutes = Math.round((fit.wakeMs - fit.bedtimeMs) / 60000);
+  if (windowMinutes < 240 || windowMinutes > 960) {
+    return { proposal: null, fallbackAllowed: false };  // gate 2（比模型 [3,14]h 更紧）
+  }
+
+  // 置信度：Δ 映射（实测正常夜 710–830、真实用户 865–1573）
+  const confidence = fit.delta >= 800 ? 'high' : fit.delta >= 300 ? 'medium' : null;
+  if (!confidence) return { proposal: null, fallbackAllowed: false };
+
+  return {
+    proposal: {
+      targetDate,
+      bedtime: fit.bedtime,
+      wakeTime: fit.wakeTime,
+      bedtimeMs: fit.bedtimeMs,
+      wakeMs: fit.wakeMs,
+      windowMinutes,
+      confidence,
+      nightPickups: fit.sleepEventsInTarget,
+    },
+    fallbackAllowed: false,
   };
 }

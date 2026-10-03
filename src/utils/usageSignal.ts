@@ -2,7 +2,8 @@
  * 使用行为信号（P3）：原生 UsageStatsManager 的聚合结果存取与权限引导。
  *
  * 隐私边界（护栏与文案共同执行）：
- *  - 原生只回传聚合结果（放下手机时刻/行为性醒来/夜间拿起次数），原始事件流不出插件
+ *  - 原生回传每日聚合信号 + 原始亮屏时间戳（SensibleSleep 模型输入，第 26 轮）——
+ *    事件流只进内存参与模型计算，不落盘、不进备份、不上传，全程留在本机
  *  - localStorage 只存聚合缓存（somnacare_usage_days），不写入导出备份
  *  - 权限被拒后记一次性标记，不再反复弹引导；功能可跳过，跳过即一切照旧
  *
@@ -113,6 +114,41 @@ export function clearUsageData(): void {
   try {
     localStorage.removeItem(CACHE_KEY);
   } catch { /* ignore */ }
+  eventsCache = null;   // 亮屏事件缓存一并失效
+}
+
+// ── 原始亮屏事件（SensibleSleep 模型输入，第 26 轮）──
+
+export interface ScreenOnEvents {
+  /** 亮屏起始事件 epoch ms（只数次数，时长在原生层已丢弃） */
+  events: number[];
+  /** 观测截止 epoch（= 查询时刻） */
+  observedUntil: number;
+}
+
+// 事件查询与聚合查询共用 30 分钟 TTL：提议引擎每处挂载都会要一次，
+// 14 天的原始事件不适合反复过桥
+let eventsCache: { at: number; data: ScreenOnEvents } | null = null;
+const EVENTS_TTL_MS = 30 * 60 * 1000;
+
+/** 拉取最近 N 天的亮屏事件时间戳（非 native / 无权限 / 失败 → null，调用方回退）。 */
+export async function queryScreenOnEvents(days = 14): Promise<ScreenOnEvents | null> {
+  const pl = usage();
+  if (!pl) return null;
+  if (eventsCache && Date.now() - eventsCache.at < EVENTS_TTL_MS) return eventsCache.data;
+  try {
+    const res = await pl.queryScreenOnEvents?.({ days });
+    if (!res || !Array.isArray(res.events)) return null;
+    const data: ScreenOnEvents = {
+      events: (res.events as unknown[]).filter((n): n is number =>
+        typeof n === 'number' && Number.isFinite(n)),
+      observedUntil: typeof res.observedUntil === 'number' ? res.observedUntil : Date.now(),
+    };
+    eventsCache = { at: Date.now(), data };
+    return data;
+  } catch {
+    return null;
+  }
 }
 
 /**

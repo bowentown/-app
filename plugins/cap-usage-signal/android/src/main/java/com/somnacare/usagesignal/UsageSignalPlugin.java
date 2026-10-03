@@ -188,4 +188,49 @@ public class UsageSignalPlugin extends Plugin {
             call.reject("查询使用事件失败: " + e.getMessage());
         }
     }
+
+    /**
+     * 导出原始亮屏事件时间戳（SensibleSleep 模型输入，第 26 轮）。
+     *
+     * 只回传「亮屏起始」事件（SCREEN_INTERACTIVE / KEYGUARD_HIDDEN）的 epoch ms——
+     * 模型只数次数、刻意丢弃时长（论文：事件时长中位 ≈26.5s，无信息量）。
+     * 隐私边界更新：事件流此前"不出本类"，现允许到 JS 内存中参与模型计算——
+     * 仍不落盘、不进备份、不上传，全程留在本机。
+     */
+    @PluginMethod
+    public void queryScreenOnEvents(PluginCall call) {
+        if (!hasUsageAccess()) {
+            call.reject("缺少使用情况访问权限");
+            return;
+        }
+        int days = call.getInt("days", 14);
+        if (days < 1) days = 1;
+        if (days > 14) days = 14;
+        try {
+            Context ctx = getContext();
+            UsageStatsManager usm =
+                    (UsageStatsManager) ctx.getSystemService(Context.USAGE_STATS_SERVICE);
+            if (usm == null) {
+                call.resolve(new JSObject());
+                return;
+            }
+            long now = System.currentTimeMillis();
+            long begin = now - days * DAY_MS;
+            UsageEvents events = usm.queryEvents(begin, now);
+            UsageEvents.Event ev = new UsageEvents.Event();
+            JSArray arr = new JSArray();
+            while (events.hasNextEvent()) {
+                events.getNextEvent(ev);
+                int type = ev.getEventType();
+                boolean on = type == EVT_SCREEN_INTERACTIVE || type == EVT_KEYGUARD_HIDDEN;
+                if (on) arr.put(ev.getTimeStamp());
+            }
+            JSObject ret = new JSObject();
+            ret.put("events", arr);
+            ret.put("observedUntil", now);
+            call.resolve(ret);
+        } catch (Exception e) {
+            call.reject("查询亮屏事件失败: " + e.getMessage());
+        }
+    }
 }
