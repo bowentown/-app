@@ -51,6 +51,7 @@ import {
 // 逐条清洗在 utils/recordSanitize.ts——启动加载路径共用同一条防线
 import { sanitizeRecord } from '../utils/recordSanitize';
 import { buildFullBackup, parseBackup, restoreFullBackup } from '../utils/backup';
+import { reclassifyForChronotype } from '../utils/recordFilter';
 
 interface SettingsTabProps {
   records: SleepRecord[];
@@ -304,7 +305,16 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               <button
                 key={opt.key}
                 type="button"
-                onClick={() => onUpdateProfile({ chronotype: opt.key })}
+                onClick={() => {
+                  // 切换作息类型：存量小睡按新类型重归类（只改 kind，不删数据）
+                  // ——白天为主者此前的主睡被误标 nap，改设置后必须生效
+                  const reclassified = reclassifyForChronotype(records, opt.key);
+                  const changed = JSON.stringify(reclassified.map((r) => r.kind)) !== JSON.stringify(records.map((r) => r.kind));
+                  onUpdateProfile({ chronotype: opt.key });
+                  if (changed && onImportRecords) {
+                    onImportRecords(reclassified);
+                  }
+                }}
                 aria-pressed={active}
                 className={`flex-1 py-2.5 rounded-xl text-[11px] font-bold border transition-all cursor-pointer active:scale-95 ${
                   active ? `${theme.accentText} border ${theme.accentBorder}` : 'bg-slate-800 border-slate-600 text-slate-400'

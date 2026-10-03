@@ -25,7 +25,7 @@ const store = new Map<string, string>();
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const { sanitizeRecord } = await import(new URL('../src/utils/recordSanitize.ts', import.meta.url).href);
-const { mergeRecord, isNap, isNight, nightsOnly } = await import(new URL('../src/utils/recordFilter.ts', import.meta.url).href);
+const { mergeRecord, isNap, isNight, nightsOnly, deriveKind } = await import(new URL('../src/utils/recordFilter.ts', import.meta.url).href);
 const { computeRegularity } = await import(new URL('../src/utils/sleepRegularity.ts', import.meta.url).href);
 
 let failures = 0;
@@ -82,6 +82,22 @@ const rec = (id: string, date: string, kind?: 'nap' | 'night', dur = 480): any =
   check('反向自检：好坏实现结果可区分',
     JSON.stringify(mergeRecord([night], nap).map((r: any) => r.id).sort())
     !== JSON.stringify(badResult.map((r: any) => r.id).sort()));
+}
+
+// ── deriveKind × chronotype（第 21 轮 #1：策略必须看用户声明）──
+{
+  // 夜间（缺省）：日间就寝 → 小睡
+  check('deriveKind night 缺省：11:00 → nap', deriveKind(11, 'night') === 'nap');
+  check('deriveKind night 缺省：23:00 → night', deriveKind(23, 'night') === 'night');
+  // 白天为主：主睡就是主睡（11:00 / 14:00 / 18:00 就寝一律 night）
+  check('deriveKind day：11:00 → night（不再误标小睡）', deriveKind(11, 'day') === 'night');
+  check('deriveKind day：14:00 → night', deriveKind(14, 'day') === 'night');
+  check('deriveKind day：18:00 → night', deriveKind(18, 'day') === 'night');
+  // 不规律：不归类，一律当主睡（不丢弃数据）
+  check('deriveKind irregular：13:00 → night（不猜）', deriveKind(13, 'irregular') === 'night');
+  // 【反向】不传 chronotype → 走 night 缺省钟点规则 → 11:00 是 nap
+  // （证明 chronotype 参数真的生效，而不是摆设）
+  check('反向：不传 chronotype 时 11:00 → nap（参数生效证明）', deriveKind(11) === 'nap');
 }
 
 // ── 分析层对小睡免疫 ──

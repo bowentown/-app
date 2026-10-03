@@ -166,14 +166,17 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
 
   // 云端引擎注入的个人数据上下文（让云端回答引用真实数字）
   const personalCtx = useMemo(() => {
-    if (records.length === 0) return '';
     const recent = nightsOnly(records).slice(0, 7);
+    // 守卫必须用【过滤后的】列表：records 非空但全是小睡时，
+    // 除以 recent.length=0 会产出 NaN 并被当作个人数据发给 LLM
+    if (recent.length === 0) return '';
+    const latestNight = recent[0];
     const avg = (f: (r: SleepRecord) => number) => Math.round(recent.reduce((a, r) => a + f(r), 0) / recent.length);
     const parts = [
       `用户近${recent.length}晚平均评分${avg((r) => r.sleepScore)}分、平均时长${(avg((r) => r.durationMinutes) / 60).toFixed(1)}小时、深睡占比${Math.round(
         (avg((r) => r.deepSleepMinutes) / Math.max(1, avg((r) => r.durationMinutes))) * 100
       )}%`,
-      `最近一晚：就寝${records[0].bedtime}、醒来${records[0].wakeTime}、评分${records[0].sleepScore}分`,
+      `最近一晚：就寝${latestNight.bedtime}、醒来${latestNight.wakeTime}、评分${latestNight.sleepScore}分`,
     ];
     if (insights.length > 0 && insights[0].id !== 'start') {
       parts.push(`关键洞察：${insights[0].title}——${insights[0].body}`);
@@ -235,7 +238,7 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
     setIsSendingChat(true);
 
     try {
-      const latestRecord = records[0];
+      const latestRecord = nightsOnly(records)[0] ?? null;
       const cfg = userProfile.aiConfig;
       const customPersona =
         cfg?.systemPersona ||
@@ -474,7 +477,7 @@ export const AIAdvicePanel: React.FC<AIAdvicePanelProps> = ({ records, userProfi
       };
       setChatMessages((prev) => [...prev, aiReply]);
     } catch (_err) {
-      const localReplyText = generateLocalChatReply(text, records[0], records);
+      const localReplyText = generateLocalChatReply(text, nightsOnly(records)[0] ?? null, records);
       const aiReply: ChatMessage = {
         id: `ai-${Date.now()}`,
         role: 'assistant',

@@ -98,6 +98,10 @@ const baseRecords = [
   // 畸形时刻（缓存陈旧）：hour 不在合法窗 → 防御性拒绝
   const p7 = computeProposal({ usageDays: [{ date: '2026-10-02', lastActive: '15:00', firstActive: '17:00', nightPickups: 0 }], records: baseRecords, sessionActive: false });
   check('畸形缓存（午后事件）→ 防御性拒绝', p7 === null);
+  // gate 0：作息类型"不规律" → 完全不提议（第 21 轮 #4：调用点此前不传
+  // chronotype，gate 0 是死代码——接线后必须有此断言）
+  const p8 = computeProposal({ usageDays: [baseDay], records: baseRecords, sessionActive: false, chronotype: 'irregular' });
+  check('gate 0：不规律作息 → 完全不提议', p8 === null);
 }
 
 if (failures > 0) {

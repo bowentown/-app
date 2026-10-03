@@ -453,7 +453,8 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
 
       {/* 本周睡眠小结：填充留白 + 周维度可读洞察 */}
       {records.length > 0 && (() => {
-        const wk = records.slice(0, 7);
+        // 周小结只聚合夜睡（第 21 轮 #3：混入午睡会少报时长；全小睡时优雅降级）
+        const wk = nightsOnly(records).slice(0, 7);
         const reg = computeRegularity(records);
         const avgScoreWk = Math.round(wk.reduce((a, r) => a + r.sleepScore, 0) / wk.length);
         const avgDurWk = Math.round(wk.reduce((a, r) => a + r.durationMinutes, 0) / wk.length);
@@ -483,6 +484,11 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
                 <span>分享</span>
               </button>
             </div>
+            {wk.length === 0 ? (
+              <p className={`text-[11px] ${textMuted} leading-relaxed`}>
+                还没有夜睡记录——白天的午睡不计入周小结。
+              </p>
+            ) : (
             <div className="grid grid-cols-3 gap-2.5">
               <div className={`${innerBg} border ${innerBorder} rounded-2xl p-3`}>
                 <span className="text-[10px] text-slate-400 block mb-0.5">平均评分</span>
@@ -502,6 +508,7 @@ export const TrendsTab: React.FC<TrendsTabProps> = ({ records, onDeleteRecord, t
                 </span>
               </div>
             </div>
+            )}
             {reg ? (
               <div className={`${innerBg} border ${innerBorder} rounded-2xl p-3.5 space-y-1.5`}>
                 <div className="flex items-center justify-between">

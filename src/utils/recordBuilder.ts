@@ -24,6 +24,8 @@ export interface BuildInput {
   id: string;
   /** 记录来源（诚实标注）：一键就寝 / 手动补录 / 手机使用提议 */
   recordSource?: 'onetap' | 'manual' | 'usage';
+  /** 作息类型：决定 kind 归类（第 21 轮 #1——白天为主者的主睡不是小睡） */
+  chronotype?: 'night' | 'day' | 'irregular';
 }
 
 export interface BuiltRecord {
@@ -113,7 +115,7 @@ export function buildRecordFromWindow(input: BuildInput): BuiltRecord {
     wakingMood: exactDurationMinutes < 30 ? 'tired' : 'refreshed',
     preSleepHabits: [],
     stages: stagesForRecord,
-    kind: deriveKind(effectiveStart.getHours()) === 'nap' ? 'nap' : undefined,
+    kind: deriveKind(effectiveStart.getHours(), input.chronotype) === 'nap' ? 'nap' : undefined,
     ...(input.recordSource ? { recordSource: input.recordSource } : {}),
   } as SleepRecord;
 

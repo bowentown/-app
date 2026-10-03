@@ -32,7 +32,37 @@ export function mergeRecord(prev: SleepRecord[], next: SleepRecord): SleepRecord
     : [next, ...prev.filter((r) => !(r.date === next.date && !isNap(r)))];
 }
 
-/** 小睡判定（构建时归类）：日间就寝（本地 10:00–19:59 入睡）视为小睡。 */
-export function deriveKind(bedtimeLocalHour: number): 'night' | 'nap' {
+/**
+ * 小睡判定（构建时归类）。
+ * ★ 必须看用户声明的作息类型（第 21 轮 #1）：kind 是"哪一段是主睡"的
+ * 宣告，不该由钟点单方面决定——
+ *  - day/irregular：主睡就是主睡（一律 night，不丢弃数据）
+ *  - night（缺省）：日间就寝（本地 10:00–19:59）视为小睡
+ */
+export type Chronotype = 'night' | 'day' | 'irregular';
+export function deriveKind(bedtimeLocalHour: number, chronotype: Chronotype = 'night'): 'night' | 'nap' {
+  if (chronotype === 'day' || chronotype === 'irregular') return 'night';
   return bedtimeLocalHour >= 10 && bedtimeLocalHour < 20 ? 'nap' : 'night';
+}
+
+/**
+ * 切换作息类型时的存量重归类（只改归类，不删数据）：
+ *  - 切到 day：同一天【唯一】的小睡很可能是被误标的主睡 → 恢复为夜睡
+ *  - 切到 night：按钟点规则重新归类
+ *  - 切到 irregular：维持现状（不猜）
+ */
+export function reclassifyForChronotype(records: SleepRecord[], chronotype: Chronotype): SleepRecord[] {
+  if (chronotype === 'irregular') return records;
+  return records.map((r) => {
+    if (chronotype === 'day') {
+      if (r.kind !== 'nap') return r;
+      const sameDayOthers = records.filter((x) => x.date === r.date && x.id !== r.id && !isNap(x));
+      const isOnlySleepOnDate = !records.some((x) => x.date === r.date && x.id !== r.id);
+      // 同一天只有这一条睡 → 大概率是主睡，恢复夜睡；已有夜睡的保持小睡
+      return isOnlySleepOnDate || sameDayOthers.length === 0 ? { ...r, kind: undefined } : r;
+    }
+    // night：按钟点重判
+    const h = parseInt(r.bedtime.split(':')[0], 10);
+    return deriveKind(h, 'night') === 'nap' ? r : { ...r, kind: undefined };
+  });
 }

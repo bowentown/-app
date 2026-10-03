@@ -57,8 +57,9 @@ export const OneTapSleepTracker: React.FC<OneTapSleepTrackerProps> = ({ onSaveRe
       records,
       sessionActive: sleepStartTime !== null,
       handledDate,
+      chronotype: userProfile?.chronotype ?? 'night',
     }),
-    [usageDays, records, sleepStartTime, handledDate]
+    [usageDays, records, sleepStartTime, handledDate, userProfile?.chronotype]
   );
 
   const markHandled = () => {
@@ -76,6 +77,7 @@ export const OneTapSleepTracker: React.FC<OneTapSleepTrackerProps> = ({ onSaveRe
       targetDurationHours,
       id: `usage-${Date.now()}`,
       recordSource: 'usage',
+      chronotype: userProfile?.chronotype ?? 'night',
     });
     markHandled();
     setCompletedRecord(built.record);
@@ -135,6 +137,7 @@ export const OneTapSleepTracker: React.FC<OneTapSleepTrackerProps> = ({ onSaveRe
       targetDurationHours,
       id: `onetap-${Date.now()}`,
       recordSource: 'onetap',
+      chronotype: userProfile?.chronotype ?? 'night',
     });
     const newRecord = built.record;
     const sessionTruncated = built.truncated;

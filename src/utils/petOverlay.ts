@@ -106,7 +106,7 @@ function fmtDuration(min: number): string {
 /** 今晚是否已有记录（按 date 是否为今天判断）。 */
 function tonightRecord(records: SleepRecord[], now: Date): SleepRecord | undefined {
   const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  return records.find((r) => r.date === today);
+  return records.find((r) => r.date === today && r.kind !== 'nap');   // 夜睡才算"今晚已有记录"（小睡不顶掉）
 }
 
 /**
