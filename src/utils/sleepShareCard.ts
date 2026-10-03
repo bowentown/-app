@@ -262,6 +262,14 @@ export async function renderWeeklyCard(input: WeeklyCardInput): Promise<WeeklyCa
     ctx.font = '900 64px system-ui, sans-serif';
     ctx.fillText(`${Math.floor(avgDurationMin / 60)} 小时 ${avgDurationMin % 60} 分`, L.durX!, L.numY);
   }
+  // 规律度需要 ≥3 晚：开关开着但数据不足时，画一行诚实提示（不再静默缺席）
+  if (input.showRegularity && !regularity) {
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.font = '500 30px system-ui, sans-serif';
+    const hintY = input.showDuration && avgDurationMin !== null ? L.statsBottom + 34 : L.labelY;
+    ctx.fillText('作息规律度 · 记录满 3 晚后解锁', CARD_W / 2, hintY);
+  }
 
   // ── 宠物语录（planner 给保留带；实际行数在带内垂直居中。
   //    对齐纪律：每个文本块显式设 textAlign——地名签的 left 若泄漏，

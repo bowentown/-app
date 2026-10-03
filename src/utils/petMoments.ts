@@ -330,8 +330,10 @@ function pickLikes(): string[] {
 }
 
 function upsert(list: Moment[], m: Moment): Moment[] {
-  // 按 date 去重（与 ensureTodayMoment 的 existing 查找同键——按 id 曾产生僵尸重复）
-  return [m, ...list.filter((x) => x.date !== m.date)].slice(0, MAX_MOMENTS);
+  // 按 date 去重，但只去重【每日动态】——明信片动态（带 postcardId）与
+  // 今日动态同日期共存，此前整条按 date 顶掉，"生成今日动态"会删掉
+  // 早上发的旅行明信片
+  return [m, ...list.filter((x) => (x.postcardId ? true : x.date !== m.date))].slice(0, MAX_MOMENTS);
 }
 
 /**
@@ -348,7 +350,9 @@ export async function ensureTodayMoment(
   const list = loadMoments();
   const date = todayStr(now);
   const today = date;   // 供 lastNight 查找用（同一值）
-  const existing = list.find((m) => m.date === date);
+  // 找【每日动态】本身：明信片动态同日期且前插，find 不加限定会命中它，
+  // 把它的点赞/评论错搬到每日动态上
+  const existing = list.find((m) => m.date === date && !m.postcardId);
   if (existing && !force) return { moments: list, generated: false };
   const prevText = existing?.text;
 
